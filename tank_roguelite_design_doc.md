@@ -164,6 +164,60 @@ Durability vs weight tradeoff. Heavier armor = slower acceleration.
 
 ---
 
+## UI Direction — Retro-Futurist (Tron)
+
+The **gameplay world** is bright, cheerful, and toy-soldier. The **UI overlay** lives in a different register entirely: dark, geometric, futuristic — like looking through a targeting computer at a toy battlefield.
+
+This contrast is intentional. The split between a glowing cockpit HUD and a sunny plastic arena is its own kind of personality.
+
+**Mood**: Tron / cold-war command center. Dark, precise, neon-lit. Every panel feels like it was ripped from a prototype weapons system.
+
+**Color palette (UI only)**:
+| Element | Value |
+|---------|-------|
+| Primary neon | `#00e5ff` (electric cyan) |
+| Primary neon (dim) | `rgba(0, 229, 255, 0.5)` |
+| Primary neon (faint) | `rgba(0, 229, 255, 0.2)` |
+| Panel background | `rgba(0, 8, 20, 0.93)` |
+| Panel border | `rgba(0, 229, 255, 0.22)` |
+| Border (active/hover) | `rgba(0, 229, 255, 0.65)` |
+| Danger / death | `#ff2060` |
+| Hull integrity | `#00ff88` |
+| Body background | `#000810` |
+
+**Typography**:
+- Monospace throughout — no exceptions
+- Uppercase labels, wide letter-spacing (3–8px)
+- Glow via `text-shadow` — text that looks like it's emitting light, not reflecting it
+
+**Panels**:
+- Dark navy background, always semi-transparent
+- 1px neon border with subtle `box-shadow` glow
+- No decorative chrome, bevels, or drop shadows — just geometry and light
+
+**HUD bars**:
+- Thin (5px) neon line bars — not chunky health bars
+- Boost bar: electric cyan with glow
+- Hull bar: neon green with glow
+- Low health / low fuel: color shifts to danger red
+
+**Overlays (pause / death)**:
+- Dark translucent overlay, subtle `backdrop-filter: blur`
+- Large uppercase glowing text
+- Minimal button set with neon border → glow on hover
+
+**Atmosphere**:
+- Subtle CRT scanlines overlaid on the entire screen (very low opacity)
+- CRT power-off transition (already implemented) — keep as-is
+- Radial ambient glow on the menu (centered, very faint neon blue haze)
+
+**What this is NOT**:
+- Not garish neon-on-neon. One accent color (cyan) plus one danger color (red), everything else dark.
+- Not pixel art or 8-bit — the geometric precision is clean and modern, just with a 1982 soul.
+- The gameplay world's bright colors are completely separate from this system.
+
+---
+
 ## Game Feel Checklist
 
 Build these in EARLY, not as polish. They sell the genre.
