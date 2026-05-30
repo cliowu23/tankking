@@ -289,8 +289,11 @@ export default class ArenaScene {
 
     // Pause / restart
     window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;                                                         // ignore key-repeat — prevents instant toggle-back
       if (e.code !== 'Escape') return;
-      if (document.getElementById('menu').style.display !== 'none') return;
+      if (document.getElementById('menu').style.display   !== 'none') return;      // on menu
+      if (document.getElementById('death').style.display  === 'flex') return;      // dead — don't let ESC unpause behind death screen
+      if (document.getElementById('controls-screen').style.display === 'flex') return; // controls tutorial showing
       this._paused = !this._paused;
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
     });
@@ -648,21 +651,21 @@ export default class ArenaScene {
       for (const s of this.aiEnemy.shells) s.update(dt);
 
       // --- Barrel elevation ---
-      const MIN_ELEV = 10 * Math.PI / 180;
       const MAX_ELEV = 50 * Math.PI / 180;
       if (this.lockedEnemy) {
         const predicted  = this._predictTargetPos(this.lockedEnemy);
         const targetElev = this._elevationForTarget(predicted);
         this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-10 * dt));
-      } else if (this._charging) {
-        this._chargeTime = Math.min(this._chargeTime + dt, 1.5);
-        const progress = this._chargeTime / 1.5;
-        this.tank.barrelElevation = MIN_ELEV + progress * (MAX_ELEV - MIN_ELEV);
       } else {
-        // Hold elevation steady during recoil so the barrel kicks straight back,
-        // not downward. Only return to rest once recoil finishes.
-        if (this.tank._recoil <= 0) {
-          this.tank.barrelElevation *= Math.exp(-8 * dt);
+        // Cursor aim: elevate barrel to arc shell to where cursor points on the ground
+        const ray = this.scene.createPickingRay(
+          this.scene.pointerX, this.scene.pointerY, null, this.camera,
+        );
+        if (ray && Math.abs(ray.direction.y) > 0.0001) {
+          const t   = -ray.origin.y / ray.direction.y;
+          const pos = { x: ray.origin.x + t * ray.direction.x, z: ray.origin.z + t * ray.direction.z };
+          const targetElev = Math.max(0, Math.min(MAX_ELEV, this._elevationForTarget(pos)));
+          this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-20 * dt));
         }
       }
 
@@ -681,7 +684,6 @@ export default class ArenaScene {
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
-      this._updateArcPreview();
       this._updateLockRing(dt);
       this._updateCamera(dt);
       this._updateHUD();
@@ -931,33 +933,11 @@ export default class ArenaScene {
   _setupFiring() {
     this.shells        = Array.from({ length: 10 }, () => new Shell(this.scene));
     this._fireCooldown = 0;
-    this._charging     = false;
-    this._chargeTime   = 0;
-    this.tank._recoil  = 0; // 0=rest, 1=just fired; drives barrel kick animation
+    this.tank._recoil  = 0;
 
-    // Arc preview dots — shown during free-aim charge only
-    const dotMat = new StandardMaterial('arcDotMat', this.scene);
-    dotMat.diffuseColor  = new Color3(1.0, 0.55, 0.1);
-    dotMat.emissiveColor = new Color3(0.7, 0.22, 0.0);
-    dotMat.alpha = 0.72;
-    this.arcDots = Array.from({ length: 20 }, (_, i) => {
-      const dot = MeshBuilder.CreateSphere(`arcDot${i}`, { diameter: 0.14, segments: 4 }, this.scene);
-      dot.material  = dotMat;
-      dot.isVisible = false;
-      return dot;
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Space' || this._charging) return;
-      this._charging   = true;
-      this._chargeTime = 0;
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.code !== 'Space' || !this._charging) return;
+    document.getElementById('renderCanvas').addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || this._paused) return;
       if (this._fireCooldown <= 0) this._shoot();
-      this._charging   = false;
-      this._chargeTime = 0;
     });
   }
 
@@ -1008,49 +988,18 @@ export default class ArenaScene {
     const HSPEED = 16;
     const aim    = this.tank.turretAimAngle;
 
-    // Locked on: always use auto-elevation, full range
-    // Free aim tap (<0.15s): flat 8-unit close-range shot
-    // Free aim hold: ballistic arc using charged elevation
-    const isTap      = !this.lockedEnemy && this._chargeTime < 0.15;
     const azSpread   = (Math.random() - 0.5) * 2 * this.tank.dispersion;
     const elevSpread = (Math.random() - 0.5) * 2 * this.tank.dispersion;
-    const vx         = Math.sin(aim + azSpread) * HSPEED;
-    const vz         = Math.cos(aim + azSpread) * HSPEED;
-    const vy         = isTap ? 2.5 : Math.tan(this.tank.barrelElevation + elevSpread) * HSPEED;
-    const maxRange   = isTap ? 8 : 0;
+    const vx = Math.sin(aim + azSpread) * HSPEED;
+    const vz = Math.cos(aim + azSpread) * HSPEED;
+    const vy = Math.tan(this.tank.barrelElevation + elevSpread) * HSPEED;
 
-    shell.fire(tip.x, tip.y, tip.z, vx, vy, vz, maxRange);
+    shell.fire(tip.x, tip.y, tip.z, vx, vy, vz, 0);
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;
     this.tank._recoil = 1.0;
   }
 
-  _updateArcPreview() {
-    if (!this._charging || this.lockedEnemy) {
-      for (const dot of this.arcDots) dot.isVisible = false;
-      return;
-    }
-    const tip    = this._barrelTip();
-    const HSPEED = 16;
-    const aim    = this.tank.turretAimAngle;
-    const vx     = Math.sin(aim) * HSPEED;
-    const vz     = Math.cos(aim) * HSPEED;
-    const vy     = Math.tan(this.tank.barrelElevation) * HSPEED;
-    const DT     = 0.1;
-
-    for (let i = 0; i < this.arcDots.length; i++) {
-      const t = (i + 1) * DT;
-      const y = tip.y + vy * t - 0.5 * SHELL_GRAVITY * t * t;
-      if (y < 0.05) {
-        for (let j = i; j < this.arcDots.length; j++) this.arcDots[j].isVisible = false;
-        return;
-      }
-      this.arcDots[i].isVisible = true;
-      this.arcDots[i].position.set(tip.x + vx * t, y, tip.z + vz * t);
-      // Taper: larger near muzzle, smaller toward impact
-      this.arcDots[i].scaling.setAll(1 - 0.55 * (i / this.arcDots.length));
-    }
-  }
 
   _checkShellHits() {
     // AI shells hitting the player
