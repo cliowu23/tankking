@@ -78,7 +78,7 @@ function exitDesigner() {
 document.addEventListener('keydown', (e) => {
   // Controls screen intercepts Enter/Space — dismiss before anything else
   if (document.getElementById('controls-screen').style.display === 'flex') {
-    if (e.code === 'Enter' || e.code === 'Space') dismissControls();
+    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') dismissControls();
     return;
   }
   if (document.getElementById('menu').style.display !== 'none') {
