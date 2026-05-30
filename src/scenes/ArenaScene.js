@@ -400,13 +400,16 @@ export default class ArenaScene {
         // is not useful for height. Only correct X and Z (the "too far forward" issue).
         const rootInv = Matrix.Invert(this.tank.root.getWorldMatrix());
         const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
+        const pivotZShift = config.turretPivotZOffset ?? 0;
         this.tank.turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
-        this.tank.turretPivot.position.z = localPos.z;
+        this.tank.turretPivot.position.z = localPos.z + pivotZShift;
         // Use GLB turret node Y if it carries meaningful height (explicitly placed pivot),
         // otherwise fall back to Tank.js default (0.55) for models where node Y ≈ 0.
         if (localPos.y > 0.3) this.tank.turretPivot.position.y = localPos.y;
         this.tank.turretPivot.computeWorldMatrix(true);
-        turretNode.position.setAll(0); // ring is now at pivot — rotates in-place
+        // Zero turret node position but compensate for pivot shift so the turret MESH
+        // stays at its original world position — only the rotation centre moves forward.
+        turretNode.position.set(0, 0, -pivotZShift);
         turretNode.computeWorldMatrix(true);
         // Propagate to all descendants (mountNode is still under turretNode)
         result.transformNodes.forEach(n => n.computeWorldMatrix(true));
