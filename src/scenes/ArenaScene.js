@@ -83,29 +83,25 @@ export default class ArenaScene {
   _setupGround() {
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
 
-    // Arena grid — medium gray with white court lines
-    const groundTex = new DynamicTexture('groundTex', { width: 512, height: 512 }, this.scene);
+    // Arena grid — medium gray tile with white border + subtle inner dividers
+    const groundTex = new DynamicTexture('groundTex', { width: 128, height: 128 }, this.scene);
     const ctx = groundTex.getContext();
 
     // Base
     ctx.fillStyle = '#484852';
-    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillRect(0, 0, 128, 128);
 
-    // Minor grid — subtle, every 64px (~1.25 game units)
-    ctx.strokeStyle = 'rgba(255,255,255,0.09)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 512; i += 64) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
-    }
+    // Subtle inner cross — divides tile into 4 (~2.5 unit subdivisions)
+    ctx.fillStyle = '#535360';
+    ctx.fillRect(63, 0, 2, 128);
+    ctx.fillRect(0, 63, 128, 2);
 
-    // Major grid — bold white, every 256px (~5 game units)
-    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i <= 512; i += 256) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
-    }
+    // Bold white tile border — this becomes the court line grid
+    ctx.fillStyle = '#c8c8d8';
+    ctx.fillRect(0, 0, 128, 2);    // top
+    ctx.fillRect(0, 126, 128, 2);  // bottom
+    ctx.fillRect(0, 0, 2, 128);    // left
+    ctx.fillRect(126, 0, 2, 128);  // right
 
     groundTex.update();
     groundTex.uScale = 10;
@@ -307,9 +303,10 @@ export default class ArenaScene {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;                                                         // ignore key-repeat — prevents instant toggle-back
       if (e.code !== 'Escape') return;
-      if (document.getElementById('menu').style.display   !== 'none') return;      // on menu
-      if (document.getElementById('death').style.display  === 'flex') return;      // dead — don't let ESC unpause behind death screen
-      if (document.getElementById('controls-screen').style.display === 'flex') return; // controls tutorial showing
+      if (document.getElementById('menu').style.display        !== 'none') return; // on menu
+      if (document.getElementById('designer-ui').style.display !== 'none') return; // inspector open
+      if (document.getElementById('death').style.display       === 'flex') return; // dead
+      if (document.getElementById('controls-screen').style.display === 'flex') return; // controls tutorial
       this._paused = !this._paused;
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
     });

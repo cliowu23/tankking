@@ -93,13 +93,16 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('controls-start').addEventListener('click', dismissControls);
 
 document.getElementById('menu-designer').addEventListener('click', startDesigner);
+// TEMP: auto-start for screenshot
+setTimeout(() => { startGame(); setTimeout(() => { document.getElementById('controls-screen').style.display = 'none'; }, 100); }, 800);
 
 document.getElementById('pause-menu').addEventListener('click', goToMenu);
 document.getElementById('death-menu').addEventListener('click',  goToMenu);
 
 function autoPause() {
   if (!arenaScene || arenaScene._paused) return;
-  if (document.getElementById('menu').style.display !== 'none') return;
+  if (document.getElementById('menu').style.display        !== 'none') return;
+  if (document.getElementById('designer-ui').style.display !== 'none') return; // inspector open
   arenaScene._paused = true;
   document.getElementById('pause').style.display = 'flex';
 }
