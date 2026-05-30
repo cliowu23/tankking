@@ -250,18 +250,20 @@
     }
     #designer-topbar-spacer { flex: 1; }
     #designer-hint-top { color: var(--dim); font-size: 7px; letter-spacing: 0px; line-height: 1.6; }
+    #designer-controls-hint { color: var(--dim); font-size: 9px; letter-spacing: 0px; line-height: 1.6; }
 
     #designer-sidebar {
-      position: fixed; left: 0; top: 0; bottom: 0; width: 160px;
+      position: fixed; left: 0; top: 38px; bottom: 0; width: 180px;
       background: var(--panel);
       border-right: 2px solid var(--accent);
       padding: 14px 10px 14px;
       display: flex; flex-direction: column; gap: 4px;
       pointer-events: auto; overflow-y: auto;
+      z-index: 6;
     }
     .ds-title {
       color: var(--dim);
-      font-size: 7px;
+      font-size: 9px;
       letter-spacing: 1px;
       padding: 8px 2px 4px;
       text-transform: uppercase;
@@ -547,11 +549,14 @@
   <div id="designer-vignette"></div>
   <div id="designer-ui">
     <div id="designer-topbar">
-      <span id="designer-title">TANK DESIGNER</span>
+      <span id="designer-title">MODEL INSPECTOR</span>
       <span id="designer-topbar-spacer"></span>
+      <span id="designer-controls-hint">A / D &mdash; TURRET &nbsp;|&nbsp; W / S &mdash; ELEVATION &nbsp;|&nbsp; SCROLL / = / - &mdash; ZOOM</span>
       <button id="designer-exit-btn" class="editor-btn">EXIT [ESC]</button>
     </div>
   </div>
+
+  <div id="designer-sidebar" style="display:none"></div>
 
   <div id="editor-ui">
     <div id="editor-toolbar">
@@ -590,14 +595,12 @@
           <div class="ctrl-row"><span class="key">A / D</span><span class="ctrl-desc">Rotate hull</span></div>
           <div class="ctrl-row"><span class="key">SHIFT tap</span><span class="ctrl-desc">Dash boost</span></div>
           <div class="ctrl-row"><span class="key">SHIFT hold</span><span class="ctrl-desc">Sustained boost</span></div>
-          <div class="ctrl-row"><span class="key">W + SHIFT + A/D</span><span class="ctrl-desc">Spin boost</span></div>
         </div>
 
         <div class="controls-divider"></div>
 
         <div class="controls-col">
           <div class="ctrl-section-title">COMBAT</div>
-          <div class="ctrl-row"><span class="key">MOUSE</span><span class="ctrl-desc">Aim turret</span></div>
           <div class="ctrl-row"><span class="key">SPACE hold</span><span class="ctrl-desc">Charge shot — raises barrel</span></div>
           <div class="ctrl-row"><span class="key">SPACE release</span><span class="ctrl-desc">Fire at current elevation</span></div>
           <div class="ctrl-row"><span class="key">F hold</span><span class="ctrl-desc">Lock on to nearest enemy</span></div>

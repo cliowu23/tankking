@@ -3,9 +3,11 @@
     "root": "Sketchfab_model",
     "turret": "turret",
     "mount": "mount",
-    "facingAxis": "+X"
+    "facingAxis": "+X",
+    "elevationDeg": 18,
+    "depressionDeg": 5
   },
-"m26_pershing_war_thunder.glb": {
+  "m26_pershing_war_thunder.glb": {
     "root": "Sketchfab_model",
     "turret": "turret",
     "mount": "mount",
@@ -14,6 +16,8 @@
     "zCenterAdjust": 1.05,
     "turretPivotZOffset": 0.78,
     "barrelTipOffset": 3.8,
-    "centerTurretX": true
+    "centerTurretX": true,
+    "elevationDeg": 20,
+    "depressionDeg": 10
   }
 }
