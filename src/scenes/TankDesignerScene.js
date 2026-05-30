@@ -1,8 +1,9 @@
 import {
   Scene, ArcRotateCamera, HemisphericLight, DirectionalLight,
   ShadowGenerator, MeshBuilder, StandardMaterial, Color3, Color4,
-  Vector3, DynamicTexture,
+  Vector3, Matrix, DynamicTexture, TransformNode, SceneLoader, Quaternion,
 } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 
 const PAD_Y = 0.06;
 
@@ -13,20 +14,31 @@ export default class TankDesignerScene {
     this.scene   = new Scene(engine);
     this.scene.clearColor = new Color4(0.84, 0.90, 0.96, 1.0);
 
+    this._turretPivot = null;
+    this._barrelPivot = null;
+    this._toDispose   = [];
+    this._activeBtn   = null;
+    this._keys        = {};
+    this._barrelUp    = -0.349; // max upward rotation.x (−20° default)
+    this._barrelDown  =  0.175; // max downward rotation.x (+10° default)
+
     this._setupCamera();
     this._setupLighting();
     this._setupRoom();
+    this._setupControls();
     this._setupUI();
+    this._populateSidebar();
   }
 
   _setupCamera() {
     const canvas = this._engine.getRenderingCanvas();
     this.camera = new ArcRotateCamera('designCam',
-      -Math.PI / 4, 0.82, 30, new Vector3(0, 2, 0), this.scene);
-    this.camera.lowerRadiusLimit = 6;
-    this.camera.upperRadiusLimit = 55;
-    this.camera.lowerBetaLimit   = 0.15;
-    this.camera.upperBetaLimit   = Math.PI / 2.05;
+      -Math.PI / 4, 0.72, 12, new Vector3(0, 1.5, 0), this.scene);
+    this.camera.lowerRadiusLimit      = 2;
+    this.camera.upperRadiusLimit      = 50;
+    this.camera.lowerBetaLimit        = 0.05;
+    this.camera.upperBetaLimit        = Math.PI / 2.05;
+    this.camera.wheelDeltaPercentage  = 0.01; // smooth scroll zoom
     this.camera.attachControl(canvas, true);
   }
 
@@ -65,11 +77,10 @@ export default class TankDesignerScene {
       leg.material = woodMat;
     }
 
-    // ── Blueprint pad with Under Construction text ────────────────────────
+    // ── Blueprint pad ─────────────────────────────────────────────────────
     const padTex = new DynamicTexture('padTex', { width: 512, height: 512 }, this.scene);
     const ctx    = padTex.getContext();
 
-    // Paper base
     ctx.fillStyle = '#f7f8fb';
     ctx.fillRect(0, 0, 512, 512);
 
@@ -91,15 +102,16 @@ export default class TankDesignerScene {
       ctx.beginPath(); ctx.moveTo(0, v); ctx.lineTo(512, v); ctx.stroke();
     }
 
-    // Under Construction text
+    // Center crosshair — forward direction indicator
+    ctx.strokeStyle = '#7aaedd';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(256, 130); ctx.lineTo(256, 382); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(130, 256); ctx.lineTo(382, 256); ctx.stroke();
+    ctx.fillStyle    = '#2a5a90';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle    = '#2a5a90';
-    ctx.font         = 'bold 34px monospace';
-    ctx.fillText('UNDER CONSTRUCTION', 256, 230);
-    ctx.fillStyle = '#7aaedd';
-    ctx.font      = '16px monospace';
-    ctx.fillText('tank designer — coming soon', 256, 278);
+    ctx.font         = 'bold 13px monospace';
+    ctx.fillText('FWD', 256, 112);
 
     padTex.update();
 
@@ -184,11 +196,356 @@ export default class TankDesignerScene {
     setSquare.isPickable = false;
   }
 
+  _setupControls() {
+    this._onKeyDown = (e) => { this._keys[e.code] = true; };
+    this._onKeyUp   = (e) => { this._keys[e.code] = false; };
+    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keyup',   this._onKeyUp);
+
+    this.scene.registerBeforeRender(() => {
+      if (!this._turretPivot) return;
+      const dt = this._engine.getDeltaTime() / 1000;
+
+      // Turret traverse
+      if (this._keys['KeyA']) this._turretPivot.rotation.y -= 1.2 * dt;
+      if (this._keys['KeyD']) this._turretPivot.rotation.y += 1.2 * dt;
+
+      // Barrel elevation — negative X = up, positive X = down (matches ArenaScene)
+      // _barrelUp / _barrelDown are set per-model from manifest elevationDeg / depressionDeg
+      if (this._barrelPivot) {
+        if (this._keys['KeyW'])
+          this._barrelPivot.rotation.x = Math.max(this._barrelUp,  this._barrelPivot.rotation.x - 0.5 * dt);
+        if (this._keys['KeyS'])
+          this._barrelPivot.rotation.x = Math.min(this._barrelDown, this._barrelPivot.rotation.x + 0.5 * dt);
+      }
+
+      // Keyboard zoom (= to zoom in, - to zoom out)
+      if (this._keys['Equal'] || this._keys['NumpadAdd'])
+        this.camera.radius = Math.max(2,  this.camera.radius - 10 * dt);
+      if (this._keys['Minus'] || this._keys['NumpadSubtract'])
+        this.camera.radius = Math.min(50, this.camera.radius + 10 * dt);
+    });
+  }
+
   _setupUI() {
     document.getElementById('designer-exit-btn').addEventListener('click', () => this._onExit());
   }
 
+  _populateSidebar() {
+    fetch('/models/manifest.json')
+      .then(r => r.json())
+      .catch(() => ({}))
+      .then(manifest => {
+        const sidebar = document.getElementById('designer-sidebar');
+        sidebar.innerHTML = '';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'ds-title';
+        titleEl.textContent = 'MODELS';
+        sidebar.appendChild(titleEl);
+
+        const divEl = document.createElement('div');
+        divEl.className = 'ds-divider';
+        sidebar.appendChild(divEl);
+
+        // Default primitive tank — always first
+        const primBtn = document.createElement('button');
+        primBtn.className = 'shape-btn';
+        primBtn.textContent = 'DEFAULT TANK';
+        primBtn.addEventListener('click', () => this._loadPrimitive(primBtn));
+        sidebar.appendChild(primBtn);
+
+        const div2 = document.createElement('div');
+        div2.className = 'ds-divider';
+        sidebar.appendChild(div2);
+
+        for (const [filename, config] of Object.entries(manifest)) {
+          const label = filename
+            .replace('.glb', '')
+            .replace(/_war_thunder/gi, '')
+            .replace(/_/g, ' ')
+            .trim()
+            .toUpperCase();
+
+          const btn = document.createElement('button');
+          btn.className = 'shape-btn';
+          btn.textContent = label;
+          btn.addEventListener('click', () => this._loadModel(filename, config, btn, label));
+          sidebar.appendChild(btn);
+        }
+
+        // Auto-load primitive on open
+        this._loadPrimitive(primBtn);
+      });
+  }
+
+  _loadPrimitive(btn) {
+    if (this._activeBtn) this._activeBtn.classList.remove('active');
+    if (btn) { btn.classList.add('active'); this._activeBtn = btn; }
+
+    this._clearCurrentModel();
+
+    const hullMat = new StandardMaterial('primHull', this.scene);
+    hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
+    hullMat.specularColor = new Color3(0.05, 0.15, 0.30);
+
+    const turretMat = new StandardMaterial('primTurret', this.scene);
+    turretMat.diffuseColor  = new Color3(0.08, 0.32, 0.75);
+    turretMat.specularColor = new Color3(0.03, 0.10, 0.25);
+
+    const trackMat = new StandardMaterial('primTrack', this.scene);
+    trackMat.diffuseColor  = new Color3(0.12, 0.12, 0.12);
+    trackMat.specularColor = new Color3(0.04, 0.04, 0.04);
+
+    const modelRoot = new TransformNode('primRoot', this.scene);
+    modelRoot.position.set(0, PAD_Y + 0.01, 0);
+
+    const turretPivot = new TransformNode('primTurretPivot', this.scene);
+    turretPivot.position.set(0, 0.55, 0);
+    turretPivot.parent = modelRoot;
+    this._turretPivot = turretPivot;
+
+    const barrelPivot = new TransformNode('primBarrelPivot', this.scene);
+    barrelPivot.position.set(0, 0.3, 0.6);
+    barrelPivot.parent = turretPivot;
+    this._barrelPivot = barrelPivot;
+
+    const add = (mesh) => {
+      mesh.receiveShadows = true;
+      this.shadowGen.addShadowCaster(mesh);
+      this._toDispose.push(mesh);
+      return mesh;
+    };
+
+    // Hull
+    const hullLower = MeshBuilder.CreateBox('primHullLower', { width: 2.55, height: 0.20, depth: 3.20 }, this.scene);
+    hullLower.position.set(0, 0.10, 0); hullLower.material = hullMat; hullLower.parent = modelRoot; add(hullLower);
+
+    const hull = MeshBuilder.CreateBox('primHull', { width: 2.40, height: 0.50, depth: 3.20 }, this.scene);
+    hull.position.set(0, 0.35, 0); hull.material = hullMat; hull.parent = modelRoot; add(hull);
+
+    const hullTop = MeshBuilder.CreateBox('primHullTop', { width: 2.20, height: 0.08, depth: 2.40 }, this.scene);
+    hullTop.position.set(0, 0.615, -0.20); hullTop.material = hullMat; hullTop.parent = modelRoot; add(hullTop);
+
+    const frontSlope = MeshBuilder.CreateBox('primFrontSlope', { width: 2.20, height: 0.65, depth: 0.55 }, this.scene);
+    frontSlope.position.set(0, 0.35, 1.30); frontSlope.rotation.x = -Math.PI * 0.22;
+    frontSlope.material = hullMat; frontSlope.parent = modelRoot; add(frontSlope);
+
+    const engineDeck = MeshBuilder.CreateBox('primEngineDeck', { width: 1.80, height: 0.10, depth: 0.70 }, this.scene);
+    engineDeck.position.set(0, 0.62, -1.20); engineDeck.material = hullMat; engineDeck.parent = modelRoot; add(engineDeck);
+
+    const trackL = MeshBuilder.CreateBox('primTrackL', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
+    trackL.position.set(-1.26, 0.325, 0); trackL.material = trackMat; trackL.parent = modelRoot; add(trackL);
+
+    const trackR = MeshBuilder.CreateBox('primTrackR', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
+    trackR.position.set(1.26, 0.325, 0); trackR.material = trackMat; trackR.parent = modelRoot; add(trackR);
+
+    const skirtL = MeshBuilder.CreateBox('primSkirtL', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
+    skirtL.position.set(-1.42, 0.125, 0); skirtL.material = trackMat; skirtL.parent = modelRoot; add(skirtL);
+
+    const skirtR = MeshBuilder.CreateBox('primSkirtR', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
+    skirtR.position.set(1.42, 0.125, 0); skirtR.material = trackMat; skirtR.parent = modelRoot; add(skirtR);
+
+    for (const wz of [-1.0, -0.33, 0.33, 1.0]) {
+      for (const wx of [-1.26, 1.26]) {
+        const w = MeshBuilder.CreateCylinder(`primWheel_${wx}_${wz}`, { height: 0.10, diameter: 0.32, tessellation: 10 }, this.scene);
+        w.rotation.z = Math.PI / 2; w.position.set(wx, 0.18, wz);
+        w.material = trackMat; w.parent = modelRoot; add(w);
+      }
+    }
+
+    // Turret
+    const turretBody = MeshBuilder.CreateBox('primTurretBody', { width: 1.15, height: 0.38, depth: 1.20 }, this.scene);
+    turretBody.position.set(0, 0.16, 0.05); turretBody.material = turretMat; turretBody.parent = turretPivot; add(turretBody);
+
+    const turretRoof = MeshBuilder.CreateBox('primTurretRoof', { width: 1.00, height: 0.12, depth: 1.00 }, this.scene);
+    turretRoof.position.set(0, 0.38, 0.00); turretRoof.material = turretMat; turretRoof.parent = turretPivot; add(turretRoof);
+
+    const turretFace = MeshBuilder.CreateBox('primTurretFace', { width: 1.10, height: 0.34, depth: 0.18 }, this.scene);
+    turretFace.position.set(0, 0.22, 0.62); turretFace.rotation.x = -Math.PI * 0.12;
+    turretFace.material = turretMat; turretFace.parent = turretPivot; add(turretFace);
+
+    const mantlet = MeshBuilder.CreateCylinder('primMantlet', { height: 0.28, diameter: 0.65, tessellation: 10 }, this.scene);
+    mantlet.rotation.x = Math.PI / 2; mantlet.position.set(0, 0.16, 0.72);
+    mantlet.material = turretMat; mantlet.parent = turretPivot; add(mantlet);
+
+    const cupola = MeshBuilder.CreateCylinder('primCupola', { height: 0.16, diameterBottom: 0.35, diameterTop: 0.28, tessellation: 8 }, this.scene);
+    cupola.position.set(0.12, 0.42, -0.10); cupola.material = turretMat; cupola.parent = turretPivot; add(cupola);
+
+    // Barrel
+    const barrel = MeshBuilder.CreateCylinder('primBarrel', { height: 2.4, diameterBottom: 0.18, diameterTop: 0.12, tessellation: 8 }, this.scene);
+    barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0, 1.2);
+    barrel.material = turretMat; barrel.parent = barrelPivot; add(barrel);
+
+    const muzzle = MeshBuilder.CreateCylinder('primMuzzle', { height: 0.18, diameter: 0.26, tessellation: 8 }, this.scene);
+    muzzle.rotation.x = Math.PI / 2; muzzle.position.set(0, 0, 2.28);
+    muzzle.material = turretMat; muzzle.parent = barrelPivot; add(muzzle);
+
+    this._toDispose.push(modelRoot, turretPivot, barrelPivot, hullMat, turretMat, trackMat);
+
+    // Generic tank limits for the primitive placeholder
+    this._barrelUp   = -20 * Math.PI / 180; // −20° (up)
+    this._barrelDown =  10 * Math.PI / 180; // +10° (down)
+    barrelPivot.rotation.x = 0;
+
+    this.camera.target = new Vector3(0, 0.8, 0);
+    this.camera.radius = 10;
+    this.camera.alpha  = -Math.PI / 4;
+    this.camera.beta   = 0.72;
+  }
+
+  _clearCurrentModel() {
+    for (const item of this._toDispose) {
+      if (item) item.dispose();
+    }
+    this._toDispose   = [];
+    this._turretPivot = null;
+    this._barrelPivot = null;
+  }
+
+  _loadModel(filename, config, btn, label) {
+    if (this._activeBtn) this._activeBtn.classList.remove('active');
+    btn.classList.add('active');
+    this._activeBtn = btn;
+
+    this._clearCurrentModel();
+
+    const rootName   = config.root       ?? 'Sketchfab_model';
+    const turretName = config.turret     ?? 'turret';
+    const mountName  = config.mount      ?? 'mount';
+    const facingAxis = config.facingAxis ?? '+X';
+    const yRotMap    = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
+    const yRot       = yRotMap[facingAxis] ?? -Math.PI / 2;
+
+    SceneLoader.ImportMeshAsync('', '/models/', filename, this.scene).then(result => {
+      const glbRoot    = result.transformNodes.find(n => n.name === rootName)
+        ?? result.transformNodes.find(n => n.name !== '__root__' && !n.parent);
+      const turretNode = result.transformNodes.find(n => n.name === turretName)
+        ?? result.transformNodes.find(n => /turret|tower|gun.base/i.test(n.name));
+      const mountNode  = result.transformNodes.find(n => n.name === mountName)
+        ?? result.transformNodes.find(n => /mount|barrel|gun|cannon|tube|weapon/i.test(n.name));
+
+      if (!glbRoot) { console.error(`[Inspector] no root in ${filename}`); return; }
+
+      // Track meshes for disposal on model switch (rendered geometry must go).
+      // Transform nodes are intentionally NOT disposed — orphaning them avoids
+      // corrupting Babylon's node registry, which breaks reloads of the same GLB.
+      this._toDispose.push(...result.meshes);
+
+      // 1. Orientation
+      const correction = Quaternion.RotationAxis(Vector3.Up(), yRot);
+      glbRoot.rotationQuaternion = glbRoot.rotationQuaternion
+        ? correction.multiply(glbRoot.rotationQuaternion)
+        : correction;
+
+      // 2. Force world matrices
+      result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      result.meshes.forEach(m => m.computeWorldMatrix(true));
+
+      // 3. Bounding box
+      let minX=Infinity, minY=Infinity, minZ=Infinity;
+      let maxX=-Infinity, maxY=-Infinity, maxZ=-Infinity;
+      for (const m of result.meshes) {
+        if (m.name === '__root__') continue;
+        const w = m.getBoundingInfo().boundingBox;
+        if (w.minimumWorld.x < minX) minX = w.minimumWorld.x;
+        if (w.minimumWorld.y < minY) minY = w.minimumWorld.y;
+        if (w.minimumWorld.z < minZ) minZ = w.minimumWorld.z;
+        if (w.maximumWorld.x > maxX) maxX = w.maximumWorld.x;
+        if (w.maximumWorld.y > maxY) maxY = w.maximumWorld.y;
+        if (w.maximumWorld.z > maxZ) maxZ = w.maximumWorld.z;
+      }
+
+      // 4. Scale — same formula as arena for 1:1 comparison
+      const targetWidth = config.targetWidth ?? 2.4;
+      const scale = targetWidth / (maxX - minX);
+      const offX  = -((maxX + minX) / 2) * scale;
+      const offY  = -minY * scale;
+      const offZ  = -((maxZ + minZ) / 2) * scale + (config.zCenterAdjust ?? 0);
+
+      // 5. Create inspector pivot nodes
+      const modelRoot   = new TransformNode('inspRoot',   this.scene);
+      const turretPivot = new TransformNode('inspTurret', this.scene);
+      const barrelPivot = new TransformNode('inspBarrel', this.scene);
+      modelRoot.position.set(0, PAD_Y + 0.01, 0);
+      turretPivot.position.set(0, 0.55, 0);
+      barrelPivot.position.set(0, 0.3,  0);
+      turretPivot.parent = modelRoot;
+      barrelPivot.parent = turretPivot;
+      this._toDispose.push(modelRoot, turretPivot, barrelPivot);
+      this._turretPivot = turretPivot;
+      this._barrelPivot = barrelPivot;
+
+      // 6. Attach GLB to inspector root
+      glbRoot.parent = modelRoot;
+      glbRoot.scaling.setAll(scale);
+      glbRoot.position.set(offX, offY, offZ);
+
+      result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      result.meshes.forEach(m => m.computeWorldMatrix(true));
+
+      const turretAbsPos = turretNode ? turretNode.absolutePosition.clone() : null;
+      const mountAbsPos  = mountNode  ? mountNode.absolutePosition.clone()  : null;
+
+      // 7a. Turret pivot — same logic as arena loader
+      if (turretNode) {
+        turretNode.setParent(turretPivot);
+        const rootInv = Matrix.Invert(modelRoot.getWorldMatrix());
+        const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
+        const pivotZShift = config.turretPivotZOffset ?? 0;
+        turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
+        turretPivot.position.z = localPos.z + pivotZShift;
+        if (localPos.y > 0.3) turretPivot.position.y = localPos.y;
+        turretPivot.computeWorldMatrix(true);
+        turretNode.position.set(0, 0, -pivotZShift);
+        turretNode.computeWorldMatrix(true);
+        result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      }
+
+      // 7b. Barrel pivot
+      if (mountNode) {
+        mountNode.setParent(barrelPivot);
+        const tpInv = Matrix.Invert(turretPivot.getWorldMatrix());
+        const localPos = Vector3.TransformCoordinates(mountAbsPos, tpInv);
+        barrelPivot.position.x = 0;
+        barrelPivot.position.z = localPos.z;
+        if (localPos.y > 0) barrelPivot.position.y = localPos.y;
+        barrelPivot.computeWorldMatrix(true);
+        mountNode.position.setAll(0);
+      }
+
+      // 8. Shadows
+      for (const m of result.meshes) {
+        if (m.name === '__root__') continue;
+        this.shadowGen.addShadowCaster(m);
+        m.receiveShadows = true;
+      }
+
+      // 9. Set accurate elevation limits from manifest (degrees → radians)
+      const toRad = d => d * Math.PI / 180;
+      this._barrelUp   = -toRad(config.elevationDeg  ?? 20);
+      this._barrelDown =  toRad(config.depressionDeg ?? 10);
+      // Reset barrel to rest when switching models
+      barrelPivot.rotation.x = 0;
+
+      // 10. Auto-frame camera
+      const modelH = (maxY - minY) * scale;
+      this.camera.target = new Vector3(0, modelH * 0.45, 0);
+      this.camera.radius = Math.max(6, modelH * 3.2);
+
+      // 10. Log pivot values — paste directly into manifest.json for tuning
+      const tp = turretPivot.position;
+      const bp = barrelPivot.position;
+      console.log(`[Inspector] ${filename}: scale=${scale.toFixed(4)}, w=${(maxX-minX).toFixed(2)}`);
+      console.log(`[Inspector] turretPivot: x=${tp.x.toFixed(3)} y=${tp.y.toFixed(3)} z=${tp.z.toFixed(3)}`);
+      console.log(`[Inspector] barrelPivot: x=${bp.x.toFixed(3)} y=${bp.y.toFixed(3)} z=${bp.z.toFixed(3)}`);
+
+    }).catch(e => console.error(`[Inspector] ${filename} failed:`, e));
+  }
+
   dispose() {
+    window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('keyup',   this._onKeyUp);
     this.scene.dispose();
   }
 }

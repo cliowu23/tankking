@@ -58,8 +58,9 @@ function startDesigner() {
   document.getElementById('menu').style.display   = 'none';
   document.getElementById('hud').style.display    = 'none';
   canvas.style.display = 'block';
-  document.getElementById('designer-ui').style.display        = 'flex';
-  document.getElementById('designer-vignette').style.display  = 'block';
+  document.getElementById('designer-ui').style.display       = 'flex';
+  document.getElementById('designer-vignette').style.display = 'block';
+  document.getElementById('designer-sidebar').style.display  = 'flex';
 
   if (!designerScene) designerScene = new TankDesignerScene(engine, exitDesigner);
   engine.runRenderLoop(() => designerScene.scene.render());
@@ -67,15 +68,16 @@ function startDesigner() {
 
 function exitDesigner() {
   engine.stopRenderLoop();
-  document.getElementById('designer-ui').style.display        = 'none';
-  document.getElementById('designer-vignette').style.display  = 'none';
+  document.getElementById('designer-ui').style.display       = 'none';
+  document.getElementById('designer-vignette').style.display = 'none';
+  document.getElementById('designer-sidebar').style.display  = 'none';
   canvas.style.display = 'none';
   document.getElementById('menu').style.display = 'flex';
 }
 
 document.addEventListener('keydown', (e) => {
   // Controls screen intercepts Enter/Space — dismiss before anything else
-  if (document.getElementById('controls-screen').style.display !== 'none') {
+  if (document.getElementById('controls-screen').style.display === 'flex') {
     if (e.code === 'Enter' || e.code === 'Space') dismissControls();
     return;
   }
