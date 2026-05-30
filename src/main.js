@@ -8,6 +8,10 @@ const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: 
 let arenaScene    = null;
 let designerScene = null;
 
+// Single source of truth for which screen is active.
+// All event handlers read this instead of checking DOM styles.
+window.__state = 'MENU'; // 'MENU' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
+
 function startGame() {
   canvas.style.display = 'block';
   document.getElementById('menu').style.display = 'none';
@@ -23,14 +27,15 @@ function startGame() {
 
   // Pause and show controls before the player engages
   arenaScene._paused = true;
+  window.__state = 'CONTROLS';
   document.getElementById('controls-screen').style.display = 'flex';
 }
 
 function dismissControls() {
-  const el = document.getElementById('controls-screen');
-  if (el.style.display === 'none') return;
-  el.style.display = 'none';
+  if (window.__state !== 'CONTROLS') return;
+  document.getElementById('controls-screen').style.display = 'none';
   if (arenaScene) arenaScene._paused = false;
+  window.__state = 'GAME';
 }
 
 function goToMenu() {
@@ -50,6 +55,7 @@ function goToMenu() {
       arenaScene._restart();
     }
     document.getElementById('menu').style.display = 'flex';
+    window.__state = 'MENU';
   }, { once: true });
 }
 
@@ -61,6 +67,7 @@ function startDesigner() {
   document.getElementById('designer-ui').style.display       = 'flex';
   document.getElementById('designer-vignette').style.display = 'block';
   document.getElementById('designer-sidebar').style.display  = 'flex';
+  window.__state = 'INSPECTOR';
 
   if (!designerScene) designerScene = new TankDesignerScene(engine, exitDesigner);
   engine.runRenderLoop(() => designerScene.scene.render());
@@ -73,19 +80,21 @@ function exitDesigner() {
   document.getElementById('designer-sidebar').style.display  = 'none';
   canvas.style.display = 'none';
   document.getElementById('menu').style.display = 'flex';
+  window.__state = 'MENU';
+  if (designerScene) { designerScene.dispose(); designerScene = null; }
 }
 
 document.addEventListener('keydown', (e) => {
-  // Controls screen intercepts Enter/Space — dismiss before anything else
-  if (document.getElementById('controls-screen').style.display === 'flex') {
+  if (e.repeat) return;
+  if (window.__state === 'CONTROLS') {
     if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') dismissControls();
     return;
   }
-  if (document.getElementById('menu').style.display !== 'none') {
+  if (window.__state === 'MENU') {
     if (e.code === 'Enter') startGame();
     if (e.code === 'KeyT')  startDesigner();
   }
-  if (e.code === 'Escape' && document.getElementById('designer-ui').style.display !== 'none') {
+  if (window.__state === 'INSPECTOR' && e.code === 'Escape') {
     exitDesigner();
   }
 });
@@ -93,17 +102,14 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('controls-start').addEventListener('click', dismissControls);
 
 document.getElementById('menu-designer').addEventListener('click', startDesigner);
-// TEMP: auto-start for screenshot
-setTimeout(() => { startGame(); setTimeout(() => { document.getElementById('controls-screen').style.display = 'none'; }, 100); }, 800);
 
 document.getElementById('pause-menu').addEventListener('click', goToMenu);
 document.getElementById('death-menu').addEventListener('click',  goToMenu);
 
 function autoPause() {
-  if (!arenaScene || arenaScene._paused) return;
-  if (document.getElementById('menu').style.display        !== 'none') return;
-  if (document.getElementById('designer-ui').style.display !== 'none') return; // inspector open
-  arenaScene._paused = true;
+  if (window.__state !== 'GAME') return;
+  window.__state = 'PAUSED';
+  if (arenaScene) arenaScene._paused = true;
   document.getElementById('pause').style.display = 'flex';
 }
 
