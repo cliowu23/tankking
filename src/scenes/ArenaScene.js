@@ -83,17 +83,33 @@ export default class ArenaScene {
   _setupGround() {
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
 
-    // Checkerboard DynamicTexture — toy diorama floor
-    const groundTex = new DynamicTexture('groundTex', { width: 128, height: 128 }, this.scene);
+    // Arena grid — medium gray with white court lines
+    const groundTex = new DynamicTexture('groundTex', { width: 512, height: 512 }, this.scene);
     const ctx = groundTex.getContext();
-    ctx.fillStyle = '#202028';
-    ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = '#181820';
-    ctx.fillRect(0, 0, 64, 64);
-    ctx.fillRect(64, 64, 64, 64);
+
+    // Base
+    ctx.fillStyle = '#484852';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Minor grid — subtle, every 64px (~1.25 game units)
+    ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 512; i += 64) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+    }
+
+    // Major grid — bold white, every 256px (~5 game units)
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i <= 512; i += 256) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+    }
+
     groundTex.update();
-    groundTex.uScale = 14;
-    groundTex.vScale = 14;
+    groundTex.uScale = 10;
+    groundTex.vScale = 10;
 
     const mat = new StandardMaterial('groundMat', this.scene);
     mat.diffuseTexture = groundTex;
