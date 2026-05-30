@@ -417,6 +417,9 @@ export default class TankDesignerScene {
     const yRotMap    = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
     const yRot       = yRotMap[facingAxis] ?? -Math.PI / 2;
 
+    btn.textContent = 'LOADING…';
+    btn.style.opacity = '0.5';
+
     SceneLoader.ImportMeshAsync('', '/models/', filename, this.scene).then(result => {
       const glbRoot    = result.transformNodes.find(n => n.name === rootName)
         ?? result.transformNodes.find(n => n.name !== '__root__' && !n.parent);
@@ -540,7 +543,13 @@ export default class TankDesignerScene {
       console.log(`[Inspector] turretPivot: x=${tp.x.toFixed(3)} y=${tp.y.toFixed(3)} z=${tp.z.toFixed(3)}`);
       console.log(`[Inspector] barrelPivot: x=${bp.x.toFixed(3)} y=${bp.y.toFixed(3)} z=${bp.z.toFixed(3)}`);
 
-    }).catch(e => console.error(`[Inspector] ${filename} failed:`, e));
+      btn.textContent = label;
+      btn.style.opacity = '';
+    }).catch(e => {
+      console.error(`[Inspector] ${filename} failed:`, e);
+      btn.textContent = label;
+      btn.style.opacity = '';
+    });
   }
 
   dispose() {

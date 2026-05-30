@@ -18,8 +18,6 @@ export default class Tank {
     this.maxSpeed         = 8;
     this.drag             = 4;
     this.rotateSpeed      = 2.1;    // rad/s
-    this.spinBoostRad     = 65 * Math.PI / 180; // 65°
-    this.spinBoostExit    = 8.5;
     this.maxFuel          = 100;
     this.fuel             = 100;
     this.fuelRecharge     = 18;
@@ -45,7 +43,7 @@ export default class Tank {
     this.dashVz           = 0;
     this.dashTimeLeft     = 0;
     this.dashExitSpeed    = 0;
-    this.spinTween        = null;
+
 
     // Lock-on target: set from ArenaScene each frame
     this.lockTarget       = null; // Vector3 or null
@@ -266,18 +264,6 @@ export default class Tank {
   update(dt) {
     if (!this.alive) return;
 
-    // --- Spin tween ---
-    if (this.spinTween) {
-      this.spinTween.elapsed += dt;
-      const t = Math.min(this.spinTween.elapsed / this.spinTween.duration, 1);
-      const e = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
-      this.rotY = this.spinTween.startAngle + e * (this.spinTween.targetAngle - this.spinTween.startAngle);
-      if (t >= 1) {
-        this.speed = this.spinBoostExit;
-        this.spinTween = null;
-      }
-    }
-
     // --- Dash ---
     if (this.dashTimeLeft > 0) {
       this.dashTimeLeft -= dt;
@@ -293,11 +279,9 @@ export default class Tank {
       return;
     }
 
-    // --- Rotation (suppressed during spin tween) ---
-    if (!this.spinTween) {
-      if (this.keys.a) this.rotY -= this.rotateSpeed * dt;
-      if (this.keys.d) this.rotY += this.rotateSpeed * dt;
-    }
+    // --- Rotation ---
+    if (this.keys.a) this.rotY -= this.rotateSpeed * dt;
+    if (this.keys.d) this.rotY += this.rotateSpeed * dt;
 
     const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
 
@@ -317,8 +301,7 @@ export default class Tank {
     const boostTapped = this._justPressedShift;
     const boostHeld   = this.keys.shift;
 
-    if (!this.spinTween) {
-      if (boostTapped && this.fuel >= this.tapCost) {
+    if (boostTapped && this.fuel >= this.tapCost) {
         const reversing    = this.keys.s;
         const dist         = reversing ? -(this.tapDashDist * 0.8) : this.tapDashDist;
         const exitSpd      = reversing ? -(this.tapDashExit  * 0.8) : this.tapDashExit;
@@ -341,7 +324,6 @@ export default class Tank {
         this.fuel    = Math.max(0, this.fuel - this.holdFuelDrain * dt);
         this._momentumTimer = this.momentumDuration; // keep resetting while held
       }
-    }
 
     // --- Boost momentum bleed ---
     if (!boostHeld) {
@@ -387,23 +369,17 @@ export default class Tank {
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
     } else {
-      // Mouse aim: cast picking ray to y=0 ground plane, snap instantly
+      // Mouse aim: turret follows cursor on the ground plane
       const ray = this.scene.createPickingRay(
-        this.scene.pointerX,
-        this.scene.pointerY,
-        null,
-        this.scene.activeCamera,
+        this.scene.pointerX, this.scene.pointerY, null, this.scene.activeCamera,
       );
       if (ray && Math.abs(ray.direction.y) > 0.0001) {
         const t      = -ray.origin.y / ray.direction.y;
         const hitX   = ray.origin.x + t * ray.direction.x;
         const hitZ   = ray.origin.z + t * ray.direction.z;
-        const targetAim = Math.atan2(
-          hitX - this.root.position.x,
-          hitZ - this.root.position.z,
-        );
-        const diff    = shortAngle(this.turretAimAngle, targetAim);
-        const maxTurn = this.turretSpeed * dt;
+        const targetAim = Math.atan2(hitX - this.root.position.x, hitZ - this.root.position.z);
+        const diff      = shortAngle(this.turretAimAngle, targetAim);
+        const maxTurn   = this.turretSpeed * dt;
         this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
       }
     }

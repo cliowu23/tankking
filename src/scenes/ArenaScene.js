@@ -11,6 +11,7 @@ import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
 import Shell, { SHELL_GRAVITY } from '../entities/Shell.js';
+import { GridMaterial } from '@babylonjs/materials';
 
 export default class ArenaScene {
   constructor(engine) {
@@ -83,33 +84,15 @@ export default class ArenaScene {
   _setupGround() {
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
 
-    // Arena grid — medium gray tile with white border + subtle inner dividers
-    const groundTex = new DynamicTexture('groundTex', { width: 128, height: 128 }, this.scene);
-    const ctx = groundTex.getContext();
-
-    // Base
-    ctx.fillStyle = '#484852';
-    ctx.fillRect(0, 0, 128, 128);
-
-    // Subtle inner cross — divides tile into 4 (~2.5 unit subdivisions)
-    ctx.fillStyle = '#535360';
-    ctx.fillRect(63, 0, 2, 128);
-    ctx.fillRect(0, 63, 128, 2);
-
-    // Bold white tile border — this becomes the court line grid
-    ctx.fillStyle = '#c8c8d8';
-    ctx.fillRect(0, 0, 128, 2);    // top
-    ctx.fillRect(0, 126, 128, 2);  // bottom
-    ctx.fillRect(0, 0, 2, 128);    // left
-    ctx.fillRect(126, 0, 2, 128);  // right
-
-    groundTex.update();
-    groundTex.uScale = 10;
-    groundTex.vScale = 10;
-
-    const mat = new StandardMaterial('groundMat', this.scene);
-    mat.diffuseTexture = groundTex;
-    mat.specularColor  = new Color3(0, 0, 0);
+    // Arena grid using GridMaterial — dedicated shader, no texture hacks needed
+    const mat = new GridMaterial('groundMat', this.scene);
+    mat.majorUnitFrequency  = 5;               // bold line every 5 units
+    mat.minorUnitVisibility = 0.35;            // subtle minor lines between
+    mat.gridRatio           = 1;               // 1 unit per grid cell
+    mat.mainColor           = new Color3(0.28, 0.28, 0.34);  // dark slate base
+    mat.lineColor           = new Color3(0.85, 0.85, 0.95);  // near-white lines
+    mat.opacity             = 1.0;
+    mat.backFaceCulling     = false;
     ground.material = mat;
     ground.receiveShadows = true;
 
@@ -118,7 +101,7 @@ export default class ArenaScene {
       width: 48, height: 48, subdivisions: 10, updatable: true,
     }, this.scene);
     this.terrainMesh.position.y = 0.01;
-    this.terrainMesh.material   = mat;
+    this.terrainMesh.material      = mat;
     this.terrainMesh.receiveShadows = true;
   }
 
@@ -301,24 +284,24 @@ export default class ArenaScene {
 
     // Pause / restart
     window.addEventListener('keydown', (e) => {
-      if (e.repeat) return;                                                         // ignore key-repeat — prevents instant toggle-back
+      if (e.repeat) return;
       if (e.code !== 'Escape') return;
-      if (document.getElementById('menu').style.display        !== 'none') return; // on menu
-      if (document.getElementById('designer-ui').style.display !== 'none') return; // inspector open
-      if (document.getElementById('death').style.display       === 'flex') return; // dead
-      if (document.getElementById('controls-screen').style.display === 'flex') return; // controls tutorial
+      if (window.__state !== 'GAME' && window.__state !== 'PAUSED') return;
       this._paused = !this._paused;
+      window.__state = this._paused ? 'PAUSED' : 'GAME';
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
     });
     document.getElementById('pause-restart').addEventListener('click', () => {
       this._restart();
       this._paused = false;
+      window.__state = 'GAME';
       document.getElementById('pause').style.display = 'none';
     });
 
     document.getElementById('death-restart').addEventListener('click', () => {
       this._restart();
       this._paused = false;
+      window.__state = 'GAME';
       document.getElementById('death').style.display = 'none';
     });
 
@@ -341,6 +324,11 @@ export default class ArenaScene {
     // Map facing axis → Y rotation that aligns model toward game +Z forward
     const yRotMap = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
     const yRot = yRotMap[facingAxis] ?? -Math.PI / 2;
+
+    const startBtn = document.getElementById('controls-start');
+    startBtn.textContent = 'LOADING…';
+    startBtn.style.pointerEvents = 'none';
+    startBtn.style.opacity = '0.4';
 
     SceneLoader.ImportMeshAsync('', '/models/', modelFile, this.scene).then(result => {
       // Exact name match first, then fuzzy fallback so any well-named GLB works
@@ -459,7 +447,16 @@ export default class ArenaScene {
       console.log(`[GLB] ${modelFile} loaded: scale=${scale.toFixed(4)}, w=${modelW.toFixed(2)}, d=${modelD.toFixed(2)}`);
       console.log(`[GLB] turretPivot: x=${tp.x.toFixed(3)} y=${tp.y.toFixed(3)} z=${tp.z.toFixed(3)}`);
       console.log(`[GLB] barrelPivot (turret-local): x=${bp.x.toFixed(3)} y=${bp.y.toFixed(3)} z=${bp.z.toFixed(3)}`);
-    }).catch(e => console.error(`[GLB] ${modelFile} load failed:`, e));
+
+      startBtn.textContent = 'PRESS ENTER TO BATTLE';
+      startBtn.style.pointerEvents = '';
+      startBtn.style.opacity = '';
+    }).catch(e => {
+      console.error(`[GLB] ${modelFile} load failed:`, e);
+      startBtn.textContent = 'PRESS ENTER TO BATTLE';
+      startBtn.style.pointerEvents = '';
+      startBtn.style.opacity = '';
+    });
   }
 
   _setupDevLabels() {
@@ -600,8 +597,7 @@ export default class ArenaScene {
 
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyE') return;
-      if (document.getElementById('menu').style.display !== 'none') return;
-      if (document.getElementById('pause').style.display === 'flex') return;
+      if (window.__state !== 'GAME') return;
       this.levelEditor.toggle();
     });
   }
@@ -809,6 +805,7 @@ export default class ArenaScene {
 
   _showDeath() {
     this._paused = true;
+    window.__state = 'DEAD';
     document.getElementById('death').style.display = 'flex';
   }
 
