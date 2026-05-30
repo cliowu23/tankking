@@ -5,13 +5,7 @@
     "mount": "mount",
     "facingAxis": "+X"
   },
-  "tank_model.glb": {
-    "root": "Sketchfab_model",
-    "turret": "turret",
-    "mount": "mount",
-    "facingAxis": "+X"
-  },
-  "m26_pershing_war_thunder.glb": {
+"m26_pershing_war_thunder.glb": {
     "root": "Sketchfab_model",
     "turret": "turret",
     "mount": "mount",

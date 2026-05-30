@@ -75,15 +75,29 @@ Entities (Tank, Enemy, Shell, AIEnemy, TerrainPiece, etc.) are their own classes
 
 ## Art Direction — DECIDED
 
+**Two separate aesthetic systems that intentionally contrast:**
+
+### Gameplay World — Bright & Cheerful
 **North star: "Beautiful in a bright way — a battlefield that feels like a game, not a war."**
 
 Aesthetic references: **Super Mario World × Escape from Duckov × toy soldier.** Bright, casual, cheerful. Grass fields, sunshine, saturated primary colors. Still a battlefield, but inviting rather than oppressive.
 
-**Concrete meaning:**
 - Saturated, confident primary colors — toy soldier plastic, not military drab
 - Shapes slightly chunkier/more exaggerated than real proportions
 - Bright green grass ground, clear blue sky, warm sunshine lighting
 - Tank colors pop hard against the green (blue player, red enemy, orange AI)
+
+### UI / HUD — Retro-Futurist (Tron)
+The overlay layer (menus, HUD, overlays) lives in a different register: dark, geometric, neon-lit.
+Like looking through a targeting computer at a toy battlefield.
+
+- Primary neon: `#00e5ff` (electric cyan), danger: `#ff2060`, hull: `#00ff88`
+- Panel background: `rgba(0, 8, 20, 0.93)`, body: `#000810`
+- 1px neon borders with glow, dark navy panels — no chrome or decoration
+- Thin (5px) glowing bar for HUD meters
+- Monospace, uppercase, wide letter-spacing throughout
+- Subtle CRT scanlines overlay on full screen (very low opacity)
+- One accent color only — cyan. Everything else is dark or glowing text.
 
 **Approved color palette:**
 | Element | Color |

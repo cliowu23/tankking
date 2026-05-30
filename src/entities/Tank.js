@@ -97,10 +97,24 @@ export default class Tank {
     this.hull.material = hullMat;
     this.hull.parent = this.root;
 
-    const hullTop = MeshBuilder.CreateBox('tankHullTop', { width: 2.20, height: 0.08, depth: 2.80 }, scene);
-    hullTop.position.set(0, 0.615, 0);
+    // Top deck — shortened at front to leave room for the slope plate
+    const hullTop = MeshBuilder.CreateBox('tankHullTop', { width: 2.20, height: 0.08, depth: 2.40 }, scene);
+    hullTop.position.set(0, 0.615, -0.20);
     hullTop.material = hullMat;
     hullTop.parent = this.root;
+
+    // Angled front armor plate — the #1 low-poly tank silhouette cue
+    const hullFrontSlope = MeshBuilder.CreateBox('tankFrontSlope', { width: 2.20, height: 0.65, depth: 0.55 }, scene);
+    hullFrontSlope.position.set(0, 0.35, 1.30);
+    hullFrontSlope.rotation.x = -Math.PI * 0.22;
+    hullFrontSlope.material = hullMat;
+    hullFrontSlope.parent = this.root;
+
+    // Rear engine deck
+    const engineDeck = MeshBuilder.CreateBox('tankEngineDeck', { width: 1.80, height: 0.10, depth: 0.70 }, scene);
+    engineDeck.position.set(0, 0.62, -1.20);
+    engineDeck.material = hullMat;
+    engineDeck.parent = this.root;
 
     const trackLeft = MeshBuilder.CreateBox('tankTrackLeft', { width: 0.28, height: 0.65, depth: 3.25 }, scene);
     trackLeft.position.set(-1.26, 0.325, 0);
@@ -122,24 +136,45 @@ export default class Tank {
     skirtRight.material = trackMat;
     skirtRight.parent = this.root;
 
+    // Road wheels — 4 per side, visible below tracks
+    const wheelZOffsets = [-1.0, -0.33, 0.33, 1.0];
+    for (const wz of wheelZOffsets) {
+      for (const wx of [-1.26, 1.26]) {
+        const w = MeshBuilder.CreateCylinder(`wheel_${wx}_${wz}`, { height: 0.10, diameter: 0.32, tessellation: 10 }, scene);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(wx, 0.18, wz);
+        w.material = trackMat;
+        w.parent = this.root;
+      }
+    }
+
     // --- Turret pivot — rotates independently from hull ---
-    // Sits on top of hull center; turret + barrel are children of this node.
-    // We control turretPivot.rotation.y to aim the turret in world space.
     this.turretPivot = new TransformNode('turretPivot', scene);
     this.turretPivot.position.set(0, 0.55, 0); // top of hull — unchanged, game logic depends on this
     this.turretPivot.parent = this.root;
 
-    // Egg-shaped cast turret — sphere squashed and stretched
-    this.turret = MeshBuilder.CreateSphere('tankTurretMesh', { diameter: 1.6, segments: 8 }, scene);
-    this.turret.scaling.set(0.95, 0.58, 1.05);
-    this.turret.position.set(0, 0.22, 0.05);
-    this.turret.material = turretMat;
-    this.turret.parent = this.turretPivot;
+    // Box-based turret — angular low-poly shape
+    const turretBody = MeshBuilder.CreateBox('tankTurretBody', { width: 1.15, height: 0.38, depth: 1.20 }, scene);
+    turretBody.position.set(0, 0.16, 0.05);
+    turretBody.material = turretMat;
+    turretBody.parent = this.turretPivot;
 
-    // Large mantlet disc — prominent gun mount
-    const mantlet = MeshBuilder.CreateCylinder('tankMantlet', { height: 0.30, diameter: 0.75, tessellation: 10 }, scene);
+    const turretRoof = MeshBuilder.CreateBox('tankTurretRoof', { width: 1.00, height: 0.12, depth: 1.00 }, scene);
+    turretRoof.position.set(0, 0.38, 0.00);
+    turretRoof.material = turretMat;
+    turretRoof.parent = this.turretPivot;
+
+    // Angled front face of turret
+    const turretFaceSlope = MeshBuilder.CreateBox('tankTurretFace', { width: 1.10, height: 0.34, depth: 0.18 }, scene);
+    turretFaceSlope.position.set(0, 0.22, 0.62);
+    turretFaceSlope.rotation.x = -Math.PI * 0.12;
+    turretFaceSlope.material = turretMat;
+    turretFaceSlope.parent = this.turretPivot;
+
+    // Mantlet
+    const mantlet = MeshBuilder.CreateCylinder('tankMantlet', { height: 0.28, diameter: 0.65, tessellation: 10 }, scene);
     mantlet.rotation.x = Math.PI / 2;
-    mantlet.position.set(0, 0.18, 0.75);
+    mantlet.position.set(0, 0.16, 0.72);
     mantlet.material = turretMat;
     mantlet.parent = this.turretPivot;
 
@@ -149,19 +184,26 @@ export default class Tank {
     cupola.material = turretMat;
     cupola.parent = this.turretPivot;
 
-    // --- Barrel pivot — elevation rotates around this point (barrel base) ---
+    // --- Barrel pivot — elevation rotates around this point ---
     this.barrelPivot = new TransformNode('barrelPivot', scene);
-    this.barrelPivot.position.set(0, 0.3, 0.6); // barrel base in turretPivot space — unchanged
+    this.barrelPivot.position.set(0, 0.3, 0.6); // unchanged — game logic depends on this
     this.barrelPivot.parent = this.turretPivot;
 
-    // Tapered cylinder barrel
+    // Tapered barrel
     this.barrel = MeshBuilder.CreateCylinder('tankBarrelMesh', { height: 2.4, diameterBottom: 0.18, diameterTop: 0.12, tessellation: 8 }, scene);
     this.barrel.rotation.x = Math.PI / 2;
-    this.barrel.position.set(0, 0, 1.2); // center = half-length forward from pivot
+    this.barrel.position.set(0, 0, 1.2);
     this.barrel.material = turretMat;
     this.barrel.parent = this.barrelPivot;
 
-    this._shadowMeshes = [hullLower, this.hull, hullTop, trackLeft, trackRight, this.turret, mantlet, this.barrel];
+    // Muzzle brake — wider cap at barrel tip
+    const muzzleBrake = MeshBuilder.CreateCylinder('tankMuzzleBrake', { height: 0.18, diameter: 0.26, tessellation: 8 }, scene);
+    muzzleBrake.rotation.x = Math.PI / 2;
+    muzzleBrake.position.set(0, 0, 2.28);
+    muzzleBrake.material = turretMat;
+    muzzleBrake.parent = this.barrelPivot;
+
+    this._shadowMeshes = [hullLower, this.hull, hullTop, hullFrontSlope, engineDeck, trackLeft, trackRight, turretBody, turretRoof, mantlet, this.barrel];
 
     // --- Input ---
     this.keys = { w: false, s: false, a: false, d: false, shift: false };
