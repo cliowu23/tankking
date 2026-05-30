@@ -1,0 +1,323 @@
+import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode } from '@babylonjs/core';
+import Shell, { SHELL_GRAVITY } from './Shell.js';
+
+function shortAngle(from, to) {
+  let d = ((to - from) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+  return d;
+}
+
+const HSPEED = 16;
+
+export default class AIEnemy {
+  constructor(scene, x, z) {
+    this.scene = scene;
+
+    this.maxHp = 100;
+    this.hp    = 100;
+    this.alive = true;
+    this.mass  = 4;
+    this.staticFrictionThreshold = 1.0;
+    this.vx    = 0;
+    this.vz    = 0;
+
+    this._aiSpeed              = 4.5;
+    this._rotateSpeed          = 1.2;
+    this._turretSpeed          = 55 * Math.PI / 180;
+    this._optimalRange         = 15;
+    this._aimTolerance         = 5 * Math.PI / 180;
+    this._fireCooldownDuration = 2.0;
+
+    this.rotY            = 0;
+    this.speed           = 0;
+    this.turretAimAngle  = 0;
+    this.barrelElevation = 0;
+    this.state           = 'APPROACH';
+    this.fireCooldown    = 1.5; // brief delay before first shot
+    this._recoil         = 0;
+
+    // --- Root ---
+    this.root = new TransformNode('aiEnemy_root', scene);
+    this.root.position.set(x, 0, z);
+
+    // --- Materials ---
+    this.hullMat = new StandardMaterial('aiHull', scene);
+    this.hullMat.diffuseColor  = new Color3(0.95, 0.42, 0.04);
+    this.hullMat.specularColor = new Color3(0.08, 0.14, 0.02);
+
+    const turretMat = new StandardMaterial('aiTurret', scene);
+    turretMat.diffuseColor  = new Color3(0.80, 0.32, 0.03);
+    turretMat.specularColor = new Color3(0.06, 0.10, 0.02);
+
+    const trackMat = new StandardMaterial('aiTrack', scene);
+    trackMat.diffuseColor  = new Color3(0.12, 0.12, 0.12);
+    trackMat.specularColor = new Color3(0.04, 0.04, 0.04);
+
+    // --- Hull group ---
+    const aiHullLower = MeshBuilder.CreateBox('aiHullLower', { width: 2.30, height: 0.20, depth: 2.90 }, scene);
+    aiHullLower.position.set(0, 0.10, 0);
+    aiHullLower.material = this.hullMat;
+    aiHullLower.parent = this.root;
+
+    this.hull = MeshBuilder.CreateBox('aiHullMesh', { width: 2.20, height: 0.52, depth: 2.90 }, scene);
+    this.hull.position.set(0, 0.36, 0);
+    this.hull.material = this.hullMat;
+    this.hull.parent = this.root;
+
+    const aiTrackLeft = MeshBuilder.CreateBox('aiTrackLeft', { width: 0.28, height: 0.65, depth: 3.00 }, scene);
+    aiTrackLeft.position.set(-1.04, 0.325, 0);
+    aiTrackLeft.material = trackMat;
+    aiTrackLeft.parent = this.root;
+
+    const aiTrackRight = MeshBuilder.CreateBox('aiTrackRight', { width: 0.28, height: 0.65, depth: 3.00 }, scene);
+    aiTrackRight.position.set(1.04, 0.325, 0);
+    aiTrackRight.material = trackMat;
+    aiTrackRight.parent = this.root;
+
+    // --- Turret pivot (rotates independently from hull) — position unchanged, game logic depends on it ---
+    this.turretPivot = new TransformNode('aiTurretPivot', scene);
+    this.turretPivot.position.set(0, 0.55, 0);
+    this.turretPivot.parent = this.root;
+
+    // Egg-shaped sphere turret
+    this.turret = MeshBuilder.CreateSphere('aiTurretMesh', { diameter: 1.5, segments: 8 }, scene);
+    this.turret.scaling.set(0.95, 0.55, 1.05);
+    this.turret.position.set(0, 0.22, 0.05);
+    this.turret.material = turretMat;
+    this.turret.parent = this.turretPivot;
+
+    const aiMantlet = MeshBuilder.CreateCylinder('aiMantlet', { height: 0.30, diameter: 0.72, tessellation: 10 }, scene);
+    aiMantlet.rotation.x = Math.PI / 2;
+    aiMantlet.position.set(0, 0.18, 0.72);
+    aiMantlet.material = turretMat;
+    aiMantlet.parent = this.turretPivot;
+
+    // --- Barrel pivot (elevation) — position unchanged, game logic depends on it ---
+    this.barrelPivot = new TransformNode('aiBarrelPivot', scene);
+    this.barrelPivot.position.set(0, 0.3, 0.6);
+    this.barrelPivot.parent = this.turretPivot;
+
+    this.barrel = MeshBuilder.CreateCylinder('aiBarrelMesh', { height: 2.4, diameterBottom: 0.18, diameterTop: 0.12, tessellation: 8 }, scene);
+    this.barrel.rotation.x = Math.PI / 2;
+    this.barrel.position.set(0, 0, 1.2);
+    this.barrel.material = turretMat;
+    this.barrel.parent = this.barrelPivot;
+
+    // --- Health bar ---
+    const bgMat = new StandardMaterial('aiHpBgMat', scene);
+    bgMat.diffuseColor  = new Color3(0.08, 0.08, 0.08);
+    bgMat.emissiveColor = new Color3(0.05, 0.05, 0.05);
+
+    this.hpBarBg = MeshBuilder.CreateBox('aiHpBarBg', { width: 2.2, height: 0.1, depth: 0.1 }, scene);
+    this.hpBarBg.position.set(0, 1.55, 0);
+    this.hpBarBg.material = bgMat;
+    this.hpBarBg.parent = this.root;
+
+    this.hpFillMat = new StandardMaterial('aiHpFillMat', scene);
+    this.hpFillMat.diffuseColor  = new Color3(0.1, 0.85, 0.1);
+    this.hpFillMat.emissiveColor = new Color3(0.0, 0.35, 0.0);
+
+    this.hpBarFill = MeshBuilder.CreateBox('aiHpBarFill', { width: 2.0, height: 0.11, depth: 0.11 }, scene);
+    this.hpBarFill.position.set(0, 1.55, 0);
+    this.hpBarFill.material = this.hpFillMat;
+    this.hpBarFill.parent = this.root;
+
+    // --- Own shell pool (separate from player's) ---
+    this.shells = Array.from({ length: 4 }, () => new Shell(scene));
+  }
+
+  get halfW()    { return 1.0; }
+  get halfD()    { return 1.4; }
+  get position() { return this.root.position; }
+  getVelocity()  {
+    return {
+      x: Math.sin(this.rotY) * this.speed + this.vx,
+      z: Math.cos(this.rotY) * this.speed + this.vz,
+    };
+  }
+
+  addShadows(shadowGen) {
+    shadowGen.addShadowCaster(this.hull);
+    shadowGen.addShadowCaster(this.turret);
+    shadowGen.addShadowCaster(this.barrel);
+  }
+
+  takeDamage(amount) {
+    if (!this.alive) return;
+    this.hp = Math.max(0, this.hp - amount);
+    this._updateHealthBar();
+    if (this.hp <= 0) this._die();
+  }
+
+  reset(x, z) {
+    this.hp    = this.maxHp;
+    this.alive = true;
+    this.vx    = 0;
+    this.vz    = 0;
+    this.speed = 0;
+    this.rotY  = 0;
+    this.turretAimAngle  = 0;
+    this.barrelElevation = 0;
+    this.state           = 'APPROACH';
+    this.fireCooldown    = 1.5;
+    this._recoil         = 0;
+    this.barrelPivot.position.z = 0.6;
+    this.staticFrictionThreshold = 1.0;
+    this.root.position.set(x, 0, z);
+    this.hullMat.diffuseColor  = new Color3(0.95, 0.42, 0.04);
+    this.hullMat.emissiveColor = new Color3(0, 0, 0);
+    this.hpBarBg.isVisible   = true;
+    this.hpBarFill.isVisible = true;
+    this._updateHealthBar();
+  }
+
+  update(dt, playerPos) {
+    // Apply collision knockback even when dead
+    const vspeed = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
+    if (vspeed > 0.001) {
+      const drag  = vspeed > 0.4 ? 1.5 : 120;
+      const decel = Math.min(vspeed, drag * dt);
+      this.vx -= (this.vx / vspeed) * decel;
+      this.vz -= (this.vz / vspeed) * decel;
+    } else {
+      this.vx = 0; this.vz = 0;
+    }
+
+    if (!this.alive) {
+      this.root.position.x = Math.max(-48, Math.min(48, this.root.position.x + this.vx * dt));
+      this.root.position.z = Math.max(-48, Math.min(48, this.root.position.z + this.vz * dt));
+      return;
+    }
+
+    const dx   = playerPos.x - this.root.position.x;
+    const dz   = playerPos.z - this.root.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    // --- State transitions ---
+    if (this.state === 'APPROACH' && dist <= this._optimalRange + 4) {
+      this.state = 'COMBAT';
+    } else if (this.state === 'COMBAT') {
+      if (dist > this._optimalRange + 8) this.state = 'APPROACH';
+      if (dist < this._optimalRange - 4) this.state = 'RETREAT';
+    } else if (this.state === 'RETREAT' && dist >= this._optimalRange) {
+      this.state = 'COMBAT';
+    }
+
+    // --- Per-state movement ---
+    const angleToPlayer = Math.atan2(dx, dz);
+
+    if (this.state === 'APPROACH') {
+      const hullDiff    = shortAngle(this.rotY, angleToPlayer);
+      const maxHullTurn = this._rotateSpeed * dt;
+      this.rotY += Math.sign(hullDiff) * Math.min(Math.abs(hullDiff), maxHullTurn);
+      this.speed = Math.abs(hullDiff) < Math.PI / 2
+        ? Math.min(this.speed + 6 * dt, this._aiSpeed)
+        : Math.max(this.speed - 6 * dt, 0);
+
+    } else if (this.state === 'COMBAT') {
+      this.speed = this.speed > 0
+        ? Math.max(0, this.speed - 8 * dt)
+        : Math.min(0, this.speed + 8 * dt);
+
+    } else if (this.state === 'RETREAT') {
+      const awayAngle   = angleToPlayer + Math.PI;
+      const hullDiff    = shortAngle(this.rotY, awayAngle);
+      const maxHullTurn = this._rotateSpeed * dt;
+      this.rotY += Math.sign(hullDiff) * Math.min(Math.abs(hullDiff), maxHullTurn);
+      this.speed = Math.max(this.speed - 6 * dt, -this._aiSpeed * 0.7);
+    }
+
+    // --- Apply position ---
+    const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
+    this.root.position.x = Math.max(-48, Math.min(48, this.root.position.x + (forward.x * this.speed + this.vx) * dt));
+    this.root.position.z = Math.max(-48, Math.min(48, this.root.position.z + (forward.z * this.speed + this.vz) * dt));
+    this.root.rotation.y = this.rotY;
+
+    this._updateTurret(dt, playerPos);
+
+    // --- Fire ---
+    this.fireCooldown -= dt;
+    if (this.state === 'COMBAT' && this.fireCooldown <= 0) {
+      const aimDiff = Math.abs(shortAngle(this.turretAimAngle, angleToPlayer));
+      if (aimDiff < this._aimTolerance) {
+        this._fire();
+      }
+    }
+  }
+
+  _updateTurret(dt, playerPos) {
+    const dx        = playerPos.x - this.root.position.x;
+    const dz        = playerPos.z - this.root.position.z;
+    const targetAim = Math.atan2(dx, dz);
+    const diff      = shortAngle(this.turretAimAngle, targetAim);
+    const maxTurn   = this._turretSpeed * dt;
+    this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
+
+    if (this.state === 'COMBAT') {
+      const targetElev = this._elevationForTarget(playerPos);
+      this.barrelElevation += (targetElev - this.barrelElevation) * (1 - Math.exp(-10 * dt));
+    } else {
+      this.barrelElevation *= Math.exp(-8 * dt);
+    }
+
+    this.turretPivot.rotation.y = this.turretAimAngle - this.rotY;
+    this.barrelPivot.rotation.x = -this.barrelElevation;
+
+    if (this._recoil > 0) {
+      this._recoil = Math.max(0, this._recoil - dt / 0.22);
+      const t    = this._recoil;
+      const kick = t < 0.5 ? (1 - t * 2) * 0.30 : (t * 2 - 1) * -0.30;
+      this.barrelPivot.position.z = 0.6 + kick;
+    }
+  }
+
+  _barrelTip() {
+    return Vector3.TransformCoordinates(
+      new Vector3(0, 0, 1.6),
+      this.barrelPivot.getWorldMatrix(),
+    );
+  }
+
+  _elevationForTarget(targetPos) {
+    const tip   = this._barrelTip();
+    const dx    = targetPos.x - tip.x;
+    const dz    = targetPos.z - tip.z;
+    const hdist = Math.sqrt(dx * dx + dz * dz);
+    const t     = Math.max(0.3, hdist / HSPEED);
+    const vy    = (0.5 - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
+    return Math.atan2(vy, HSPEED);
+  }
+
+  _fire() {
+    const shell = this.shells.find(s => !s.active);
+    if (!shell) return;
+    const tip = this._barrelTip();
+    const aim = this.turretAimAngle;
+    shell.fire(
+      tip.x, tip.y, tip.z,
+      Math.sin(aim) * HSPEED,
+      Math.tan(this.barrelElevation) * HSPEED,
+      Math.cos(aim) * HSPEED,
+    );
+    this.fireCooldown = this._fireCooldownDuration;
+    this._recoil = 1.0;
+  }
+
+  _updateHealthBar() {
+    const r = this.hp / this.maxHp;
+    this.hpBarFill.scaling.x  = r;
+    this.hpBarFill.position.x = (r - 1) * 1.0;
+    const red   = r < 0.5 ? 1.0 : 2 * (1 - r);
+    const green = r > 0.5 ? 1.0 : 2 * r;
+    this.hpFillMat.diffuseColor  = new Color3(red * 0.8, green * 0.8, 0);
+    this.hpFillMat.emissiveColor = new Color3(red * 0.3, green * 0.3, 0);
+  }
+
+  _die() {
+    this.alive = false;
+    this.speed = 0;
+    this.hullMat.diffuseColor  = new Color3(0.12, 0.04, 0.04);
+    this.hullMat.emissiveColor = new Color3(0.04, 0.01, 0.01);
+    this.hpBarBg.isVisible   = false;
+    this.hpBarFill.isVisible = false;
+  }
+}
