@@ -11,7 +11,6 @@ import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
 import Shell, { SHELL_GRAVITY } from '../entities/Shell.js';
-import PershingTank from '../entities/PershingTank.js';
 
 export default class ArenaScene {
   constructor(engine) {
@@ -287,9 +286,6 @@ export default class ArenaScene {
     this.aiEnemy = new AIEnemy(this.scene, 0, 42);
     this.aiEnemy.addShadows(this.shadowGen);
 
-    // Demo model — Pershing for art direction reference (drive north)
-    this.pershing = new PershingTank(this.scene, -7, 20);
-    this.pershing.addShadows(this.shadowGen);
 
     // Pause / restart
     window.addEventListener('keydown', (e) => {
@@ -310,19 +306,39 @@ export default class ArenaScene {
       document.getElementById('death').style.display = 'none';
     });
 
-    this._loadPlayerGLB();
+    // Fetch model manifest then load — manifest provides node name overrides per model
+    fetch('/models/manifest.json')
+      .then(r => r.json())
+      .catch(() => ({}))
+      .then(manifest => {
+        const modelFile = 'm26_pershing_war_thunder.glb';
+        this._loadPlayerGLB(modelFile, manifest[modelFile] ?? {});
+      });
   }
 
-  _loadPlayerGLB() {
-    SceneLoader.ImportMeshAsync('', '/models/', 't-55ak.glb', this.scene).then(result => {
-      const glbRoot    = result.transformNodes.find(n => n.name === 'Sketchfab_model');
-      const turretNode = result.transformNodes.find(n => n.name === 'turret');
-      const mountNode  = result.transformNodes.find(n => n.name === 'mount');
+  _loadPlayerGLB(modelFile = 't-55ak.glb', config = {}) {
+    const rootName   = config.root        ?? 'Sketchfab_model';
+    const turretName = config.turret      ?? 'turret';
+    const mountName  = config.mount       ?? 'mount';
+    const facingAxis = config.facingAxis  ?? '+X';
 
-      if (!glbRoot) { console.error('T-55: Sketchfab_model not found'); return; }
+    // Map facing axis → Y rotation that aligns model toward game +Z forward
+    const yRotMap = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
+    const yRot = yRotMap[facingAxis] ?? -Math.PI / 2;
 
-      // --- 1. Correct orientation: model faces +X, game forward is +Z → pre-rotate -PI/2 Y ---
-      const correction = Quaternion.RotationAxis(Vector3.Up(), -Math.PI / 2);
+    SceneLoader.ImportMeshAsync('', '/models/', modelFile, this.scene).then(result => {
+      // Exact name match first, then fuzzy fallback so any well-named GLB works
+      const glbRoot    = result.transformNodes.find(n => n.name === rootName)
+        ?? result.transformNodes.find(n => n.name !== '__root__' && n.parent == null);
+      const turretNode = result.transformNodes.find(n => n.name === turretName)
+        ?? result.transformNodes.find(n => /turret|tower|gun.base/i.test(n.name));
+      const mountNode  = result.transformNodes.find(n => n.name === mountName)
+        ?? result.transformNodes.find(n => /mount|barrel|gun|cannon|tube|weapon/i.test(n.name));
+
+      if (!glbRoot) { console.error(`GLB load: no root node found in ${modelFile}`); return; }
+
+      // --- 1. Correct orientation from facingAxis → game +Z ---
+      const correction = Quaternion.RotationAxis(Vector3.Up(), yRot);
       if (glbRoot.rotationQuaternion) {
         glbRoot.rotationQuaternion = correction.multiply(glbRoot.rotationQuaternion);
       } else {
@@ -347,14 +363,16 @@ export default class ArenaScene {
         if (w.maximumWorld.z > maxZ) maxZ = w.maximumWorld.z;
       }
 
-      // Scale by hull width (2.4 game units) — barrel length is ignored so
-      // the barrel can overhang the collision box as expected on a real tank model.
-      const modelW = maxX - minX;
-      const modelD = maxZ - minZ;
-      const scale  = 2.4 / modelW;
+      // Scale to targetWidth (default 2.4) — barrel overhang is intentional
+      const modelW      = maxX - minX;
+      const modelD      = maxZ - minZ;
+      const targetWidth = config.targetWidth ?? 2.4;
+      const scale       = targetWidth / modelW;
       const offX   = -((maxX + minX) / 2) * scale;
       const offY   = -minY * scale;
-      const offZ   = -((maxZ + minZ) / 2) * scale;
+      // zCenterAdjust shifts the whole model forward so hull center sits at Z≈0
+      // (default centers barrel midpoint; use manifest override to center hull instead)
+      const offZ   = -((maxZ + minZ) / 2) * scale + (config.zCenterAdjust ?? 0);
 
       // --- 4. Hide ALL primitive placeholder meshes under tank.root before attaching GLB ---
       this.scene.meshes
@@ -382,9 +400,11 @@ export default class ArenaScene {
         // is not useful for height. Only correct X and Z (the "too far forward" issue).
         const rootInv = Matrix.Invert(this.tank.root.getWorldMatrix());
         const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
-        this.tank.turretPivot.position.x = localPos.x;
+        this.tank.turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
         this.tank.turretPivot.position.z = localPos.z;
-        // Y remains at 0.55 — hull-roof height, set in Tank.js
+        // Use GLB turret node Y if it carries meaningful height (explicitly placed pivot),
+        // otherwise fall back to Tank.js default (0.55) for models where node Y ≈ 0.
+        if (localPos.y > 0.3) this.tank.turretPivot.position.y = localPos.y;
         this.tank.turretPivot.computeWorldMatrix(true);
         turretNode.position.setAll(0); // ring is now at pivot — rotates in-place
         turretNode.computeWorldMatrix(true);
@@ -398,12 +418,14 @@ export default class ArenaScene {
         // Same logic: only correct X and Z, keep Y=0.3 (barrel height above ring)
         const tpInv = Matrix.Invert(this.tank.turretPivot.getWorldMatrix());
         const localPos = Vector3.TransformCoordinates(mountAbsPos, tpInv);
-        this.tank.barrelPivot.position.x = localPos.x;
+        this.tank.barrelPivot.position.x = 0; // force center — small X drift is a coord-system artifact
         this.tank.barrelPivot.position.z = localPos.z;
-        // Y remains at 0.3 in turretPivot space — barrel elevation pivot height
+        // Use GLB mount node Y if present (explicitly placed pivot), else keep Tank.js default 0.3
+        if (localPos.y > 0) this.tank.barrelPivot.position.y = localPos.y;
         this.tank.barrelPivot.computeWorldMatrix(true);
         mountNode.position.setAll(0);
         this._barrelPivotBaseZ = this.tank.barrelPivot.position.z;
+        this._barrelTipOffset  = config.barrelTipOffset ?? 1.8;
       }
 
       // --- 8. Shadows ---
@@ -413,8 +435,12 @@ export default class ArenaScene {
         m.receiveShadows = true;
       }
 
-      console.log(`T-55 loaded: scale=${scale.toFixed(4)}, w=${modelW.toFixed(2)}, d=${modelD.toFixed(2)}`);
-    }).catch(e => console.error('T-55 load failed:', e));
+      const tp = this.tank.turretPivot.position;
+      const bp = this.tank.barrelPivot.position;
+      console.log(`[GLB] ${modelFile} loaded: scale=${scale.toFixed(4)}, w=${modelW.toFixed(2)}, d=${modelD.toFixed(2)}`);
+      console.log(`[GLB] turretPivot: x=${tp.x.toFixed(3)} y=${tp.y.toFixed(3)} z=${tp.z.toFixed(3)}`);
+      console.log(`[GLB] barrelPivot (turret-local): x=${bp.x.toFixed(3)} y=${bp.y.toFixed(3)} z=${bp.z.toFixed(3)}`);
+    }).catch(e => console.error(`[GLB] ${modelFile} load failed:`, e));
   }
 
   _setupDevLabels() {
@@ -934,7 +960,7 @@ export default class ArenaScene {
 
   _barrelTip() {
     return Vector3.TransformCoordinates(
-      new Vector3(0, 0, 1.8),
+      new Vector3(0, 0, this._barrelTipOffset ?? 1.8),
       this.tank.barrelPivot.getWorldMatrix(),
     );
   }

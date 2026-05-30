@@ -1,0 +1,24 @@
+{
+  "t-55ak.glb": {
+    "root": "Sketchfab_model",
+    "turret": "turret",
+    "mount": "mount",
+    "facingAxis": "+X"
+  },
+  "tank_model.glb": {
+    "root": "Sketchfab_model",
+    "turret": "turret",
+    "mount": "mount",
+    "facingAxis": "+X"
+  },
+  "m26_pershing_war_thunder.glb": {
+    "root": "Sketchfab_model",
+    "turret": "turret",
+    "mount": "mount",
+    "facingAxis": "+Z",
+    "targetWidth": 3.2,
+    "zCenterAdjust": 1.05,
+    "barrelTipOffset": 4.5,
+    "centerTurretX": true
+  }
+}
