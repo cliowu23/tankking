@@ -51,11 +51,11 @@
       box-shadow:
         0 0 0 4px var(--bg),
         0 0 0 6px var(--accent);
-      padding: 42px 72px 36px;
+      padding: 52px 88px 46px;
       display: flex; flex-direction: column;
       align-items: center;
       position: relative;
-      min-width: 380px;
+      min-width: 460px;
     }
 
     /* Diamond corners */
@@ -75,9 +75,9 @@
 
     #menu h1 {
       color: var(--white);
-      font-size: 30px;
-      letter-spacing: 4px;
-      text-shadow: 3px 3px 0 #000;
+      font-size: 38px;
+      letter-spacing: 5px;
+      text-shadow: 4px 4px 0 #000;
       line-height: 1.2;
     }
     #menu h1 .king {
@@ -87,8 +87,8 @@
 
     #menu-start {
       color: var(--white);
-      font-size: 9px;
-      margin-top: 32px;
+      font-size: 12px;
+      margin-top: 38px;
       letter-spacing: 2px;
       animation: blink 1.0s step-end infinite;
       text-shadow: 2px 2px 0 #000;
@@ -98,8 +98,8 @@
 
     #menu-designer {
       color: var(--dim);
-      font-size: 7px;
-      margin-top: 16px;
+      font-size: 9px;
+      margin-top: 20px;
       cursor: pointer;
       letter-spacing: 1px;
       line-height: 1.8;
@@ -111,7 +111,7 @@
 
     /* ─── HUD ──────────────────────────────────────────── */
     #hud {
-      position: fixed; bottom: 18px; left: 20px;
+      position: fixed; bottom: 22px; left: 24px;
       z-index: 10; display: none;
       background: var(--panel);
       border-top:    2px solid rgba(255,255,255,0.1);
@@ -120,19 +120,19 @@
       border-right:  2px solid rgba(0,0,0,0.45);
       outline: 1px solid rgba(233,69,96,0.45);
       outline-offset: 2px;
-      padding: 9px 13px 10px;
+      padding: 12px 16px 13px;
     }
     #hud-label {
       color: var(--blue);
-      font-size: 7px;
+      font-size: 10px;
       letter-spacing: 1px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       line-height: 1.6;
     }
     #hud-label::before { content: '▶  '; }
 
     #hud-track {
-      width: 180px; height: 9px;
+      width: 220px; height: 12px;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(43,127,255,0.3);
       overflow: hidden;
@@ -150,15 +150,15 @@
 
     #hud-hp-label {
       color: var(--green);
-      font-size: 7px;
+      font-size: 10px;
       letter-spacing: 1px;
-      margin-bottom: 6px; margin-top: 12px;
+      margin-bottom: 8px; margin-top: 14px;
       line-height: 1.6;
     }
     #hud-hp-label::before { content: '◆  '; }
 
     #hud-hp-track {
-      width: 180px; height: 9px;
+      width: 220px; height: 12px;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(74,222,128,0.3);
       overflow: hidden;
@@ -186,21 +186,21 @@
 
     #death h2 {
       color: var(--accent);
-      font-size: 24px;
-      letter-spacing: 4px;
+      font-size: 30px;
+      letter-spacing: 5px;
       text-shadow: 4px 4px 0 #5a0015;
       line-height: 1.4;
     }
     #pause h2 {
       color: var(--white);
-      font-size: 20px;
-      letter-spacing: 4px;
+      font-size: 26px;
+      letter-spacing: 5px;
       text-shadow: 3px 3px 0 #000;
       line-height: 1.4;
     }
     #death-restart, #death-menu,
     #pause-restart, #pause-menu {
-      margin-top: 16px;
+      margin-top: 20px;
       background: var(--panel);
       cursor: pointer;
       color: var(--white);
@@ -210,9 +210,9 @@
       border-right:  2px solid rgba(0,0,0,0.5);
       outline: 1px solid rgba(233,69,96,0.35);
       outline-offset: 2px;
-      font-size: 8px;
+      font-size: 11px;
       letter-spacing: 1px;
-      padding: 12px 24px;
+      padding: 16px 32px;
       text-shadow: 2px 2px 0 #000;
       line-height: 1.6;
       transition: color 0.1s, outline-color 0.1s;
@@ -394,19 +394,19 @@
       border-right:  3px solid rgba(0,0,0,0.45);
       outline: 2px solid var(--accent);
       box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--accent);
-      padding: 34px 52px 30px;
+      padding: 44px 68px 40px;
       display: flex; flex-direction: column;
       align-items: center;
       position: relative;
-      min-width: 600px;
+      min-width: 760px;
     }
 
     #controls-title {
       color: var(--gold);
-      font-size: 13px;
-      letter-spacing: 5px;
+      font-size: 17px;
+      letter-spacing: 6px;
       text-shadow: 3px 3px 0 rgba(90,50,0,0.8);
-      margin-bottom: 26px;
+      margin-bottom: 32px;
       line-height: 1.4;
     }
 
@@ -432,10 +432,10 @@
 
     .ctrl-section-title {
       color: var(--accent);
-      font-size: 7px;
+      font-size: 10px;
       letter-spacing: 2px;
-      margin-bottom: 14px;
-      padding-bottom: 7px;
+      margin-bottom: 18px;
+      padding-bottom: 9px;
       border-bottom: 1px solid rgba(233,69,96,0.2);
       line-height: 1.6;
     }
@@ -443,8 +443,8 @@
     .ctrl-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 9px;
+      gap: 14px;
+      margin-bottom: 12px;
     }
 
     .key {
@@ -454,35 +454,35 @@
       border-bottom: 2px solid rgba(0,0,0,0.50);
       border-right:  2px solid rgba(0,0,0,0.50);
       color: var(--gold);
-      font-size: 5px;
+      font-size: 8px;
       letter-spacing: 0.5px;
-      padding: 4px 7px;
+      padding: 6px 10px;
       white-space: nowrap;
-      min-width: 54px;
+      min-width: 78px;
       text-align: center;
       line-height: 1.8;
     }
 
     .ctrl-desc {
       color: var(--dim);
-      font-size: 6px;
+      font-size: 9px;
       letter-spacing: 0px;
       line-height: 1.8;
     }
 
     #controls-tip {
       color: rgba(104,104,160,0.6);
-      font-size: 5px;
+      font-size: 8px;
       letter-spacing: 1px;
-      margin-top: 20px;
+      margin-top: 24px;
       line-height: 1.8;
     }
     #controls-tip::before { content: '◆  '; color: var(--accent); opacity: 0.5; }
 
     #controls-start {
       color: var(--white);
-      font-size: 8px;
-      margin-top: 22px;
+      font-size: 11px;
+      margin-top: 26px;
       letter-spacing: 2px;
       animation: blink 1.0s step-end infinite;
       text-shadow: 2px 2px 0 #000;
