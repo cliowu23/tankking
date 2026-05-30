@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TanKING</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; }
+    #renderCanvas { width: 100vw; height: 100vh; display: block; }
+
+    #menu {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 10;
+    }
+    #menu h1 { color: #cccccc; font: bold 48px monospace; letter-spacing: 6px; }
+    #menu h1 .king { color: #ffffff; font-size: 1.25em; letter-spacing: 8px; }
+    #menu p  { color: #888888; font: 20px monospace; margin-top: 40px; animation: blink 1.2s step-end infinite; }
+    #menu-designer { color: #666; font: 13px monospace; margin-top: 18px; cursor: pointer; letter-spacing: 2px; transition: color 0.15s; }
+    #menu-designer:hover { color: #aaa; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    #hud { position: fixed; bottom: 20px; left: 24px; z-index: 10; display: none; }
+    #hud-label { color: #aaaacc; font: 11px monospace; margin-bottom: 4px; }
+    #hud-track { width: 200px; height: 16px; background: #222; border-radius: 2px; }
+    #hud-fill  { height: 100%; width: 100%; background: #2277ff; border-radius: 2px; transition: background 0.2s; }
+    #hud-hp-label { color: #aaaacc; font: 11px monospace; margin-bottom: 4px; margin-top: 10px; }
+    #hud-hp-track { width: 200px; height: 16px; background: #222; border-radius: 2px; }
+    #hud-hp-fill  { height: 100%; width: 100%; background: #22ee44; border-radius: 2px; transition: background 0.2s; }
+
+    #death {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 20;
+    }
+    #death h2 { color: #ff4455; font: bold 52px monospace; letter-spacing: 10px; }
+    #death-restart, #death-menu {
+      margin-top: 16px; background: none; cursor: pointer;
+      color: #999; border: 1px solid #555; border-radius: 2px;
+      font: 14px monospace; letter-spacing: 3px; padding: 10px 28px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #death-restart:hover, #death-menu:hover { color: #fff; border-color: #aaa; }
+
+    #pause {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 20;
+    }
+    #pause h2 { color: #cccccc; font: bold 42px monospace; letter-spacing: 8px; }
+    #pause-restart, #pause-menu {
+      margin-top: 16px; background: none; cursor: pointer;
+      color: #999; border: 1px solid #555; border-radius: 2px;
+      font: 14px monospace; letter-spacing: 3px; padding: 10px 28px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #pause-restart:hover, #pause-menu:hover { color: #fff; border-color: #aaa; }
+
+    /* Tank Designer */
+    #designer-vignette {
+      position: fixed; inset: 0; display: none;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(180,200,220,0.35) 100%);
+      pointer-events: none; z-index: 4;
+    }
+    #designer-ui {
+      position: fixed; inset: 0; display: none;
+      pointer-events: none; z-index: 5; flex-direction: column;
+    }
+    #designer-topbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; background: rgba(0,0,0,0.78);
+      border-bottom: 1px solid #2a2a2a; pointer-events: auto;
+    }
+    #designer-title { color: #4a8fd4; font: bold 12px monospace; letter-spacing: 3px; }
+    #designer-topbar-spacer { flex: 1; }
+    #designer-hint-top { color: #444; font: 10px monospace; letter-spacing: 1px; }
+    #designer-sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 160px;
+      background: rgba(4,4,6,0.92); border-right: 1px solid #1e1e22;
+      padding: 14px 10px 14px; display: flex; flex-direction: column; gap: 4px;
+      pointer-events: auto; overflow-y: auto;
+    }
+    .ds-title { color: #554; font: 9px monospace; letter-spacing: 2px; padding: 6px 2px 3px; }
+    .ds-divider { border-top: 1px solid #1e1e22; margin: 5px 0; }
+    .shape-btn {
+      width: 100%; background: none; cursor: pointer; border: 1px solid #2a2a2a;
+      color: #888; font: 11px monospace; letter-spacing: 1px; text-align: left;
+      padding: 5px 8px; border-radius: 2px; transition: all 0.1s;
+    }
+    .shape-btn:hover { color: #ddd; border-color: #555; background: rgba(255,255,255,0.04); }
+    .shape-btn.active { color: #4a8fd4; border-color: #4a8fd4; background: rgba(74,143,212,0.10); }
+    .transform-btn {
+      width: 100%; background: none; cursor: pointer; border: 1px solid #2a2a2a;
+      color: #666; font: 10px monospace; letter-spacing: 1px; text-align: left;
+      padding: 4px 8px; border-radius: 2px; transition: all 0.1s;
+    }
+    .transform-btn:hover { color: #bbb; border-color: #444; }
+    .transform-btn.active { color: #4a8fd4; border-color: #4a8fd4; }
+    #designer-color {
+      width: 100%; height: 32px; border: 1px solid #2a2a2a;
+      border-radius: 2px; background: none; cursor: pointer; margin-top: 2px;
+    }
+    #designer-swatches { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .swatch {
+      width: 24px; height: 24px; border-radius: 2px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1); transition: border-color 0.1s;
+    }
+    .swatch:hover { border-color: rgba(255,255,255,0.6); }
+    #designer-delete-btn { margin-top: 6px; }
+
+    /* Level Editor */
+    #editor-ui {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.85); z-index: 30;
+      display: none; flex-direction: column;
+      font-family: monospace;
+    }
+    #editor-toolbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; border-bottom: 1px solid #333;
+    }
+    #editor-title { color: #ffdd00; font: bold 12px monospace; letter-spacing: 3px; margin-right: 6px; }
+    #editor-spacer { flex: 1; }
+    .editor-btn {
+      background: none; cursor: pointer; border: 1px solid #444;
+      color: #888; font: 11px monospace; letter-spacing: 2px;
+      padding: 5px 12px; border-radius: 2px;
+      transition: color 0.1s, border-color 0.1s;
+    }
+    .editor-btn:hover { color: #fff; border-color: #999; }
+    .editor-btn.active { color: #ffdd00; border-color: #ffdd00; }
+    #editor-palette {
+      display: none; align-items: center; gap: 8px;
+      padding: 6px 16px; border-bottom: 1px solid #222;
+    }
+    .palette-btn {
+      background: none; cursor: pointer; border: 1px solid #444;
+      color: #bbb; font: 11px monospace; letter-spacing: 1px;
+      padding: 4px 10px; border-radius: 2px; transition: all 0.1s;
+    }
+    .palette-btn:hover { color: #fff; border-color: #888; }
+    .palette-btn.active { color: #ffdd00; border-color: #ffdd00; background: rgba(255,221,0,0.08); }
+    #editor-palette-hint { color: #555; font: 10px monospace; margin-left: 8px; }
+    #editor-hint {
+      padding: 5px 16px; color: #555; font: 10px monospace; letter-spacing: 1px;
+    }
+
+    /* CRT power-off transition overlay */
+    #crt-off {
+      position: fixed; inset: 0;
+      background: #fff;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transform-origin: center center;
+    }
+    #crt-off.playing {
+      animation: crtOff 0.38s ease-in forwards;
+    }
+    @keyframes crtOff {
+      0%   { opacity: 1;   transform: scaleY(1);     filter: brightness(1.4); }
+      32%  { opacity: 1;   transform: scaleY(0.018); filter: brightness(3);   }
+      66%  { opacity: 0.7; transform: scaleY(0.018); filter: brightness(1);   }
+      100% { opacity: 0;   transform: scaleY(0.018);                          }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+
+  <div id="menu">
+    <h1>Tan<span class="king">KING</span></h1>
+    <p>PRESS ENTER TO START</p>
+    <p id="menu-designer">[ T ] TANK DESIGNER</p>
+  </div>
+
+  <div id="pause">
+    <h2>PAUSED</h2>
+    <button id="pause-restart">RESTART</button>
+    <button id="pause-menu">MAIN MENU</button>
+  </div>
+
+  <div id="death">
+    <h2>YOU DIED</h2>
+    <button id="death-restart">RESTART</button>
+    <button id="death-menu">MAIN MENU</button>
+  </div>
+
+  <div id="hud">
+    <div id="hud-label">BOOST</div>
+    <div id="hud-track"><div id="hud-fill"></div></div>
+    <div id="hud-hp-label">HULL</div>
+    <div id="hud-hp-track"><div id="hud-hp-fill"></div></div>
+  </div>
+
+  <!-- Tank Designer -->
+  <div id="designer-vignette"></div>
+  <div id="designer-ui">
+    <div id="designer-topbar">
+      <span id="designer-title">TANK DESIGNER</span>
+      <span id="designer-topbar-spacer"></span>
+      <button id="designer-exit-btn" class="editor-btn">EXIT [ESC]</button>
+    </div>
+  </div>
+
+  <div id="editor-ui">
+    <div id="editor-toolbar">
+      <span id="editor-title">LEVEL EDITOR</span>
+      <button id="editor-terrain-btn" class="editor-btn active">TERRAIN</button>
+      <button id="editor-objects-btn" class="editor-btn">OBJECTS</button>
+      <span id="editor-spacer"></span>
+      <button id="editor-save-btn" class="editor-btn">SAVE [S]</button>
+      <button id="editor-clear-btn" class="editor-btn">CLEAR OBJECTS</button>
+      <button id="editor-reset-btn" class="editor-btn">RESET ALL</button>
+      <button id="editor-exit-btn" class="editor-btn">EXIT [E]</button>
+    </div>
+    <div id="editor-palette">
+      <button class="palette-btn" data-type="tree">TREE</button>
+      <button class="palette-btn" data-type="house">HOUSE</button>
+      <button class="palette-btn" data-type="rock">ROCK</button>
+      <button class="palette-btn" data-type="wall">WALL</button>
+      <button class="palette-btn" data-type="wreck">WRECK</button>
+      <span id="editor-palette-hint">click ground to place &nbsp;|&nbsp; R = rotate 45 &nbsp;|&nbsp; DEL = remove</span>
+    </div>
+    <div id="editor-hint">click a yellow node to select &nbsp;|&nbsp; UP / DOWN arrows to raise / lower &nbsp;|&nbsp; SHIFT for fine control</div>
+  </div>
+
+  <div id="crt-off"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

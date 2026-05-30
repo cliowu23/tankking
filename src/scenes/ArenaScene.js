@@ -1,0 +1,1066 @@
+import {
+  Scene, ArcRotateCamera, HemisphericLight, DirectionalLight,
+  ShadowGenerator, MeshBuilder, StandardMaterial, Color3, Color4,
+  Vector3, Matrix, DynamicTexture, GlowLayer, TransformNode, SceneLoader,
+  VertexBuffer, VertexData, Quaternion,
+} from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
+import LevelEditor from '../editor/LevelEditor.js';
+import { loadLayout } from '../editor/SceneSerializer.js';
+import Tank from '../entities/Tank.js';
+import Enemy from '../entities/Enemy.js';
+import AIEnemy from '../entities/AIEnemy.js';
+import Shell, { SHELL_GRAVITY } from '../entities/Shell.js';
+import PershingTank from '../entities/PershingTank.js';
+
+export default class ArenaScene {
+  constructor(engine) {
+    this.scene = new Scene(engine);
+    this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
+
+    this.scene._onCameraShake = (duration, intensity) => this._triggerShake(duration, intensity);
+    this._shakeTime      = 0;
+    this._shakeIntensity = 0;
+
+    this.lockedEnemy      = null;
+    this._fHeld           = false;
+    this._fHoldTime       = 0;
+    this._fDidLock        = false;
+    this._prevLockedEnemy = null;
+    this._fadeOutTime     = 0;
+    this._lockSnapTime    = -1; // seconds since snap fired; -1 = inactive
+    this._cancelFadeTime     = -1;
+    this._cancelFadeEnemy    = null;
+    this._cancelFadeAlpha    = 0;
+    this._cancelFadeHoldTime = 0;
+
+    // Persistent camera target position for soft follow
+    this._camX = 0;
+    this._camZ = 0;
+
+    this._paused = false;
+
+    this._obstacles = [];
+    this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
+
+    this._setupCamera();
+    this._setupLighting();
+    this._setupGround();
+    this._setupEnvironment();
+    this._setupSky();
+    this._setupHazards();
+    this._setupEntities();
+    // this._setupDevLabels();
+    this._initEditor();
+    this._loadLayout();
+    this._setupLockOn();
+    this._setupFiring();
+    this._setupGameLoop();
+  }
+
+  _setupCamera() {
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2, 0.5, 39, Vector3.Zero(), this.scene);
+  }
+
+  _setupLighting() {
+    const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
+    ambient.intensity   = 0.85;
+    ambient.diffuse     = new Color3(1.0, 0.97, 0.88);
+    ambient.groundColor = new Color3(0.28, 0.52, 0.10);
+
+    this.dirLight = new DirectionalLight('dir', new Vector3(-0.5, -1.4, -0.5), this.scene);
+    this.dirLight.intensity = 1.1;
+    this.dirLight.position  = new Vector3(12, 20, 12);
+
+    this.shadowGen = new ShadowGenerator(1024, this.dirLight);
+    this.shadowGen.useBlurExponentialShadowMap = true;
+
+    // Warm green bounce from below — grass reflection
+    const fillLight = new HemisphericLight('fill', new Vector3(0, -1, 0), this.scene);
+    fillLight.diffuse   = new Color3(0.20, 0.45, 0.10);
+    fillLight.intensity = 0.15;
+  }
+
+  _setupGround() {
+    const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
+
+    // Checkerboard DynamicTexture — toy diorama floor
+    const groundTex = new DynamicTexture('groundTex', { width: 128, height: 128 }, this.scene);
+    const ctx = groundTex.getContext();
+    ctx.fillStyle = '#202028';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#181820';
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillRect(64, 64, 64, 64);
+    groundTex.update();
+    groundTex.uScale = 14;
+    groundTex.vScale = 14;
+
+    const mat = new StandardMaterial('groundMat', this.scene);
+    mat.diffuseTexture = groundTex;
+    mat.specularColor  = new Color3(0, 0, 0);
+    ground.material = mat;
+    ground.receiveShadows = true;
+
+    // Inner editable terrain — sits on top of outer ground, subdivided for height sculpting
+    this.terrainMesh = MeshBuilder.CreateGround('terrain', {
+      width: 48, height: 48, subdivisions: 10, updatable: true,
+    }, this.scene);
+    this.terrainMesh.position.y = 0.01;
+    this.terrainMesh.material   = mat;
+    this.terrainMesh.receiveShadows = true;
+  }
+
+  _setupEnvironment() {
+    const wallMat = new StandardMaterial('wallMat', this.scene);
+    wallMat.diffuseColor  = new Color3(0.95, 0.82, 0.30);
+    wallMat.specularColor = new Color3(0.08, 0.08, 0.08);
+
+    const stripeMat = new StandardMaterial('stripeDecalMat', this.scene);
+    stripeMat.diffuseColor  = new Color3(0.90, 0.10, 0.08);
+    stripeMat.specularColor = new Color3(0.0, 0.0, 0.0);
+
+    // [name, w, h, d, x, y, z]
+    const wallDefs = [
+      ['wallN', 102, 2.2, 1.2,    0, 1.1, -50],
+      ['wallS', 102, 2.2, 1.2,    0, 1.1,  50],
+      ['wallE', 1.2, 2.2, 102,   50, 1.1,   0],
+      ['wallW', 1.2, 2.2, 102,  -50, 1.1,   0],
+    ];
+    for (const [name, w, h, d, x, y, z] of wallDefs) {
+      const wall = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, this.scene);
+      wall.position.set(x, y, z);
+      wall.material = wallMat;
+      wall.receiveShadows = true;
+      this.shadowGen.addShadowCaster(wall);
+    }
+
+    // Red accent stripe near top of each wall's interior face
+    const stripeDefs = [
+      ['stripeN', 102,  0.30, 0.06,    0, 1.85, -49.4],
+      ['stripeS', 102,  0.30, 0.06,    0, 1.85,  49.4],
+      ['stripeE', 0.06, 0.30, 102,  49.4, 1.85,     0],
+      ['stripeW', 0.06, 0.30, 102, -49.4, 1.85,     0],
+    ];
+    for (const [name, w, h, d, x, y, z] of stripeDefs) {
+      const stripe = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, this.scene);
+      stripe.position.set(x, y, z);
+      stripe.material = stripeMat;
+    }
+  }
+
+  _setupSky() {
+    // Top-down camera (y=34, beta=0.5) sees the ground as the dominant surface.
+    // The clearColor IS the sky — it fills all pixels outside the arena ground.
+    this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
+
+    // Clouds positioned outside the arena perimeter at low altitude so
+    // the elevated camera actually sees them around the arena edges.
+    const cloudMat = new StandardMaterial('cloudMat', this.scene);
+    cloudMat.diffuseColor    = new Color3(1, 1, 1);
+    cloudMat.emissiveColor   = new Color3(0.90, 0.93, 0.98);
+    cloudMat.disableLighting = true;
+
+    // [centerX, centerY, centerZ, scale]
+    const cloudDefs = [
+      [  10, 5,  80, 10],
+      [ -80, 4,  35,  8],
+      [  80, 5, -15,  9],
+      [ -45, 4,  85, 11],
+      [  65, 5,  70,  8],
+      [ -65, 4, -70,  7],
+    ];
+    const puffLayout = [
+      [  0.0, 0.0, 0, 1.00],
+      [  2.2, 0.3, 0, 0.80],
+      [ -2.0, 0.2, 0, 0.75],
+      [  0.5, 1.4, 0, 0.65],
+    ];
+    for (const [cx, cy, cz, scale] of cloudDefs) {
+      const root = new TransformNode(`cloud_${cx}_${cz}`, this.scene);
+      root.position.set(cx, cy, cz);
+      for (const [px, py, pz, pr] of puffLayout) {
+        const puff = MeshBuilder.CreateSphere(`puff_${cx}_${px}`, {
+          diameter: pr * scale * 2, segments: 5,
+        }, this.scene);
+        puff.position.set(px * scale, py * scale, pz * scale);
+        puff.material   = cloudMat;
+        puff.parent     = root;
+        puff.isPickable = false;
+      }
+    }
+  }
+
+  _setupHazards() {
+    const TS = 16; // 16×16 pixel grid — Minecraft scale
+
+    // Animated lava texture
+    this._lavaTex = new DynamicTexture('lavaTex', { width: TS, height: TS }, this.scene, false);
+    this._lavaTex.updateSamplingMode(1); // NEAREST — hard pixel edges
+
+    const lavaMat = new StandardMaterial('lavaMat', this.scene);
+    lavaMat.disableLighting = true;
+    lavaMat.diffuseTexture  = this._lavaTex;
+    lavaMat.emissiveTexture = this._lavaTex;
+
+    const lava = MeshBuilder.CreateBox('lavaPool', { width: 10, height: 0.1, depth: 10 }, this.scene);
+    lava.position.set(-15, 0.05, 0);
+    lava.material = lavaMat;
+
+    // Seed heat grid with random values
+    this._lavaGrid  = Array.from({ length: TS }, () =>
+      Array.from({ length: TS }, () => Math.random()),
+    );
+    this._lavaFrame = 0;
+
+    this.lavaZones = [{ x: -15, z: 0, halfW: 5, halfD: 5, dps: 80 }];
+
+    // Glow — only affects the lava mesh
+    this._lavaGlow = new GlowLayer('lavaGlow', this.scene);
+    this._lavaGlow.intensity = 0.8;
+    this._lavaGlow.addIncludedOnlyMesh(lava);
+
+  }
+
+  _updateLavaTex() {
+    const TS    = 16;
+    const grid  = this._lavaGrid;
+
+    // Throttle to every 3 rendered frames for the slow Minecraft lava feel
+    this._lavaFrame++;
+    if (this._lavaFrame % 3 !== 0) return;
+
+    // Cellular automaton — each cell blends with neighbours + random heat injections
+    const next = grid.map(row => [...row]);
+    for (let y = 0; y < TS; y++) {
+      for (let x = 0; x < TS; x++) {
+        const l = grid[y][(x - 1 + TS) % TS];
+        const r = grid[y][(x + 1) % TS];
+        const u = grid[(y - 1 + TS) % TS][x];
+        const d = grid[(y + 1) % TS][x];
+        let v = grid[y][x] * 0.4 + l * 0.15 + r * 0.15 + u * 0.15 + d * 0.15;
+        if (Math.random() < 0.04) v = 0.6 + Math.random() * 0.4; // random heat spike
+        next[y][x] = Math.max(0.05, Math.min(1.0, v));
+      }
+    }
+    this._lavaGrid = next;
+
+    // Draw pixel-by-pixel using a 6-stop lava palette
+    const ctx = this._lavaTex.getContext();
+    const img = ctx.createImageData(TS, TS);
+    const px  = img.data;
+    for (let y = 0; y < TS; y++) {
+      for (let x = 0; x < TS; x++) {
+        const v = this._lavaGrid[y][x];
+        let r, g, b;
+        if      (v < 0.20) { r=40;  g=0;   b=60; }
+        else if (v < 0.38) { r=130; g=0;   b=100; }
+        else if (v < 0.55) { r=220; g=30;  b=140; }
+        else if (v < 0.70) { r=255; g=100; b=30; }
+        else if (v < 0.85) { r=255; g=200; b=30; }
+        else               { r=255; g=240; b=180; }
+        const i = (y * TS + x) * 4;
+        px[i]=r; px[i+1]=g; px[i+2]=b; px[i+3]=255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    this._lavaTex.update();
+  }
+
+  _setupEntities() {
+    this.tank = new Tank(this.scene, 0, 0);
+    this.tank.addShadows(this.shadowGen);
+
+    this._enemySpawns = [
+      [  0.0, -25.5],
+      [-21.9, -10.3],
+      [ 19.2, -13.9],
+      [-13.6,  16.7],
+      [ 16.2,  14.7],
+    ];
+    this.enemies = this._enemySpawns.map(([x, z]) => {
+      const e = new Enemy(this.scene, x, z);
+      e.addShadows(this.shadowGen);
+      return e;
+    });
+
+    this.aiEnemy = new AIEnemy(this.scene, 0, 42);
+    this.aiEnemy.addShadows(this.shadowGen);
+
+    // Demo model — Pershing for art direction reference (drive north)
+    this.pershing = new PershingTank(this.scene, -7, 20);
+    this.pershing.addShadows(this.shadowGen);
+
+    // Pause / restart
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape') return;
+      if (document.getElementById('menu').style.display !== 'none') return;
+      this._paused = !this._paused;
+      document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
+    });
+    document.getElementById('pause-restart').addEventListener('click', () => {
+      this._restart();
+      this._paused = false;
+      document.getElementById('pause').style.display = 'none';
+    });
+
+    document.getElementById('death-restart').addEventListener('click', () => {
+      this._restart();
+      this._paused = false;
+      document.getElementById('death').style.display = 'none';
+    });
+
+    this._loadPlayerGLB();
+  }
+
+  _loadPlayerGLB() {
+    SceneLoader.ImportMeshAsync('', '/models/', 't-55ak.glb', this.scene).then(result => {
+      const glbRoot    = result.transformNodes.find(n => n.name === 'Sketchfab_model');
+      const turretNode = result.transformNodes.find(n => n.name === 'turret');
+      const mountNode  = result.transformNodes.find(n => n.name === 'mount');
+
+      if (!glbRoot) { console.error('T-55: Sketchfab_model not found'); return; }
+
+      // --- 1. Correct orientation: model faces +X, game forward is +Z → pre-rotate -PI/2 Y ---
+      const correction = Quaternion.RotationAxis(Vector3.Up(), -Math.PI / 2);
+      if (glbRoot.rotationQuaternion) {
+        glbRoot.rotationQuaternion = correction.multiply(glbRoot.rotationQuaternion);
+      } else {
+        glbRoot.rotationQuaternion = correction;
+      }
+
+      // --- 2. Force world matrices after rotation so bounding box is correct ---
+      result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      result.meshes.forEach(m => m.computeWorldMatrix(true));
+
+      // --- 3. Bounding box in world space (model still at origin) ---
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (const m of result.meshes) {
+        if (m.name === '__root__') continue;
+        const w = m.getBoundingInfo().boundingBox;
+        if (w.minimumWorld.x < minX) minX = w.minimumWorld.x;
+        if (w.minimumWorld.y < minY) minY = w.minimumWorld.y;
+        if (w.minimumWorld.z < minZ) minZ = w.minimumWorld.z;
+        if (w.maximumWorld.x > maxX) maxX = w.maximumWorld.x;
+        if (w.maximumWorld.y > maxY) maxY = w.maximumWorld.y;
+        if (w.maximumWorld.z > maxZ) maxZ = w.maximumWorld.z;
+      }
+
+      // Scale by hull width (2.4 game units) — barrel length is ignored so
+      // the barrel can overhang the collision box as expected on a real tank model.
+      const modelW = maxX - minX;
+      const modelD = maxZ - minZ;
+      const scale  = 2.4 / modelW;
+      const offX   = -((maxX + minX) / 2) * scale;
+      const offY   = -minY * scale;
+      const offZ   = -((maxZ + minZ) / 2) * scale;
+
+      // --- 4. Hide ALL primitive placeholder meshes under tank.root before attaching GLB ---
+      this.scene.meshes
+        .filter(m => m.isDescendantOf(this.tank.root))
+        .forEach(m => { m.isVisible = false; });
+
+      // --- 5. Attach glbRoot directly to tank.root ---
+      glbRoot.parent = this.tank.root;
+      glbRoot.scaling.setAll(scale);
+      glbRoot.position.set(offX, offY, offZ);
+
+      // --- 6. Force world matrices with new parent chain ---
+      result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      result.meshes.forEach(m => m.computeWorldMatrix(true));
+
+      // Capture world positions BEFORE re-parenting so we can correct pivot centers.
+      // turretNode origin = turret ring center; mountNode origin = barrel trunnion.
+      const turretAbsPos = turretNode ? turretNode.absolutePosition.clone() : null;
+      const mountAbsPos  = mountNode  ? mountNode.absolutePosition.clone()  : null;
+
+      // --- 7a. Turret → turretPivot, then move pivot to actual turret ring ---
+      if (turretNode) {
+        turretNode.setParent(this.tank.turretPivot);
+        // GLB node origins sit at the model's base plane (y≈0), so absolutePosition.y
+        // is not useful for height. Only correct X and Z (the "too far forward" issue).
+        const rootInv = Matrix.Invert(this.tank.root.getWorldMatrix());
+        const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
+        this.tank.turretPivot.position.x = localPos.x;
+        this.tank.turretPivot.position.z = localPos.z;
+        // Y remains at 0.55 — hull-roof height, set in Tank.js
+        this.tank.turretPivot.computeWorldMatrix(true);
+        turretNode.position.setAll(0); // ring is now at pivot — rotates in-place
+        turretNode.computeWorldMatrix(true);
+        // Propagate to all descendants (mountNode is still under turretNode)
+        result.transformNodes.forEach(n => n.computeWorldMatrix(true));
+      }
+
+      // --- 7b. Mount → barrelPivot, then move pivot to barrel trunnion XZ ---
+      if (mountNode) {
+        mountNode.setParent(this.tank.barrelPivot);
+        // Same logic: only correct X and Z, keep Y=0.3 (barrel height above ring)
+        const tpInv = Matrix.Invert(this.tank.turretPivot.getWorldMatrix());
+        const localPos = Vector3.TransformCoordinates(mountAbsPos, tpInv);
+        this.tank.barrelPivot.position.x = localPos.x;
+        this.tank.barrelPivot.position.z = localPos.z;
+        // Y remains at 0.3 in turretPivot space — barrel elevation pivot height
+        this.tank.barrelPivot.computeWorldMatrix(true);
+        mountNode.position.setAll(0);
+        this._barrelPivotBaseZ = this.tank.barrelPivot.position.z;
+      }
+
+      // --- 8. Shadows ---
+      for (const m of result.meshes) {
+        if (m.name === '__root__') continue;
+        this.shadowGen.addShadowCaster(m);
+        m.receiveShadows = true;
+      }
+
+      console.log(`T-55 loaded: scale=${scale.toFixed(4)}, w=${modelW.toFixed(2)}, d=${modelD.toFixed(2)}`);
+    }).catch(e => console.error('T-55 load failed:', e));
+  }
+
+  _setupDevLabels() {
+    // Grid reference: label one square near origin (cyan)
+    const g = this._devLabel('grid: 2.5u', '#66ddff');
+    g.position.set(1.25, 0.15, 1.25);
+
+    // Tank hull dimensions (yellow), parented so they follow the tank
+    const w = this._devLabel('2.4u wide', '#ffee66');
+    w.parent = this.tank.root;
+    w.position.set(2.2, 0.8, 0);
+
+    const d = this._devLabel('3.2u deep', '#ffee66');
+    d.parent = this.tank.root;
+    d.position.set(0, 0.8, 2.4);
+  }
+
+  _devLabel(text, color) {
+    const plane = MeshBuilder.CreatePlane(`dl_${text}`, { width: 3.0, height: 0.72 }, this.scene);
+    plane.billboardMode = 7; // BILLBOARDMODE_ALL — always faces camera
+    plane.isPickable = false;
+
+    const tex = new DynamicTexture(`dlt_${text}`, { width: 384, height: 80 }, this.scene, false);
+    tex.drawText(text, null, null, 'bold 34px Arial', color, 'transparent', true);
+
+    const mat = new StandardMaterial(`dlm_${text}`, this.scene);
+    mat.diffuseTexture = tex;
+    mat.emissiveTexture = tex;
+    mat.backFaceCulling = false;
+    mat.useAlphaFromDiffuseTexture = true;
+    plane.material = mat;
+    return plane;
+  }
+
+  _setupLockOn() {
+    const ringMat = new StandardMaterial('lockRingMat', this.scene);
+    ringMat.diffuseColor  = new Color3(0.8, 0.0, 0.0);
+    ringMat.emissiveColor = new Color3(1.0, 0.0, 0.0);
+    ringMat.alpha = 0.9;
+
+    this.lockRing = MeshBuilder.CreateTorus('lockRing', {
+      diameter: 3.8, thickness: 0.18, tessellation: 40,
+    }, this.scene);
+    // Torus default axis is Y — ring already lies flat in XZ plane, no rotation needed
+    this.lockRing.rotation.x = 0;
+    this.lockRing.isVisible  = false;
+    this.lockRing.material   = ringMat;
+
+    // Second ring used only for the quick fade-out when switching / unlocking
+    const fadeMat = new StandardMaterial('fadeRingMat', this.scene);
+    fadeMat.diffuseColor  = new Color3(0.8, 0.0, 0.0);
+    fadeMat.emissiveColor = new Color3(1.0, 0.0, 0.0);
+    fadeMat.alpha = 0;
+    this.fadeRing = MeshBuilder.CreateTorus('fadeRing', {
+      diameter: 3.8, thickness: 0.18, tessellation: 40,
+    }, this.scene);
+    this.fadeRing.rotation.x = 0;
+    this.fadeRing.isVisible  = false;
+    this.fadeRing.material   = fadeMat;
+
+    this._lockPulseTime = 0;
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'KeyF' || this._fHeld) return;
+      this._fHeld       = true;
+      this._fHoldTime   = 0;
+      this._fDidLock    = false;
+      this._lockPulseTime = 0; // restart pulse animation each hold attempt
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code !== 'KeyF') return;
+      if (!this._fDidLock) {
+        if (this.lockedEnemy) {
+          // Tap unlock — fade out current target
+          this._prevLockedEnemy = this.lockedEnemy;
+          this._fadeOutTime     = 0;
+          this.lockedEnemy      = null;
+        } else {
+          // Released early without completing lock — fade out candidate ring from wherever it was
+          this._cancelFadeEnemy    = this._nearestToCursor();
+          this._cancelFadeAlpha    = this.lockRing.material.alpha;
+          this._cancelFadeHoldTime = this._fHoldTime; // continue shrink from here
+          this._cancelFadeTime     = 0;
+        }
+      }
+      this._fHeld = false;
+    });
+  }
+
+  _nearestToCursor() {
+    let cx = this.tank.position.x;
+    let cz = this.tank.position.z;
+    const ray = this.scene.createPickingRay(
+      this.scene.pointerX, this.scene.pointerY, null, this.camera,
+    );
+    if (ray && Math.abs(ray.direction.y) > 0.0001) {
+      const t = -ray.origin.y / ray.direction.y;
+      cx = ray.origin.x + t * ray.direction.x;
+      cz = ray.origin.z + t * ray.direction.z;
+    }
+    let nearest = null, bestDist = Infinity;
+    const candidates = [...this.enemies, this.aiEnemy];
+    for (const enemy of candidates) {
+      if (!enemy.alive) continue;
+      const d = Math.hypot(enemy.position.x - cx, enemy.position.z - cz);
+      if (d < bestDist) { bestDist = d; nearest = enemy; }
+    }
+    return nearest;
+  }
+
+  _lockOnNearestToCursor() {
+    const next = this._nearestToCursor();
+    if (this.lockedEnemy && this.lockedEnemy !== next) {
+      this._prevLockedEnemy = this.lockedEnemy;
+      this._fadeOutTime     = 0;
+    }
+    this.lockedEnemy   = next;
+    this._lockSnapTime = 0; // kick off snap animation
+  }
+
+  _initEditor() {
+    const canvas = document.getElementById('renderCanvas');
+    this.levelEditor = new LevelEditor(
+      this.scene, this.terrainMesh, this.shadowGen, this._obstacles,
+      {
+        onActivate: () => {
+          this._paused = true;
+          this.camera.target.set(0, 0, 0);
+          this.camera.detachControl();
+        },
+        onDeactivate: () => {
+          this._paused = false;
+          this.camera.attachControl(canvas, true);
+        },
+      },
+    );
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'KeyE') return;
+      if (document.getElementById('menu').style.display !== 'none') return;
+      if (document.getElementById('pause').style.display === 'flex') return;
+      this.levelEditor.toggle();
+    });
+  }
+
+  _loadLayout() {
+    const data = loadLayout();
+    if (data) this.levelEditor.applyLayout(data);
+  }
+
+  _checkObstacleCollisions() {
+    if (!this.tank.alive) return;
+    const t = this.tank;
+    for (const obs of this._obstacles) {
+      const dx = t.position.x - obs.position.x;
+      const dz = t.position.z - obs.position.z;
+      const overlapX = (t.halfW + obs.halfW) - Math.abs(dx);
+      const overlapZ = (t.halfD + obs.halfD) - Math.abs(dz);
+      if (overlapX <= 0 || overlapZ <= 0) continue;
+      t.speed *= 0.25;
+      if (overlapX < overlapZ) {
+        t.root.position.x += overlapX * Math.sign(dx);
+      } else {
+        t.root.position.z += overlapZ * Math.sign(dz);
+      }
+    }
+  }
+
+  _setupGameLoop() {
+    let lastTime = performance.now();
+
+    this.scene.registerBeforeRender(() => {
+      const now = performance.now();
+      const dt  = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime  = now;
+
+      if (this._paused) return;
+
+      // Hold-F lock-on: fire after 0.7 s
+      if (this._fHeld && !this._fDidLock) {
+        this._fHoldTime += dt;
+        if (this._fHoldTime >= 0.7) {
+          this._fDidLock = true;
+          this._lockOnNearestToCursor();
+        }
+      }
+
+      // Pass lock target to tank — use predicted position for moving targets
+      if (this.lockedEnemy) {
+        this.tank.lockTarget = this._predictTargetPos(this.lockedEnemy);
+      } else {
+        this.tank.lockTarget = null;
+      }
+
+      this.tank.update(dt);
+
+      for (const enemy of this.enemies) {
+        enemy.update(dt);
+      }
+      this.aiEnemy.update(dt, this.tank.position);
+      for (const s of this.aiEnemy.shells) s.update(dt);
+
+      // --- Barrel elevation ---
+      const MIN_ELEV = 10 * Math.PI / 180;
+      const MAX_ELEV = 50 * Math.PI / 180;
+      if (this.lockedEnemy) {
+        const predicted  = this._predictTargetPos(this.lockedEnemy);
+        const targetElev = this._elevationForTarget(predicted);
+        this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-10 * dt));
+      } else if (this._charging) {
+        this._chargeTime = Math.min(this._chargeTime + dt, 1.5);
+        const progress = this._chargeTime / 1.5;
+        this.tank.barrelElevation = MIN_ELEV + progress * (MAX_ELEV - MIN_ELEV);
+      } else {
+        // Hold elevation steady during recoil so the barrel kicks straight back,
+        // not downward. Only return to rest once recoil finishes.
+        if (this.tank._recoil <= 0) {
+          this.tank.barrelElevation *= Math.exp(-8 * dt);
+        }
+      }
+
+      // Barrel recoil: kick back on fire, spring back to rest over 0.22s (no overshoot)
+      if (this.tank._recoil > 0) {
+        this.tank._recoil = Math.max(0, this.tank._recoil - dt / 0.22);
+        const kick = -0.30 * this.tank._recoil;
+        this.tank.barrelPivot.position.z = this._barrelPivotBaseZ + kick;
+      }
+
+      this._updateLavaTex();
+      this._lavaGlow.intensity = 0.5 + Math.sin(performance.now() / 600) * 0.35;
+      this._checkHazards(dt);
+      this._checkCollisions();
+      this._checkObstacleCollisions();
+      this._fireCooldown = Math.max(0, this._fireCooldown - dt);
+      for (const shell of this.shells) shell.update(dt);
+      this._checkShellHits();
+      this._updateArcPreview();
+      this._updateLockRing(dt);
+      this._updateCamera(dt);
+      this._updateHUD();
+    });
+  }
+
+  _updateLockRing(dt) {
+    const FADE_OUT = 0.2;
+    // Cache candidate once per frame
+    const candidate = (this._fHeld && !this._fDidLock) ? this._nearestToCursor() : null;
+
+    // --- fadeRing: holds old target steady during switch, then fades it out ---
+    if (this._prevLockedEnemy) {
+      this._fadeOutTime += dt;
+      const t = this._fadeOutTime / FADE_OUT;
+      if (t < 1) {
+        this.fadeRing.isVisible          = true;
+        this.fadeRing.position.x         = this._prevLockedEnemy.position.x;
+        this.fadeRing.position.y         = 0.04;
+        this.fadeRing.position.z         = this._prevLockedEnemy.position.z;
+        this.fadeRing.material.alpha     = 0.9 * (1 - t);
+      } else {
+        this.fadeRing.isVisible = false;
+        this._prevLockedEnemy   = null;
+      }
+    } else if (candidate && this.lockedEnemy && candidate !== this.lockedEnemy) {
+      // Mid-switch: keep old locked target visible on fadeRing while candidate builds
+      this.fadeRing.isVisible          = true;
+      this.fadeRing.position.x         = this.lockedEnemy.position.x;
+      this.fadeRing.position.y         = 0.04;
+      this.fadeRing.position.z         = this.lockedEnemy.position.z;
+      this.fadeRing.material.alpha         = 0.9;
+      this.fadeRing.material.emissiveColor = new Color3(1, 0, 0);
+    } else {
+      this.fadeRing.isVisible = false;
+    }
+
+    // --- lockRing: candidate closing in during lock-in, solid red when locked ---
+    // Skip candidate animation if it's the same as the already-locked enemy (tap-to-unlock case)
+    if (candidate && candidate !== this.lockedEnemy) {
+      const progress = this._fHoldTime / 0.7;
+      const rem      = 1 - progress;
+      // Ring closes in: 2.5× → 1× quadratic ease (fast start, slows as it locks)
+      this.lockRing.scaling.setAll(1 + 0.9 * rem * rem);
+      this.lockRing.material.alpha         = 0.15 + progress * 0.75;
+      this.lockRing.material.emissiveColor = new Color3(1, rem * 0.5, 0);
+      this.lockRing.isVisible  = true;
+      this.lockRing.position.x = candidate.position.x;
+      this.lockRing.position.y = 0.04;
+      this.lockRing.position.z = candidate.position.z;
+    } else if (this._cancelFadeTime >= 0) {
+      // Early F release — fade the candidate ring out from wherever it was
+      this._cancelFadeTime += dt;
+      const t = this._cancelFadeTime / 0.2;
+      if (t < 1) {
+        // Continue shrinking from where it was when F was released
+        const virtualProgress = Math.min((this._cancelFadeHoldTime + this._cancelFadeTime) / 0.7, 1);
+        const rem = 1 - virtualProgress;
+        this.lockRing.isVisible          = true;
+        this.lockRing.scaling.setAll(1 + 0.9 * rem * rem);
+        this.lockRing.material.alpha         = this._cancelFadeAlpha * (1 - t);
+        this.lockRing.material.emissiveColor = new Color3(1, 0.3, 0);
+        this.lockRing.position.x = this._cancelFadeEnemy.position.x;
+        this.lockRing.position.y = 0.04;
+        this.lockRing.position.z = this._cancelFadeEnemy.position.z;
+      } else {
+        this._cancelFadeTime  = -1;
+        this._cancelFadeEnemy = null;
+        this.lockRing.scaling.setAll(1);
+        this.lockRing.isVisible = false;
+      }
+
+    } else if (this.lockedEnemy) {
+      this.lockRing.material.alpha         = 0.9;
+      this.lockRing.material.emissiveColor = new Color3(1, 0, 0);
+      this.lockRing.isVisible  = true;
+      this.lockRing.position.x = this.lockedEnemy.position.x;
+      this.lockRing.position.y = 0.04;
+      this.lockRing.position.z = this.lockedEnemy.position.z;
+
+      // Snap animation: ring overshoots to 1.5× then eases back to 1× over 0.15s
+      if (this._lockSnapTime >= 0) {
+        this._lockSnapTime += dt;
+        const t     = Math.min(this._lockSnapTime / 0.15, 1);
+        const ease  = 1 - (1 - t) * (1 - t);        // quadratic ease-out
+        const scale = 1.5 - 0.5 * ease;              // 1.5 → 1.0
+        this.lockRing.scaling.setAll(scale);
+        if (t >= 1) this._lockSnapTime = -1;
+      } else {
+        this.lockRing.scaling.setAll(1);
+      }
+    } else {
+      this.lockRing.scaling.setAll(1);
+      this.lockRing.isVisible = false;
+    }
+  }
+
+  _checkHazards(dt) {
+    if (!this.tank.alive) return;
+    for (const zone of this.lavaZones) {
+      const dx = Math.abs(this.tank.position.x - zone.x);
+      const dz = Math.abs(this.tank.position.z - zone.z);
+      if (dx < zone.halfW && dz < zone.halfD) {
+        this.tank.takeDamage(zone.dps * dt);
+        if (!this.tank.alive) this._showDeath();
+        break;
+      }
+    }
+  }
+
+  _showDeath() {
+    this._paused = true;
+    document.getElementById('death').style.display = 'flex';
+  }
+
+  _restart() {
+    for (let i = 0; i < this.enemies.length; i++) {
+      const [x, z] = this._enemySpawns[i];
+      this.enemies[i].reset(x, z);
+    }
+    this.aiEnemy.reset(0, 42);
+    this.tank.reset();
+    this.lockedEnemy      = null;
+    this._prevLockedEnemy = null;
+    this.lockRing.isVisible  = false;
+    this.fadeRing.isVisible  = false;
+  }
+
+  _checkCollisions() {
+    const t = this.tank;
+
+    for (const enemy of [...this.enemies, this.aiEnemy]) {
+      if (!enemy.alive) continue;
+      const dx = t.position.x - enemy.position.x;
+      const dz = t.position.z - enemy.position.z;
+
+      const overlapX = (t.halfW + enemy.halfW) - Math.abs(dx);
+      const overlapZ = (t.halfD + enemy.halfD) - Math.abs(dz);
+
+      if (overlapX <= 0 || overlapZ <= 0) continue;
+
+      const impactSpeed = Math.abs(t.speed);
+
+      if (impactSpeed < enemy.staticFrictionThreshold) {
+        t.speed *= 0.4;
+        this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.5);
+        continue;
+      }
+
+      const alreadyBroken = enemy.staticFrictionThreshold === 0;
+      enemy.staticFrictionThreshold = 0;
+      t.speed *= 0.2;
+
+      const pushMult = alreadyBroken ? 3.5 : 2.2;
+      const pushSpd  = impactSpeed * (t.mass / enemy.mass) * pushMult;
+      const fwd      = new Vector3(Math.sin(t.rotY), 0, Math.cos(t.rotY));
+      enemy.vx = fwd.x * pushSpd;
+      enemy.vz = fwd.z * pushSpd;
+
+      this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.7);
+      this._triggerShake(0.11, 0.4);
+    }
+  }
+
+  _separate(tank, enemy, dx, dz, overlapX, overlapZ, ratio) {
+    if (overlapX < overlapZ) {
+      const sep = overlapX * Math.sign(dx);
+      tank.root.position.x  +=  sep * ratio;
+      enemy.root.position.x -= sep * (1 - ratio);
+    } else {
+      const sep = overlapZ * Math.sign(dz);
+      tank.root.position.z  +=  sep * ratio;
+      enemy.root.position.z -= sep * (1 - ratio);
+    }
+  }
+
+  _triggerShake(duration, intensity) {
+    this._shakeTime      = duration;
+    this._shakeIntensity = intensity;
+  }
+
+  _updateCamera(dt) {
+    // --- 1. Aim offset: pull frame toward cursor (30%, clamped to 3.5 u) ---
+    let aimX = 0, aimZ = 0;
+    const ray = this.scene.createPickingRay(
+      this.scene.pointerX, this.scene.pointerY, null, this.camera,
+    );
+    if (ray && Math.abs(ray.direction.y) > 0.0001) {
+      const t  = -ray.origin.y / ray.direction.y;
+      const cx = ray.origin.x + t * ray.direction.x;
+      const cz = ray.origin.z + t * ray.direction.z;
+      const rawX = (cx - this.tank.position.x) * 0.3;
+      const rawZ = (cz - this.tank.position.z) * 0.3;
+      const len  = Math.sqrt(rawX * rawX + rawZ * rawZ) || 1;
+      const scale = Math.min(len, 4.8) / len;
+      aimX = rawX * scale;
+      aimZ = rawZ * scale;
+    }
+
+    // --- 2. Movement lead: push frame ahead in travel direction (clamped to 1.5 u) ---
+    const rawLeadX = Math.sin(this.tank.rotY) * this.tank.speed * 0.12;
+    const rawLeadZ = Math.cos(this.tank.rotY) * this.tank.speed * 0.12;
+    const leadLen  = Math.sqrt(rawLeadX * rawLeadX + rawLeadZ * rawLeadZ) || 1;
+    const leadScale = Math.min(leadLen, 1.5) / leadLen;
+    const leadX = rawLeadX * leadScale;
+    const leadZ = rawLeadZ * leadScale;
+
+    // --- 3. Soft follow: exponential lerp toward desired target ---
+    const desiredX = this.tank.position.x + aimX + leadX;
+    const desiredZ = this.tank.position.z + aimZ + leadZ;
+    const smooth   = 1 - Math.exp(-7 * dt);
+    this._camX += (desiredX - this._camX) * smooth;
+    this._camZ += (desiredZ - this._camZ) * smooth;
+
+    // --- Apply with shake on top ---
+    if (this._shakeTime > 0) {
+      this._shakeTime -= dt;
+      const s = this._shakeIntensity;
+      this.camera.target.set(
+        this._camX + (Math.random() - 0.5) * s,
+        0,
+        this._camZ + (Math.random() - 0.5) * s,
+      );
+    } else {
+      this.camera.target.set(this._camX, 0, this._camZ);
+    }
+  }
+
+  _updateHUD() {
+    const fuelRatio = this.tank.fuel / this.tank.maxFuel;
+    const fill = document.getElementById('hud-fill');
+    if (fill) {
+      fill.style.width      = `${Math.max(1, fuelRatio * 100)}%`;
+      fill.style.background = fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
+    }
+
+    const hpRatio = this.tank.hp / this.tank.maxHp;
+    const hpFill  = document.getElementById('hud-hp-fill');
+    if (hpFill) {
+      hpFill.style.width      = `${Math.max(1, hpRatio * 100)}%`;
+      const r = hpRatio < 0.5 ? 1.0 : 2 * (1 - hpRatio);
+      const g = hpRatio > 0.5 ? 1.0 : 2 * hpRatio;
+      hpFill.style.background = `rgb(${Math.round(r*220)},${Math.round(g*220)},40)`;
+    }
+  }
+
+  _setupFiring() {
+    this.shells        = Array.from({ length: 10 }, () => new Shell(this.scene));
+    this._fireCooldown = 0;
+    this._charging     = false;
+    this._chargeTime   = 0;
+    this.tank._recoil  = 0; // 0=rest, 1=just fired; drives barrel kick animation
+
+    // Arc preview dots — shown during free-aim charge only
+    const dotMat = new StandardMaterial('arcDotMat', this.scene);
+    dotMat.diffuseColor  = new Color3(1.0, 0.55, 0.1);
+    dotMat.emissiveColor = new Color3(0.7, 0.22, 0.0);
+    dotMat.alpha = 0.72;
+    this.arcDots = Array.from({ length: 20 }, (_, i) => {
+      const dot = MeshBuilder.CreateSphere(`arcDot${i}`, { diameter: 0.14, segments: 4 }, this.scene);
+      dot.material  = dotMat;
+      dot.isVisible = false;
+      return dot;
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space' || this._charging) return;
+      this._charging   = true;
+      this._chargeTime = 0;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code !== 'Space' || !this._charging) return;
+      if (this._fireCooldown <= 0) this._shoot();
+      this._charging   = false;
+      this._chargeTime = 0;
+    });
+  }
+
+  _barrelTip() {
+    return Vector3.TransformCoordinates(
+      new Vector3(0, 0, 1.8),
+      this.tank.barrelPivot.getWorldMatrix(),
+    );
+  }
+
+  _predictTargetPos(target) {
+    const tip = this._barrelTip();
+    const vel = target.getVelocity();
+    const dx0 = target.position.x - tip.x;
+    const dz0 = target.position.z - tip.z;
+
+    // Pass 1: flight time from current distance
+    let t  = Math.max(0.1, Math.sqrt(dx0 * dx0 + dz0 * dz0) / 16);
+    let px = target.position.x + vel.x * t;
+    let pz = target.position.z + vel.z * t;
+
+    // Pass 2: refine using distance to the predicted position so the
+    // elevation formula and the lead both use the same flight time
+    const dx1 = px - tip.x;
+    const dz1 = pz - tip.z;
+    t  = Math.max(0.1, Math.sqrt(dx1 * dx1 + dz1 * dz1) / 16);
+    px = target.position.x + vel.x * t;
+    pz = target.position.z + vel.z * t;
+
+    return { x: px, z: pz };
+  }
+
+  _elevationForTarget(targetPos) {
+    const tip   = this._barrelTip();
+    const dx    = targetPos.x - tip.x;
+    const dz    = targetPos.z - tip.z;
+    const hdist = Math.sqrt(dx * dx + dz * dz);
+    const t     = Math.max(0.3, hdist / 16);
+    const vy    = (0.5 - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
+    return Math.atan2(vy, 16);
+  }
+
+  _shoot() {
+    const shell = this.shells.find(s => !s.active);
+    if (!shell) return;
+
+    const tip    = this._barrelTip();
+    const HSPEED = 16;
+    const aim    = this.tank.turretAimAngle;
+
+    // Locked on: always use auto-elevation, full range
+    // Free aim tap (<0.15s): flat 8-unit close-range shot
+    // Free aim hold: ballistic arc using charged elevation
+    const isTap      = !this.lockedEnemy && this._chargeTime < 0.15;
+    const azSpread   = (Math.random() - 0.5) * 2 * this.tank.dispersion;
+    const elevSpread = (Math.random() - 0.5) * 2 * this.tank.dispersion;
+    const vx         = Math.sin(aim + azSpread) * HSPEED;
+    const vz         = Math.cos(aim + azSpread) * HSPEED;
+    const vy         = isTap ? 2.5 : Math.tan(this.tank.barrelElevation + elevSpread) * HSPEED;
+    const maxRange   = isTap ? 8 : 0;
+
+    shell.fire(tip.x, tip.y, tip.z, vx, vy, vz, maxRange);
+    this._triggerShake(0.06, 0.2);
+    this._fireCooldown = 0.3;
+    this.tank._recoil = 1.0;
+  }
+
+  _updateArcPreview() {
+    if (!this._charging || this.lockedEnemy) {
+      for (const dot of this.arcDots) dot.isVisible = false;
+      return;
+    }
+    const tip    = this._barrelTip();
+    const HSPEED = 16;
+    const aim    = this.tank.turretAimAngle;
+    const vx     = Math.sin(aim) * HSPEED;
+    const vz     = Math.cos(aim) * HSPEED;
+    const vy     = Math.tan(this.tank.barrelElevation) * HSPEED;
+    const DT     = 0.1;
+
+    for (let i = 0; i < this.arcDots.length; i++) {
+      const t = (i + 1) * DT;
+      const y = tip.y + vy * t - 0.5 * SHELL_GRAVITY * t * t;
+      if (y < 0.05) {
+        for (let j = i; j < this.arcDots.length; j++) this.arcDots[j].isVisible = false;
+        return;
+      }
+      this.arcDots[i].isVisible = true;
+      this.arcDots[i].position.set(tip.x + vx * t, y, tip.z + vz * t);
+      // Taper: larger near muzzle, smaller toward impact
+      this.arcDots[i].scaling.setAll(1 - 0.55 * (i / this.arcDots.length));
+    }
+  }
+
+  _checkShellHits() {
+    // AI shells hitting the player
+    for (const shell of this.aiEnemy.shells) {
+      if (!shell.active) continue;
+      if (shell.position.y < 0 || shell.position.y > 1.6) continue;
+      const dx = shell.position.x - this.tank.position.x;
+      const dz = shell.position.z - this.tank.position.z;
+      if (Math.abs(dx) < 0.25 + this.tank.halfW && Math.abs(dz) < 0.25 + this.tank.halfD) {
+        shell.deactivate();
+        this.tank.takeDamage(34);
+        this._triggerShake(0.18, 0.55);
+        if (!this.tank.alive) this._showDeath();
+        break;
+      }
+    }
+
+    const allTargets = [...this.enemies, this.aiEnemy];
+
+    for (const shell of this.shells) {
+      if (!shell.active) continue;
+      if (shell.position.y < 0 || shell.position.y > 1.6) continue;
+
+      for (const enemy of allTargets) {
+        if (!enemy.alive) continue;
+        const dx = shell.position.x - enemy.position.x;
+        const dz = shell.position.z - enemy.position.z;
+        if (Math.abs(dx) < 0.25 + enemy.halfW && Math.abs(dz) < 0.25 + enemy.halfD) {
+          shell.deactivate();
+          enemy.takeDamage(34);
+          this._triggerShake(0.12, 0.4);
+          if (!enemy.alive && this.lockedEnemy === enemy) {
+            this._prevLockedEnemy = enemy;
+            this._fadeOutTime     = 0;
+            this.lockedEnemy      = null;
+          }
+          break;
+        }
+      }
+    }
+  }
+}
