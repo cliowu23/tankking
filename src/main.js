@@ -20,6 +20,17 @@ function startGame() {
     arenaScene._restart();
   }
   engine.runRenderLoop(() => arenaScene.scene.render());
+
+  // Pause and show controls before the player engages
+  arenaScene._paused = true;
+  document.getElementById('controls-screen').style.display = 'flex';
+}
+
+function dismissControls() {
+  const el = document.getElementById('controls-screen');
+  if (el.style.display === 'none') return;
+  el.style.display = 'none';
+  if (arenaScene) arenaScene._paused = false;
 }
 
 function goToMenu() {
@@ -63,6 +74,11 @@ function exitDesigner() {
 }
 
 document.addEventListener('keydown', (e) => {
+  // Controls screen intercepts Enter/Space — dismiss before anything else
+  if (document.getElementById('controls-screen').style.display !== 'none') {
+    if (e.code === 'Enter' || e.code === 'Space') dismissControls();
+    return;
+  }
   if (document.getElementById('menu').style.display !== 'none') {
     if (e.code === 'Enter') startGame();
     if (e.code === 'KeyT')  startDesigner();
@@ -71,6 +87,8 @@ document.addEventListener('keydown', (e) => {
     exitDesigner();
   }
 });
+
+document.getElementById('controls-start').addEventListener('click', dismissControls);
 
 document.getElementById('menu-designer').addEventListener('click', startDesigner);
 

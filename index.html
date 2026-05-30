@@ -377,6 +377,120 @@
     #editor-palette-hint { color: var(--dim); font-size: 6px; margin-left: 8px; line-height: 1.6; }
     #editor-hint { padding: 6px 16px; color: var(--dim); font-size: 6px; line-height: 1.6; }
 
+    /* ─── CONTROLS SCREEN ─────────────────────────────── */
+    #controls-screen {
+      position: fixed; inset: 0;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 25;
+      background: rgba(8, 8, 22, 0.90);
+    }
+
+    #controls-panel {
+      background: var(--panel);
+      border-top:    3px solid rgba(255,255,255,0.10);
+      border-left:   3px solid rgba(255,255,255,0.10);
+      border-bottom: 3px solid rgba(0,0,0,0.45);
+      border-right:  3px solid rgba(0,0,0,0.45);
+      outline: 2px solid var(--accent);
+      box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--accent);
+      padding: 34px 52px 30px;
+      display: flex; flex-direction: column;
+      align-items: center;
+      position: relative;
+      min-width: 600px;
+    }
+
+    #controls-title {
+      color: var(--gold);
+      font-size: 13px;
+      letter-spacing: 5px;
+      text-shadow: 3px 3px 0 rgba(90,50,0,0.8);
+      margin-bottom: 26px;
+      line-height: 1.4;
+    }
+
+    #controls-grid {
+      display: flex;
+      width: 100%;
+      gap: 0;
+    }
+
+    .controls-col {
+      flex: 1;
+      padding: 0 20px;
+    }
+    .controls-col:first-child { padding-left: 0; }
+    .controls-col:last-child  { padding-right: 0; }
+
+    .controls-divider {
+      width: 1px;
+      background: rgba(233,69,96,0.25);
+      margin: 0 8px;
+      flex-shrink: 0;
+    }
+
+    .ctrl-section-title {
+      color: var(--accent);
+      font-size: 7px;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid rgba(233,69,96,0.2);
+      line-height: 1.6;
+    }
+
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 9px;
+    }
+
+    .key {
+      background: rgba(255,255,255,0.06);
+      border-top:    2px solid rgba(255,255,255,0.18);
+      border-left:   2px solid rgba(255,255,255,0.18);
+      border-bottom: 2px solid rgba(0,0,0,0.50);
+      border-right:  2px solid rgba(0,0,0,0.50);
+      color: var(--gold);
+      font-size: 5px;
+      letter-spacing: 0.5px;
+      padding: 4px 7px;
+      white-space: nowrap;
+      min-width: 54px;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .ctrl-desc {
+      color: var(--dim);
+      font-size: 6px;
+      letter-spacing: 0px;
+      line-height: 1.8;
+    }
+
+    #controls-tip {
+      color: rgba(104,104,160,0.6);
+      font-size: 5px;
+      letter-spacing: 1px;
+      margin-top: 20px;
+      line-height: 1.8;
+    }
+    #controls-tip::before { content: '◆  '; color: var(--accent); opacity: 0.5; }
+
+    #controls-start {
+      color: var(--white);
+      font-size: 8px;
+      margin-top: 22px;
+      letter-spacing: 2px;
+      animation: blink 1.0s step-end infinite;
+      text-shadow: 2px 2px 0 #000;
+      line-height: 1.8;
+      cursor: pointer;
+    }
+    #controls-start::before { content: '▶  '; color: var(--accent); }
+
     /* ─── CRT POWER-OFF ────────────────────────────────── */
     #crt-off {
       position: fixed; inset: 0;
@@ -459,6 +573,42 @@
       <span id="editor-palette-hint">click ground to place &nbsp;|&nbsp; R = rotate 45 &nbsp;|&nbsp; DEL = remove</span>
     </div>
     <div id="editor-hint">click a yellow node to select &nbsp;|&nbsp; UP / DOWN arrows to raise / lower &nbsp;|&nbsp; SHIFT for fine control</div>
+  </div>
+
+  <!-- Controls screen — shown on game start, dismissed with Enter -->
+  <div id="controls-screen">
+    <div id="controls-panel">
+      <span class="menu-corner tr">◆</span>
+      <span class="menu-corner bl">◆</span>
+      <h2 id="controls-title">HOW TO PLAY</h2>
+
+      <div id="controls-grid">
+
+        <div class="controls-col">
+          <div class="ctrl-section-title">MOVEMENT</div>
+          <div class="ctrl-row"><span class="key">W / S</span><span class="ctrl-desc">Move forward / back</span></div>
+          <div class="ctrl-row"><span class="key">A / D</span><span class="ctrl-desc">Rotate hull</span></div>
+          <div class="ctrl-row"><span class="key">SHIFT tap</span><span class="ctrl-desc">Dash boost</span></div>
+          <div class="ctrl-row"><span class="key">SHIFT hold</span><span class="ctrl-desc">Sustained boost</span></div>
+          <div class="ctrl-row"><span class="key">W + SHIFT + A/D</span><span class="ctrl-desc">Spin boost</span></div>
+        </div>
+
+        <div class="controls-divider"></div>
+
+        <div class="controls-col">
+          <div class="ctrl-section-title">COMBAT</div>
+          <div class="ctrl-row"><span class="key">MOUSE</span><span class="ctrl-desc">Aim turret</span></div>
+          <div class="ctrl-row"><span class="key">SPACE hold</span><span class="ctrl-desc">Charge shot — raises barrel</span></div>
+          <div class="ctrl-row"><span class="key">SPACE release</span><span class="ctrl-desc">Fire at current elevation</span></div>
+          <div class="ctrl-row"><span class="key">F hold</span><span class="ctrl-desc">Lock on to nearest enemy</span></div>
+          <div class="ctrl-row"><span class="key">F tap</span><span class="ctrl-desc">Cycle locked targets</span></div>
+        </div>
+
+      </div>
+
+      <p id="controls-tip">longer charge = longer range &nbsp;|&nbsp; ESC to pause</p>
+      <p id="controls-start">PRESS ENTER TO BATTLE</p>
+    </div>
   </div>
 
   <div id="crt-off"></div>
