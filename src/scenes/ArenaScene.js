@@ -1063,13 +1063,11 @@ export default class ArenaScene {
     const HSPEED = 16;
     const aim    = this.tank.turretAimAngle;
 
-    const azSpread   = (Math.random() - 0.5) * 2 * this.tank.dispersion;
-    const elevSpread = (Math.random() - 0.5) * 2 * this.tank.dispersion;
+    const azSpread = (Math.random() - 0.5) * 2 * this.tank.dispersion;
     const vx = Math.sin(aim + azSpread) * HSPEED;
     const vz = Math.cos(aim + azSpread) * HSPEED;
-    const vy = Math.tan(this.tank.barrelElevation + elevSpread) * HSPEED;
 
-    shell.fire(tip.x, tip.y, tip.z, vx, vy, vz, 0);
+    shell.fire(tip.x, tip.y, tip.z, vx, 0, vz, 45);
     this._spawnMuzzleFlash(tip);
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;
