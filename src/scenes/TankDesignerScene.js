@@ -498,9 +498,19 @@ export default class TankDesignerScene {
         const pivotZShift = config.turretPivotZOffset ?? 0;
         turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
         turretPivot.position.z = localPos.z + pivotZShift;
-        if (localPos.y > 0.3) turretPivot.position.y = localPos.y;
+        if (localPos.y > 0.3) {
+          turretPivot.position.y = localPos.y;
+        } else {
+          console.warn(`[Inspector] ${filename}: turretNode y=${localPos.y.toFixed(3)} — empty may be misplaced in Blender (expected > 0.3). Geometry preserved at original position but rotation pivot will be off.`);
+        }
         turretPivot.computeWorldMatrix(true);
-        turretNode.position.set(0, 0, -pivotZShift);
+        // Compute local offset that keeps geometry at its original world position.
+        // When the "turret" empty is correctly placed, this ≈ (0,0,-pivotZShift).
+        // When the empty is at the wrong height (near ground), this prevents the
+        // geometry from jumping to turretPivot's height.
+        const tpInv = Matrix.Invert(turretPivot.getWorldMatrix());
+        const localInPivot = Vector3.TransformCoordinates(turretAbsPos, tpInv);
+        turretNode.position.set(localInPivot.x, localInPivot.y, localInPivot.z);
         turretNode.computeWorldMatrix(true);
         result.transformNodes.forEach(n => n.computeWorldMatrix(true));
       }

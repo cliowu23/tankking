@@ -37,32 +37,49 @@ Download as **GLB** wherever possible. If only FBX is available, convert in Blen
 
 ---
 
-### Step 3 — Tell Claude what to do
+### Step 3 — Pre-check: verify ground level before placing empties
 
-Paste this prompt (fill in the paths):
+**Do this before placing any empties.** Sketchfab models often have their GLTF Y-minimum above 0 (the model is "floating" in GLTF space). If you place the turret empty assuming Z=0 is the floor, it'll land near ground level and the geometry will look correct in Blender but break in the game.
+
+Paste this prompt first:
 
 ```
 Import the file at /path/to/downloaded/model.glb into Blender.
-Analyze the object tree and identify:
-- The root/parent node
-- The turret assembly (elevated, roughly centered, rotatable)
-- The barrel/gun (thin elongated mesh attached to or child of turret)
-- Which direction the tank nose is facing (report the axis: +X, -X, +Z, or -Z)
+Before doing anything else, report:
+- The object's bounding box minimum Z in Blender world space
+- The object's bounding box maximum Z in Blender world space
+- Which direction the tank nose is facing (+X, -X, +Z, or -Z)
+- The total height (max Z - min Z) in Blender units
 
-Then:
+Do NOT place any empties yet.
+```
+
+**Interpret the result:**
+- If `min Z ≈ 0` → floor is at Blender Z=0. Standard placement applies.
+- If `min Z > 0` (e.g. 1.476) → the model is elevated. You MUST add `min Z` to all empty heights. Example: if min Z = 1.476 and the turret ring should be 1.4m above the hull floor, place the "turret" empty at Z = 1.476 + 1.4 = 2.876.
+
+---
+
+### Step 4 — Tell Claude to rig and export
+
+Paste this prompt (fill in paths and the `min Z` value from step 3):
+
+```
+The model's Blender Z-minimum is [MIN_Z]. Use this as the floor reference for all empty placement.
+
 1. Rename the root object to: Sketchfab_model
-2. Create an EMPTY named "turret" at the turret ring center (bottom of the turret body)
-   — re-parent all turret meshes and the barrel under it
-3. Create an EMPTY named "mount" at the barrel trunnion point
-   — re-parent the barrel mesh under it
-4. Do NOT rotate the root — just report the facing axis so we can set facingAxis in the manifest
-5. Export the result as GLB to: /Users/cliowu/claude-workspace/game/public/models/MODELNAME.glb
+2. Create an EMPTY named "turret" at the turret ring center.
+   Height = [MIN_Z] + (hull height × 0.7) approximately — verify visually that it sits at the hull deck.
+   Re-parent all turret meshes and the barrel under it using keep_world=True.
+3. Create an EMPTY named "mount" at the barrel trunnion (where the barrel pivots for elevation).
+   Re-parent the barrel mesh under it using keep_world=True.
+4. Do NOT rotate the root.
+5. Export as GLB to: /Users/cliowu/claude-workspace/game/public/models/MODELNAME.glb
 
 Report:
-- The facing axis of the tank nose
-- Bounding box dimensions (width × depth × height)
-- World position of the turret empty
-- World position of the mount empty
+- World position of the "turret" empty (X, Y, Z)
+- World position of the "mount" empty (X, Y, Z)
+- Facing axis
 ```
 
 Claude will use `execute_blender_code` (bpy) to inspect, rig, and export.
@@ -71,7 +88,7 @@ Claude will use `execute_blender_code` (bpy) to inspect, rig, and export.
 
 ---
 
-### Step 4 — Add to manifest
+### Step 5 — Add to manifest
 
 Open `public/models/manifest.json` and add an entry:
 
@@ -117,7 +134,42 @@ Open `public/models/manifest.json` and add an entry:
 
 ---
 
-### Step 5 — Load it in the game
+### Step 6 — Verify in the inspector
+
+Open the game (`npm run dev`), press **T** from the menu, and click your model's button.
+
+**Check the console output immediately:**
+
+```
+[Inspector] your_model.glb: scale=X.XXXX, w=X.XX
+[Inspector] turretPivot: x=... y=... z=...
+[Inspector] barrelPivot: x=... y=... z=...
+```
+
+**Pass/fail criteria:**
+
+| Value | Pass | Fail |
+|-------|------|------|
+| `turretPivot.y` | > 0.3 | ≤ 0.3 → empty too low, redo Step 3 with corrected Z |
+| `turretPivot.x` | ≈ 0 (or small) | > 0.5 → add `centerTurretX: true` to manifest |
+| `barrelPivot.z` | > 0 (forward of ring) | ≤ 0 → mount empty behind the ring |
+| Scale | 0.5 – 1.5 | Outside range → check `targetWidth` in manifest |
+
+If `turretPivot.y ≤ 0.3`, a **console warning fires automatically** — look for:
+```
+[Inspector] your_model.glb: turretNode y=... — empty may be misplaced in Blender
+```
+
+**Visual check — take a side-profile screenshot:**
+
+Run from the `game/` directory:
+```
+node architecture/verify-model.mjs your_model.glb
+```
+
+This opens the inspector headlessly and saves `architecture/verify-screenshots/` with default, side, and front views. If the turret is floating or sunken in the side view, the empty height is wrong.
+
+### Step 7 — Load it in the game
 
 In `ArenaScene._setupEntities()`, change the model filename:
 
@@ -168,3 +220,6 @@ You don't need to scale in Blender — the game handles it.
 | Turret rotates off-center | Pivot Z not at turret ring | Tune `turretPivotZOffset` in manifest |
 | Shells spawn inside the barrel | `barrelTipOffset` too small | Increase value until shells clear the barrel |
 | Turret drifts left/right | Coord-system X artifact | Set `centerTurretX: true` in manifest |
+| `turretPivot.y ≤ 0.3` warning in console | "turret" empty placed at wrong height | Re-do Step 3: add model's Blender `min Z` to the empty's target height |
+| Turret geometry floating above hull | "turret" empty near ground level (same as above) | Same fix — the loader preserves geometry position but rotation pivot will be off |
+| Turret rotation orbits in a wide arc | Empty height incorrect, pivot far from ring | Fix empty placement in Blender, re-export |
