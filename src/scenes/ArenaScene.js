@@ -5,12 +5,13 @@ import {
   VertexBuffer, VertexData, Quaternion,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
+import { applyModelPaint } from '../utils/modelPaint.js';
 import LevelEditor from '../editor/LevelEditor.js';
 import { loadLayout } from '../editor/SceneSerializer.js';
 import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
-import Shell, { SHELL_GRAVITY } from '../entities/Shell.js';
+import Shell from '../entities/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 
 export default class ArenaScene {
@@ -451,6 +452,9 @@ export default class ArenaScene {
         m.receiveShadows = true;
       }
 
+      // --- 8.5. Paint — body panels get manifest paintColor (matte), tracks/optics left original
+      applyModelPaint(result.meshes, config, this.scene);
+
       const tp = this.tank.turretPivot.position;
       const bp = this.tank.barrelPivot.position;
       console.log(`[GLB] ${modelFile} loaded: scale=${scale.toFixed(4)}, w=${modelW.toFixed(2)}, d=${modelD.toFixed(2)}`);
@@ -669,20 +673,14 @@ export default class ArenaScene {
       this.aiEnemy.update(dt, this.tank.position);
       for (const s of this.aiEnemy.shells) s.update(dt);
 
-      // --- Barrel elevation ---
-      const MAX_ELEV = 50 * Math.PI / 180;
+      // --- Barrel elevation (tip-height formula: point barrel tip at cursor surface Y) ---
       if (this.lockedEnemy) {
-        const predicted  = this._predictTargetPos(this.lockedEnemy);
-        const targetElev = this._elevationForTarget(predicted);
+        const targetElev = this._elevationForHeight(this.lockedEnemy.position.y + 0.75);
         this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-10 * dt));
       } else {
-        // Cursor aim: pick the actual surface under the cursor so elevation accounts
-        // for target height (turret, hull, hill) rather than just the ground plane.
         const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
         if (pick.hit && pick.pickedPoint) {
-          const pos     = { x: pick.pickedPoint.x, z: pick.pickedPoint.z };
-          const targetY = pick.pickedPoint.y;
-          const targetElev = Math.max(0, Math.min(MAX_ELEV, this._elevationForTarget(pos, targetY)));
+          const targetElev = this._elevationForHeight(pick.pickedPoint.y);
           this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-20 * dt));
         }
       }
@@ -1051,14 +1049,10 @@ export default class ArenaScene {
     return { x: px, z: pz };
   }
 
-  _elevationForTarget(targetPos, targetY = 0.5) {
-    const tip   = this._barrelTip();
-    const dx    = targetPos.x - tip.x;
-    const dz    = targetPos.z - tip.z;
-    const hdist = Math.sqrt(dx * dx + dz * dz);
-    const t     = Math.max(0.3, hdist / 16);
-    const vy    = (targetY - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
-    return Math.atan2(vy, 16);
+  _elevationForHeight(targetY) {
+    const pivotY = this.tank.barrelPivot.getAbsolutePosition().y;
+    const ratio  = (targetY - pivotY) / this._barrelTipOffset;
+    return Math.asin(Math.max(-1, Math.min(1, ratio)));
   }
 
   _shoot() {
@@ -1146,10 +1140,11 @@ export default class ArenaScene {
     }
     if (slot === -1) return;
 
+    const oy   = Math.max(0.1, pos.y); // use actual hit height; clamp above floor
     const core = this._impactCores[slot];
     core._vfxActive = true;
     core.isVisible  = true;
-    core.position.set(pos.x, 0.25, pos.z);
+    core.position.set(pos.x, oy, pos.z);
     core.scaling.setAll(0.1);
     core.material.alpha = 1.0;
 
@@ -1158,7 +1153,7 @@ export default class ArenaScene {
       const mesh = this._smokePuffs[slot * 4 + b];
       mesh._vfxActive = true;
       mesh.isVisible  = true;
-      mesh.position.set(pos.x, 0.25, pos.z);
+      mesh.position.set(pos.x, oy, pos.z);
       mesh.scaling.setAll(0.1);
       mesh.material.diffuseColor = isEnemy
         ? new Color3(0.55, 0.50, 0.45)
@@ -1170,7 +1165,7 @@ export default class ArenaScene {
     this._activeVFX.push({
       type: 'impact', slot, core, blobs,
       t: 0, duration: isEnemy ? 0.40 : 0.30,
-      ox: pos.x, oz: pos.z, isEnemy,
+      ox: pos.x, oy, oz: pos.z, isEnemy,
     });
   }
 
@@ -1218,7 +1213,7 @@ export default class ArenaScene {
           const angle = b * Math.PI / 2;
           entry.blobs[b].position.set(
             entry.ox + Math.sin(angle) * eased * maxRadius,
-            0.25       + eased * maxLift,
+            entry.oy + eased * maxLift,
             entry.oz + Math.cos(angle) * eased * maxRadius,
           );
           entry.blobs[b].scaling.setAll(eased * maxBlobScale);
