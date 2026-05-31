@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode } from '@babylonjs/core';
-import Shell, { SHELL_GRAVITY } from './Shell.js';
+import Shell from './Shell.js';
 
 function shortAngle(from, to) {
   let d = ((to - from) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -253,7 +253,7 @@ export default class AIEnemy {
     this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
 
     if (this.state === 'COMBAT') {
-      const targetElev = this._elevationForTarget(playerPos);
+      const targetElev = this._elevationForHeight(playerPos.y + 0.75);
       this.barrelElevation += (targetElev - this.barrelElevation) * (1 - Math.exp(-10 * dt));
     } else {
       this.barrelElevation *= Math.exp(-8 * dt);
@@ -277,14 +277,11 @@ export default class AIEnemy {
     );
   }
 
-  _elevationForTarget(targetPos) {
-    const tip   = this._barrelTip();
-    const dx    = targetPos.x - tip.x;
-    const dz    = targetPos.z - tip.z;
-    const hdist = Math.sqrt(dx * dx + dz * dz);
-    const t     = Math.max(0.3, hdist / HSPEED);
-    const vy    = (0.5 - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
-    return Math.atan2(vy, HSPEED);
+  _elevationForHeight(targetY) {
+    const pivotY    = this.barrelPivot.getAbsolutePosition().y;
+    const tipOffset = 1.6; // matches _barrelTip() offset in this class
+    const ratio     = (targetY - pivotY) / tipOffset;
+    return Math.asin(Math.max(-1, Math.min(1, ratio)));
   }
 
   _fire() {
@@ -295,8 +292,9 @@ export default class AIEnemy {
     shell.fire(
       tip.x, tip.y, tip.z,
       Math.sin(aim) * HSPEED,
-      Math.tan(this.barrelElevation) * HSPEED,
+      0,
       Math.cos(aim) * HSPEED,
+      45,
     );
     this.fireCooldown = this._fireCooldownDuration;
     this._recoil = 1.0;
