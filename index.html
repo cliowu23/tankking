@@ -31,7 +31,10 @@
       font-smooth: never;
     }
 
-    #renderCanvas { width: 100vw; height: 100vh; display: block; }
+    #renderCanvas {
+      width: 100vw; height: 100vh; display: block;
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cline x1='2' y1='16' x2='12' y2='16' stroke='white' stroke-width='2'/%3E%3Cline x1='20' y1='16' x2='30' y2='16' stroke='white' stroke-width='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='12' stroke='white' stroke-width='2'/%3E%3Cline x1='16' y1='20' x2='16' y2='30' stroke='white' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23e94560'/%3E%3C/svg%3E") 16 16, crosshair;
+    }
 
     /* ─── MENU ─────────────────────────────────────────── */
     #menu {
@@ -493,6 +496,33 @@
     }
     #controls-start::before { content: '▶  '; color: var(--accent); }
 
+    /* ─── AIM INDICATOR ───────────────────────────────── */
+    #aim-indicator {
+      position: fixed;
+      width: 24px; height: 24px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 12;
+      display: none;
+      filter: drop-shadow(0 0 3px rgba(255,255,255,0.5));
+    }
+    .aim-corner {
+      position: absolute;
+      width: 8px; height: 8px;
+    }
+    .aim-corner.tl { top: 0; left: 0;
+      border-top: 2px solid rgba(255,255,255,0.9);
+      border-left: 2px solid rgba(255,255,255,0.9); }
+    .aim-corner.tr { top: 0; right: 0;
+      border-top: 2px solid rgba(255,255,255,0.9);
+      border-right: 2px solid rgba(255,255,255,0.9); }
+    .aim-corner.bl { bottom: 0; left: 0;
+      border-bottom: 2px solid rgba(255,255,255,0.9);
+      border-left: 2px solid rgba(255,255,255,0.9); }
+    .aim-corner.br { bottom: 0; right: 0;
+      border-bottom: 2px solid rgba(255,255,255,0.9);
+      border-right: 2px solid rgba(255,255,255,0.9); }
+
     /* ─── CRT POWER-OFF ────────────────────────────────── */
     #crt-off {
       position: fixed; inset: 0;
@@ -612,6 +642,13 @@
       <p id="controls-tip">aim at ground to arc your shot &nbsp;|&nbsp; ESC to pause</p>
       <p id="controls-start">PRESS ENTER TO BATTLE</p>
     </div>
+  </div>
+
+  <div id="aim-indicator">
+    <div class="aim-corner tl"></div>
+    <div class="aim-corner tr"></div>
+    <div class="aim-corner bl"></div>
+    <div class="aim-corner br"></div>
   </div>
 
   <div id="crt-off"></div>

@@ -4,6 +4,7 @@
     "turret": "turret",
     "mount": "mount",
     "facingAxis": "+X",
+    "centerTurretX": true,
     "zCenterAdjust": 0.9,
     "barrelTipOffset": 3.1,
     "elevationDeg": 18,

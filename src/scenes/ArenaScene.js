@@ -55,6 +55,7 @@ export default class ArenaScene {
     this._loadLayout();
     this._setupLockOn();
     this._setupFiring();
+    this._setupVFX();
     this._setupGameLoop();
   }
 
@@ -409,11 +410,19 @@ export default class ArenaScene {
         this.tank.turretPivot.position.z = localPos.z + pivotZShift;
         // Use GLB turret node Y if it carries meaningful height (explicitly placed pivot),
         // otherwise fall back to Tank.js default (0.55) for models where node Y ≈ 0.
-        if (localPos.y > 0.3) this.tank.turretPivot.position.y = localPos.y;
+        if (localPos.y > 0.3) {
+          this.tank.turretPivot.position.y = localPos.y;
+        } else {
+          console.warn(`[GLB] ${modelFile}: turretNode y=${localPos.y.toFixed(3)} — empty may be misplaced in Blender (expected > 0.3). Geometry preserved at original position but rotation pivot will be off.`);
+        }
         this.tank.turretPivot.computeWorldMatrix(true);
-        // Zero turret node position but compensate for pivot shift so the turret MESH
-        // stays at its original world position — only the rotation centre moves forward.
-        turretNode.position.set(0, 0, -pivotZShift);
+        // Compute local offset that keeps geometry at its original world position.
+        // When the "turret" empty is correctly placed, this ≈ (0,0,-pivotZShift).
+        // When the empty is at the wrong height (near ground), this prevents geometry
+        // from jumping to turretPivot's height. Same fix as TankDesignerScene.
+        const tpInvT = Matrix.Invert(this.tank.turretPivot.getWorldMatrix());
+        const localInPivot = Vector3.TransformCoordinates(turretAbsPos, tpInvT);
+        turretNode.position.set(localInPivot.x, localInPivot.y, localInPivot.z);
         turretNode.computeWorldMatrix(true);
         // Propagate to all descendants (mountNode is still under turretNode)
         result.transformNodes.forEach(n => n.computeWorldMatrix(true));
@@ -518,6 +527,7 @@ export default class ArenaScene {
     this.fadeRing.material   = fadeMat;
 
     this._lockPulseTime = 0;
+    this._aimEl = document.getElementById('aim-indicator');
 
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyF' || this._fHeld) return;
@@ -666,14 +676,13 @@ export default class ArenaScene {
         const targetElev = this._elevationForTarget(predicted);
         this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-10 * dt));
       } else {
-        // Cursor aim: elevate barrel to arc shell to where cursor points on the ground
-        const ray = this.scene.createPickingRay(
-          this.scene.pointerX, this.scene.pointerY, null, this.camera,
-        );
-        if (ray && Math.abs(ray.direction.y) > 0.0001) {
-          const t   = -ray.origin.y / ray.direction.y;
-          const pos = { x: ray.origin.x + t * ray.direction.x, z: ray.origin.z + t * ray.direction.z };
-          const targetElev = Math.max(0, Math.min(MAX_ELEV, this._elevationForTarget(pos)));
+        // Cursor aim: pick the actual surface under the cursor so elevation accounts
+        // for target height (turret, hull, hill) rather than just the ground plane.
+        const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
+        if (pick.hit && pick.pickedPoint) {
+          const pos     = { x: pick.pickedPoint.x, z: pick.pickedPoint.z };
+          const targetY = pick.pickedPoint.y;
+          const targetElev = Math.max(0, Math.min(MAX_ELEV, this._elevationForTarget(pos, targetY)));
           this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-20 * dt));
         }
       }
@@ -691,9 +700,19 @@ export default class ArenaScene {
       this._checkCollisions();
       this._checkObstacleCollisions();
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
+      // Snapshot active state before shell updates to catch ground deactivations
+      const wasActive = this.shells.map(s => s.active);
       for (const shell of this.shells) shell.update(dt);
+      for (let i = 0; i < this.shells.length; i++) {
+        if (wasActive[i] && !this.shells[i].active) {
+          const s = this.shells[i];
+          this._spawnImpact(new Vector3(s.position.x, 0, s.position.z), false);
+        }
+      }
       this._checkShellHits();
+      this._updateVFX(dt);
       this._updateLockRing(dt);
+      this._updateAimIndicator();
       this._updateCamera(dt);
       this._updateHUD();
     });
@@ -790,6 +809,56 @@ export default class ArenaScene {
     }
   }
 
+  _updateAimIndicator() {
+    // Reference point: locked enemy or cursor-ground intersection
+    let tx, tz;
+    if (this.lockedEnemy) {
+      tx = this.lockedEnemy.position.x;
+      tz = this.lockedEnemy.position.z;
+    } else {
+      tx = this.tank.position.x;
+      tz = this.tank.position.z;
+      const ray = this.scene.createPickingRay(
+        this.scene.pointerX, this.scene.pointerY, null, this.camera,
+      );
+      if (ray && Math.abs(ray.direction.y) > 0.0001) {
+        const t = -ray.origin.y / ray.direction.y;
+        tx = ray.origin.x + t * ray.direction.x;
+        tz = ray.origin.z + t * ray.direction.z;
+      }
+    }
+
+    // Use tank root as origin — same reference point as _updateTurret's targetAim calculation.
+    // This guarantees: when turretAimAngle has fully converged to atan2(tx-root.x, tz-root.z),
+    // root + sin/cos(aim)*range == (tx, tz), which projects back to the cursor pixel exactly.
+    const root  = this.tank.position;
+    const dx    = tx - root.x;
+    const dz    = tz - root.z;
+    const range = Math.max(0.5, Math.sqrt(dx * dx + dz * dz));
+    const aim   = this.tank.turretAimAngle;
+    const landPos = new Vector3(
+      root.x + Math.sin(aim) * range,
+      0,
+      root.z + Math.cos(aim) * range,
+    );
+
+    // Project 3D → CSS pixels
+    const engine = this.scene.getEngine();
+    const screen = Vector3.Project(
+      landPos,
+      Matrix.Identity(),
+      this.scene.getTransformMatrix(),
+      this.camera.viewport.toGlobal(
+        engine.getRenderWidth(true),
+        engine.getRenderHeight(true),
+      ),
+    );
+
+    this._aimEl.style.display = 'block';
+    this._aimEl.style.left    = screen.x + 'px';
+    this._aimEl.style.top     = screen.y + 'px';
+  }
+
   _checkHazards(dt) {
     if (!this.tank.alive) return;
     for (const zone of this.lavaZones) {
@@ -806,6 +875,7 @@ export default class ArenaScene {
   _showDeath() {
     this._paused = true;
     window.__state = 'DEAD';
+    this._aimEl.style.display = 'none';
     document.getElementById('death').style.display = 'flex';
   }
 
@@ -820,6 +890,7 @@ export default class ArenaScene {
     this._prevLockedEnemy = null;
     this.lockRing.isVisible  = false;
     this.fadeRing.isVisible  = false;
+    this._aimEl.style.display = 'none';
   }
 
   _checkCollisions() {
@@ -980,13 +1051,13 @@ export default class ArenaScene {
     return { x: px, z: pz };
   }
 
-  _elevationForTarget(targetPos) {
+  _elevationForTarget(targetPos, targetY = 0.5) {
     const tip   = this._barrelTip();
     const dx    = targetPos.x - tip.x;
     const dz    = targetPos.z - tip.z;
     const hdist = Math.sqrt(dx * dx + dz * dz);
     const t     = Math.max(0.3, hdist / 16);
-    const vy    = (0.5 - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
+    const vy    = (targetY - tip.y + 0.5 * SHELL_GRAVITY * t * t) / t;
     return Math.atan2(vy, 16);
   }
 
@@ -1005,11 +1076,159 @@ export default class ArenaScene {
     const vy = Math.tan(this.tank.barrelElevation + elevSpread) * HSPEED;
 
     shell.fire(tip.x, tip.y, tip.z, vx, vy, vz, 0);
+    this._spawnMuzzleFlash(tip);
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;
     this.tank._recoil = 1.0;
   }
 
+
+  _setupVFX() {
+    this._activeVFX = [];
+
+    // Muzzle flash — 1 sphere
+    const flashMat = new StandardMaterial('muzzleFlashMat', this.scene);
+    flashMat.diffuseColor    = new Color3(1.0, 0.85, 0.1);
+    flashMat.emissiveColor   = new Color3(1.0, 0.9, 0.2);
+    flashMat.disableLighting = true;
+    this._muzzleFlashMesh = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 1.0, segments: 5 }, this.scene);
+    this._muzzleFlashMesh.material   = flashMat;
+    this._muzzleFlashMesh.isVisible  = false;
+    this._muzzleFlashMesh.isPickable = false;
+    this._muzzleFlashMesh._vfxActive = false;
+
+    // Impact cores — 4 spheres (one per simultaneous impact slot)
+    this._impactCores = [];
+    for (let i = 0; i < 4; i++) {
+      const mat = new StandardMaterial(`impactCoreMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(1.0, 0.65, 0.0);
+      mat.emissiveColor   = new Color3(1.0, 0.6, 0.0);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`impactCore_${i}`, { diameter: 1.0, segments: 5 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._impactCores.push(mesh);
+    }
+
+    // Smoke puffs — 16 spheres (4 per impact slot). Each gets its own material
+    // so alpha can be animated independently.
+    this._smokePuffs = [];
+    for (let i = 0; i < 16; i++) {
+      const mat = new StandardMaterial(`smokePuffMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(0.65, 0.58, 0.50);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`smokePuff_${i}`, { diameter: 1.0, segments: 4 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._smokePuffs.push(mesh);
+    }
+  }
+
+  _spawnMuzzleFlash(pos) {
+    const mesh = this._muzzleFlashMesh;
+    if (mesh._vfxActive) return;
+    mesh._vfxActive = true;
+    mesh.isVisible  = true;
+    mesh.position.copyFrom(pos);
+    mesh.scaling.setAll(0.15);
+    mesh.material.alpha = 1.0;
+    this._activeVFX.push({ type: 'muzzleFlash', mesh, t: 0, duration: 0.10 });
+  }
+
+  _spawnImpact(pos, isEnemy) {
+    let slot = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!this._impactCores[i]._vfxActive) { slot = i; break; }
+    }
+    if (slot === -1) return;
+
+    const core = this._impactCores[slot];
+    core._vfxActive = true;
+    core.isVisible  = true;
+    core.position.set(pos.x, 0.25, pos.z);
+    core.scaling.setAll(0.1);
+    core.material.alpha = 1.0;
+
+    const blobs = [];
+    for (let b = 0; b < 4; b++) {
+      const mesh = this._smokePuffs[slot * 4 + b];
+      mesh._vfxActive = true;
+      mesh.isVisible  = true;
+      mesh.position.set(pos.x, 0.25, pos.z);
+      mesh.scaling.setAll(0.1);
+      mesh.material.diffuseColor = isEnemy
+        ? new Color3(0.55, 0.50, 0.45)
+        : new Color3(0.72, 0.62, 0.48);
+      mesh.material.alpha = 0.85;
+      blobs.push(mesh);
+    }
+
+    this._activeVFX.push({
+      type: 'impact', slot, core, blobs,
+      t: 0, duration: isEnemy ? 0.40 : 0.30,
+      ox: pos.x, oz: pos.z, isEnemy,
+    });
+  }
+
+  _updateVFX(dt) {
+    for (let i = this._activeVFX.length - 1; i >= 0; i--) {
+      const entry = this._activeVFX[i];
+      entry.t += dt;
+
+      if (entry.t >= entry.duration) {
+        if (entry.type === 'muzzleFlash') {
+          entry.mesh.isVisible = false;
+          entry.mesh._vfxActive = false;
+        } else {
+          entry.core.isVisible = false;
+          entry.core._vfxActive = false;
+          for (const b of entry.blobs) { b.isVisible = false; b._vfxActive = false; }
+        }
+        this._activeVFX.splice(i, 1);
+        continue;
+      }
+
+      const p = entry.t / entry.duration;
+
+      if (entry.type === 'muzzleFlash') {
+        if (p < 0.4) {
+          const phase = p / 0.4;
+          entry.mesh.scaling.setAll(0.15 + phase * 0.45);
+          entry.mesh.material.alpha = 1.0;
+        } else {
+          const phase = (p - 0.4) / 0.6;
+          entry.mesh.scaling.setAll(0.60 + phase * 0.30);
+          entry.mesh.material.alpha = 1.0 - phase;
+        }
+      } else {
+        const eased        = 1 - (1 - p) * (1 - p);
+        const maxCoreScale = entry.isEnemy ? 1.2 : 0.8;
+        const maxRadius    = entry.isEnemy ? 1.8 : 1.2;
+        const maxBlobScale = entry.isEnemy ? 0.7 : 0.45;
+        const maxLift      = entry.isEnemy ? 0.6 : 0.35;
+
+        entry.core.scaling.setAll(eased * maxCoreScale);
+        entry.core.material.alpha = 1.0 - p;
+
+        for (let b = 0; b < 4; b++) {
+          const angle = b * Math.PI / 2;
+          entry.blobs[b].position.set(
+            entry.ox + Math.sin(angle) * eased * maxRadius,
+            0.25       + eased * maxLift,
+            entry.oz + Math.cos(angle) * eased * maxRadius,
+          );
+          entry.blobs[b].scaling.setAll(eased * maxBlobScale);
+          entry.blobs[b].material.alpha = p < 0.4
+            ? 0.85
+            : 0.85 * (1 - (p - 0.4) / 0.6);
+        }
+      }
+    }
+  }
 
   _checkShellHits() {
     // AI shells hitting the player
@@ -1038,6 +1257,7 @@ export default class ArenaScene {
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
         if (Math.abs(dx) < 0.25 + enemy.halfW && Math.abs(dz) < 0.25 + enemy.halfD) {
+          this._spawnImpact(shell.position.clone(), true);
           shell.deactivate();
           enemy.takeDamage(34);
           this._triggerShake(0.12, 0.4);
