@@ -1241,18 +1241,21 @@ export default class ArenaScene {
 
     const allTargets = [...this.enemies, this.aiEnemy];
 
+    const TURRET_ZONE_Y = 0.55; // top of hull box — shells at/above this height hit the turret
+
     for (const shell of this.shells) {
       if (!shell.active) continue;
-      if (shell.position.y < 0 || shell.position.y > 1.6) continue;
 
       for (const enemy of allTargets) {
         if (!enemy.alive) continue;
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
         if (Math.abs(dx) < 0.25 + enemy.halfW && Math.abs(dz) < 0.25 + enemy.halfD) {
-          this._spawnImpact(shell.position.clone(), true);
+          const isCritical = shell.position.y >= TURRET_ZONE_Y;
+          const damage     = isCritical ? 51 : 34;
+          this._spawnImpact(shell.position.clone(), true, isCritical);
           shell.deactivate();
-          enemy.takeDamage(34);
+          enemy.takeDamage(damage);
           this._triggerShake(0.12, 0.4);
           if (!enemy.alive && this.lockedEnemy === enemy) {
             this._prevLockedEnemy = enemy;
