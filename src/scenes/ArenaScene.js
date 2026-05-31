@@ -1131,7 +1131,7 @@ export default class ArenaScene {
     this._activeVFX.push({ type: 'muzzleFlash', mesh, t: 0, duration: 0.10 });
   }
 
-  _spawnImpact(pos, isEnemy) {
+  _spawnImpact(pos, isEnemy, isCritical = false) {
     let slot = -1;
     for (let i = 0; i < 4; i++) {
       if (!this._impactCores[i]._vfxActive) { slot = i; break; }
@@ -1145,6 +1145,12 @@ export default class ArenaScene {
     core.position.set(pos.x, oy, pos.z);
     core.scaling.setAll(0.1);
     core.material.alpha = 1.0;
+    core.material.diffuseColor  = isCritical
+      ? new Color3(1.0, 0.92, 0.3)
+      : new Color3(1.0, 0.65, 0.0);
+    core.material.emissiveColor = isCritical
+      ? new Color3(1.0, 0.85, 0.2)
+      : new Color3(1.0, 0.6, 0.0);
 
     const blobs = [];
     for (let b = 0; b < 4; b++) {
@@ -1153,17 +1159,17 @@ export default class ArenaScene {
       mesh.isVisible  = true;
       mesh.position.set(pos.x, oy, pos.z);
       mesh.scaling.setAll(0.1);
-      mesh.material.diffuseColor = isEnemy
-        ? new Color3(0.55, 0.50, 0.45)
-        : new Color3(0.72, 0.62, 0.48);
+      mesh.material.diffuseColor = isCritical
+        ? new Color3(0.70, 0.68, 0.60)
+        : (isEnemy ? new Color3(0.55, 0.50, 0.45) : new Color3(0.72, 0.62, 0.48));
       mesh.material.alpha = 0.85;
       blobs.push(mesh);
     }
 
     this._activeVFX.push({
       type: 'impact', slot, core, blobs,
-      t: 0, duration: isEnemy ? 0.40 : 0.30,
-      ox: pos.x, oy, oz: pos.z, isEnemy,
+      t: 0, duration: isCritical ? 0.55 : (isEnemy ? 0.40 : 0.30),
+      ox: pos.x, oy, oz: pos.z, isEnemy, isCritical,
     });
   }
 
@@ -1199,10 +1205,10 @@ export default class ArenaScene {
         }
       } else {
         const eased        = 1 - (1 - p) * (1 - p);
-        const maxCoreScale = entry.isEnemy ? 1.2 : 0.8;
-        const maxRadius    = entry.isEnemy ? 1.8 : 1.2;
-        const maxBlobScale = entry.isEnemy ? 0.7 : 0.45;
-        const maxLift      = entry.isEnemy ? 0.6 : 0.35;
+        const maxCoreScale = entry.isCritical ? 1.8  : (entry.isEnemy ? 1.2  : 0.8);
+        const maxRadius    = entry.isCritical ? 2.2  : (entry.isEnemy ? 1.8  : 1.2);
+        const maxBlobScale = entry.isCritical ? 1.0  : (entry.isEnemy ? 0.7  : 0.45);
+        const maxLift      = entry.isCritical ? 0.8  : (entry.isEnemy ? 0.6  : 0.35);
 
         entry.core.scaling.setAll(eased * maxCoreScale);
         entry.core.material.alpha = 1.0 - p;
