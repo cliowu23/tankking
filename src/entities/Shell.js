@@ -1,6 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
 
-export const SHELL_GRAVITY = 14;
+export const SHELL_GRAVITY = 0;
 
 export default class Shell {
   constructor(scene) {
@@ -35,7 +35,6 @@ export default class Shell {
     if (!this.active) return;
 
     this.life += dt;
-    this.vy -= SHELL_GRAVITY * dt;
 
     this.mesh.position.x += this.vx * dt;
     this.mesh.position.y += this.vy * dt;
@@ -47,7 +46,7 @@ export default class Shell {
     this.mesh.rotation.y =  Math.atan2(this.vx, this.vz);
 
     const hDist = Math.hypot(this.mesh.position.x - this.originX, this.mesh.position.z - this.originZ);
-    if (this.mesh.position.y <= 0.05 || this.life > 3.5 || (this.maxRange > 0 && hDist >= this.maxRange)) {
+    if (this.life > 3.5 || (this.maxRange > 0 && hDist >= this.maxRange)) {
       this.deactivate();
     }
   }
