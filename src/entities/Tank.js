@@ -48,10 +48,8 @@ export default class Tank {
     // Lock-on target: set from ArenaScene each frame
     this.lockTarget       = null; // Vector3 or null
 
-    // Turret world-space aim angle (visual, traverses at turretSpeed — starts matching hull)
+    // Turret world-space aim angle (traverses at turretSpeed toward cursor)
     this.turretAimAngle   = 0;
-    // Cursor aim angle (snaps instantly to cursor — used for firing direction)
-    this.fireAimAngle     = 0;
 
     // Barrel elevation in radians (0 = flat, positive = muzzle up)
     this.barrelElevation  = 0;
@@ -251,7 +249,6 @@ export default class Tank {
     this.speed = 0;
     this.rotY  = 0;
     this.turretAimAngle  = 0;
-    this.fireAimAngle    = 0;
     this.barrelElevation = 0;
     this.fuel  = this.maxFuel;
     this.root.position.set(0, 0, 0);
@@ -371,7 +368,6 @@ export default class Tank {
       const diff      = shortAngle(this.turretAimAngle, targetAim);
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
-      this.fireAimAngle    = this.turretAimAngle; // lock-on fires where turret actually points
     } else {
       // Mouse aim: turret traverses at limited rate (visual), fireAimAngle snaps to cursor (shot precision)
       const ray = this.scene.createPickingRay(
@@ -385,7 +381,6 @@ export default class Tank {
         const diff      = shortAngle(this.turretAimAngle, targetAim);
         const maxTurn   = this.turretSpeed * dt;
         this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
-        this.fireAimAngle    = targetAim; // shot always goes exactly where cursor points
       }
     }
 
