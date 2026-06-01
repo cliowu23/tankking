@@ -15,13 +15,13 @@ import Shell from '../entities/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 
 const NORMAL_SPARK_VELS = [
-  { vx:  0.0, vy: 7.0, vz:  0.0 },
-  { vx:  3.5, vy: 6.2, vz:  0.0 },
-  { vx: -3.5, vy: 6.2, vz:  0.0 },
-  { vx:  0.0, vy: 6.2, vz:  3.5 },
-  { vx:  0.0, vy: 6.2, vz: -3.5 },
-  { vx:  2.5, vy: 5.8, vz:  2.5 },
-  { vx: -2.5, vy: 5.8, vz: -2.5 },
+  { vx:  0.0, vy: 5.2, vz:  0.0 },
+  { vx:  2.6, vy: 4.6, vz:  0.0 },
+  { vx: -2.6, vy: 4.6, vz:  0.0 },
+  { vx:  0.0, vy: 4.6, vz:  2.6 },
+  { vx:  0.0, vy: 4.6, vz: -2.6 },
+  { vx:  1.8, vy: 4.3, vz:  1.8 },
+  { vx: -1.8, vy: 4.3, vz: -1.8 },
 ];
 const NORMAL_SPARK_GRAVITY = 14;  // units/s² downward (Babylon Y-up)
 const NORMAL_SPARK_TRAIL   = 0.07; // seconds of trail behind spark head
