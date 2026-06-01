@@ -1407,6 +1407,70 @@ export default class ArenaScene {
               : 0.6 * (1 - (sp - 0.4) / 0.6);
           }
         }
+      } else if (entry.type === 'normalImpact') {
+        const p     = entry.t / entry.duration;
+        const eased = 1 - (1 - p) * (1 - p);
+
+        // Flash: scale up fast, fade out fully by p=0.5
+        const ff = Math.max(0, 1 - p / 0.5);
+        entry.flash.scaling.setAll(0.5 + eased * 1.5);  // 0.5 → 2.0
+        entry.flash.material.alpha = ff;
+        if (ff <= 0) entry.flash.isVisible = false;
+
+        // Sparks: arc physics + trail line update
+        const st = entry.t;
+        for (let s = 0; s < 7; s++) {
+          const vel  = NORMAL_SPARK_VELS[s];
+          const mesh = entry.sparks[s];
+          const pts  = this._sparkPts[entry.slot][s];
+          const cols = this._sparkCols[entry.slot][s];
+
+          const tt = Math.max(0, st - NORMAL_SPARK_TRAIL);
+
+          // Head position at current time
+          pts[1].set(
+            entry.ox + vel.vx * st,
+            entry.oy + vel.vy * st - 0.5 * NORMAL_SPARK_GRAVITY * st * st,
+            entry.oz + vel.vz * st,
+          );
+          // Tail position at (t - trail)
+          pts[0].set(
+            entry.ox + vel.vx * tt,
+            entry.oy + vel.vy * tt - 0.5 * NORMAL_SPARK_GRAVITY * tt * tt,
+            entry.oz + vel.vz * tt,
+          );
+
+          const sparkFade = Math.max(0, 1 - p / 0.75);
+          cols[0].set(1, 1, 1, sparkFade * 0.4);          // tail: white, dim
+          cols[1].set(1, 0.9, 0.3, sparkFade);             // head: yellow, bright
+
+          if (sparkFade > 0 && pts[1].y > -1) {
+            mesh.isVisible = true;
+            MeshBuilder.CreateLines(`normalSpark_${entry.slot * 7 + s}`, {
+              points: pts,
+              colors: cols,
+              instance: mesh,
+            });
+          } else {
+            mesh.isVisible = false;
+          }
+        }
+
+        // Smoke: same pattern as tankImpact smokes
+        const smokeDelay = 0.18;
+        for (let s = 0; s < 2; s++) {
+          if (entry.t < smokeDelay) {
+            entry.smokes[s].material.alpha = 0;
+          } else {
+            const sp     = (entry.t - smokeDelay) / (entry.duration - smokeDelay);
+            const seased = 1 - (1 - sp) * (1 - sp);
+            entry.smokes[s].position.y = entry.oy + seased * 1.2;
+            entry.smokes[s].scaling.setAll(0.3 + seased * 0.9);
+            entry.smokes[s].material.alpha = sp < 0.4
+              ? sp * 1.2
+              : 0.48 * (1 - (sp - 0.4) / 0.6);
+          }
+        }
       }
     }
   }
