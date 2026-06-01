@@ -360,14 +360,17 @@ export default class Tank {
   }
 
   _updateTurret(dt) {
-    // Use turret pivot world position as the aim origin — it's the actual centre of rotation,
-    // and sits slightly forward of the tank root. Computing angles from root caused a lateral
-    // offset when aiming 90° to either side.
-    const pivot = this.turretPivot.getAbsolutePosition();
+    // Compute turret pivot world XZ analytically from hull rotation — avoids Babylon's
+    // stale world-matrix cache and works for any turret geometry on any future tank.
+    const tp   = this.turretPivot.position; // hull-local offset
+    const cosY = Math.cos(this.rotY);
+    const sinY = Math.sin(this.rotY);
+    const pivotX = this.root.position.x + tp.x * cosY + tp.z * sinY;
+    const pivotZ = this.root.position.z - tp.x * sinY + tp.z * cosY;
 
     if (this.lockTarget) {
       // Lock-on: traverse at limited rate toward locked enemy
-      const targetAim = Math.atan2(this.lockTarget.x - pivot.x, this.lockTarget.z - pivot.z);
+      const targetAim = Math.atan2(this.lockTarget.x - pivotX, this.lockTarget.z - pivotZ);
       const diff      = shortAngle(this.turretAimAngle, targetAim);
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
@@ -380,7 +383,7 @@ export default class Tank {
         const t         = -ray.origin.y / ray.direction.y;
         const hitX      = ray.origin.x + t * ray.direction.x;
         const hitZ      = ray.origin.z + t * ray.direction.z;
-        const targetAim = Math.atan2(hitX - pivot.x, hitZ - pivot.z);
+        const targetAim = Math.atan2(hitX - pivotX, hitZ - pivotZ);
         const diff      = shortAngle(this.turretAimAngle, targetAim);
         const maxTurn   = this.turretSpeed * dt;
         this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
