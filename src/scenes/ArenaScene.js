@@ -1507,7 +1507,7 @@ export default class ArenaScene {
           this._spawnTankImpact(shell.position.clone(), isCritical);
           shell.deactivate();
           enemy.takeDamage(damage);
-          this._triggerShake(0.12, 0.4);
+          this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
           if (!enemy.alive && this.lockedEnemy === enemy) {
             this._prevLockedEnemy = enemy;
             this._fadeOutTime     = 0;
