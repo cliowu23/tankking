@@ -799,7 +799,12 @@ export default class ArenaScene {
   }
 
   _updateAimIndicator() {
-    // Reference point: locked enemy or cursor-ground intersection
+    // Barrel firing plane height — same formula as Tank._updateTurret so everything is consistent
+    const tipY = this.tank.root.position.y
+      + this.tank.turretPivot.position.y
+      + this.tank.barrelPivot.position.y;
+
+    // Reference point: locked enemy or cursor on barrel firing plane
     let tx, tz;
     if (this.lockedEnemy) {
       tx = this.lockedEnemy.position.x;
@@ -811,24 +816,27 @@ export default class ArenaScene {
         this.scene.pointerX, this.scene.pointerY, null, this.camera,
       );
       if (ray && Math.abs(ray.direction.y) > 0.0001) {
-        const t = -ray.origin.y / ray.direction.y;
+        const t = (tipY - ray.origin.y) / ray.direction.y;
         tx = ray.origin.x + t * ray.direction.x;
         tz = ray.origin.z + t * ray.direction.z;
       }
     }
 
-    // Use tank root as origin — same reference point as _updateTurret's targetAim calculation.
-    // This guarantees: when turretAimAngle has fully converged to atan2(tx-root.x, tz-root.z),
-    // root + sin/cos(aim)*range == (tx, tz), which projects back to the cursor pixel exactly.
-    const root  = this.tank.position;
-    const dx    = tx - root.x;
-    const dz    = tz - root.z;
+    // Use turret pivot XZ as origin (matches _updateTurret), range to barrel-plane cursor point
+    const tp    = this.tank.turretPivot.position;
+    const scale = this.tank.root.scaling.x;
+    const cosY  = Math.cos(this.tank.rotY);
+    const sinY  = Math.sin(this.tank.rotY);
+    const pivotX = this.tank.position.x + (tp.x * cosY + tp.z * sinY) * scale;
+    const pivotZ = this.tank.position.z + (-tp.x * sinY + tp.z * cosY) * scale;
+    const dx    = tx - pivotX;
+    const dz    = tz - pivotZ;
     const range = Math.max(0.5, Math.sqrt(dx * dx + dz * dz));
     const aim   = this.tank.turretAimAngle;
     const landPos = new Vector3(
-      root.x + Math.sin(aim) * range,
-      0,
-      root.z + Math.cos(aim) * range,
+      pivotX + Math.sin(aim) * range,
+      tipY,
+      pivotZ + Math.cos(aim) * range,
     );
 
     // Project 3D → CSS pixels
