@@ -116,6 +116,7 @@ Open `public/models/manifest.json` and add an entry:
 | `turretPivotZOffset` | no | `0` | Fine-tunes the turret ring Z position after the loader places it. Use if the turret rotates off-center. |
 | `barrelTipOffset` | no | `1.8` | Distance in game units from the barrel pivot to the shell spawn point. Match to barrel length. M26 Pershing uses `3.8`. |
 | `centerTurretX` | no | `false` | Forces turretPivot.x = 0. Set to `true` if the turret is drifting left/right due to coord-system X artifacts. |
+| `paintColor` | no | none | RGB array `[r, g, b]` (0–1). Paints body panels this color (matte finish) while leaving tracks, optics, wheels, and interior with their original War Thunder materials. See **Model Painting** section below. |
 
 **Real example — M26 Pershing:**
 ```json
@@ -223,3 +224,36 @@ You don't need to scale in Blender — the game handles it.
 | `turretPivot.y ≤ 0.3` warning in console | "turret" empty placed at wrong height | Re-do Step 3: add model's Blender `min Z` to the empty's target height |
 | Turret geometry floating above hull | "turret" empty near ground level (same as above) | Same fix — the loader preserves geometry position but rotation pivot will be off |
 | Turret rotation orbits in a wide arc | Empty height incorrect, pivot far from ring | Fix empty placement in Blender, re-export |
+| Entire model painted including tracks | Track mesh names don't match keyword list | Check `[Paint]` log for the mesh names — add new keywords to `UNPAINTABLE` in `src/utils/modelPaint.js` |
+| Nothing is painted | `paintColor` missing from manifest | Add `"paintColor": [r, g, b]` to manifest entry |
+
+---
+
+## Model Painting
+
+The loader can intelligently repaint body panels while leaving mechanical/optical parts with their original War Thunder materials. Think of it like masking a car before spraying: tracks, wheels, lenses, and interior don't get painted.
+
+**Enable it:**
+```json
+"paintColor": [0.12, 0.42, 0.88]
+```
+
+**Color reference:**
+| Look | RGB |
+|------|-----|
+| Cobalt blue (player tank) | `[0.12, 0.42, 0.88]` |
+| Toy green | `[0.18, 0.75, 0.22]` |
+| Signal red (enemy) | `[0.92, 0.12, 0.08]` |
+| White matte | `[0.92, 0.90, 0.88]` |
+| Sand / desert | `[0.85, 0.75, 0.45]` |
+
+**How it works:** After load, every mesh name is checked against an unpaintable keyword list. Matches keep their GLTF material. Everything else gets a `StandardMaterial` with `diffuseColor = paintColor` and near-zero specular (matte finish).
+
+**Default unpaintable keywords** (in `src/utils/modelPaint.js`):
+`track`, `tread`, `wheel`, `road_wheel`, `sprocket`, `idler`, `roller`, `bogie`, `suspension`, `lens`, `glass`, `optic`, `periscope`, `sight`, `vision`, `interior`, `crew`, `engine`, `rubber`, `seal`, `exhaust`, `muffler`
+
+**Tuning for a new model:** Load it in the inspector and read the `[Paint]` console log:
+```
+[Paint] 30 painted, 35 left original: track_t55-track_2_0, wheel_t55-wheels_1_0, ...
+```
+If something is wrongly painted (e.g. a track named `caterpillar_01`), add `caterpillar` to the `UNPAINTABLE` list. If something is wrongly skipped (e.g. a hatch named `vision_port_cover` being left grey), rename it in Blender or add an exception.

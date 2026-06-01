@@ -4,6 +4,7 @@ import {
   Vector3, Matrix, DynamicTexture, TransformNode, SceneLoader, Quaternion,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
+import { applyModelPaint } from '../utils/modelPaint.js';
 
 const PAD_Y = 0.06;
 
@@ -533,6 +534,9 @@ export default class TankDesignerScene {
         this.shadowGen.addShadowCaster(m);
         m.receiveShadows = true;
       }
+
+      // 8.5. Paint — body panels get manifest paintColor (matte), tracks/optics left original
+      applyModelPaint(result.meshes, config, this.scene);
 
       // 9. Set accurate elevation limits from manifest (degrees → radians)
       const toRad = d => d * Math.PI / 180;
