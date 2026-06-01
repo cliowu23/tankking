@@ -1101,6 +1101,56 @@ export default class ArenaScene {
       this._tankSmokes.push(mesh);
     }
 
+    // --- Normal impact pools (4 slots: 1 flash + 7 sparks + 2 smokes each) ---
+    this._normalFlashes = [];
+    for (let i = 0; i < 4; i++) {
+      const mat = new StandardMaterial(`normalFlashMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(1.0, 1.0, 1.0);
+      mat.emissiveColor   = new Color3(0.9, 0.95, 1.0);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`normalFlash_${i}`, { diameter: 1.0, segments: 5 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._normalFlashes.push(mesh);
+    }
+
+    // 4 slots × 7 sparks = 28 updatable line meshes
+    this._normalSparks = [];
+    for (let i = 0; i < 28; i++) {
+      const line = MeshBuilder.CreateLines(`normalSpark_${i}`, {
+        points: [Vector3.Zero(), new Vector3(0, 0.01, 0)],
+        colors: [new Color4(1, 1, 1, 0), new Color4(1, 0.9, 0.3, 0)],
+        updatable: true,
+      }, this.scene);
+      line.isVisible  = false;
+      line.isPickable = false;
+      line._vfxActive = false;
+      this._normalSparks.push(line);
+    }
+
+    // Pre-allocated Vector3/Color4 arrays for spark line updates (avoids GC)
+    this._sparkPts = Array.from({ length: 4 }, () =>
+      Array.from({ length: 7 }, () => [Vector3.Zero(), Vector3.Zero()])
+    );
+    this._sparkCols = Array.from({ length: 4 }, () =>
+      Array.from({ length: 7 }, () => [new Color4(1, 1, 1, 0), new Color4(1, 0.9, 0.3, 0)])
+    );
+
+    this._normalSmokes = [];
+    for (let i = 0; i < 8; i++) {
+      const mat = new StandardMaterial(`normalSmokeMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(0.82, 0.82, 0.85);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`normalSmoke_${i}`, { diameter: 1.0, segments: 4 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._normalSmokes.push(mesh);
+    }
+
     // Blast ring disc — expands flat and fades (pressure shockwave)
     const discMat = new StandardMaterial('muzzleDiscMat', this.scene);
     discMat.diffuseColor    = new Color3(1.0, 0.90, 0.5);
