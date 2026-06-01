@@ -1,7 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
 
-export const SHELL_GRAVITY = 0;
-
 export default class Shell {
   constructor(scene) {
     const mat = new StandardMaterial('shellMat', scene);

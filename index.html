@@ -202,7 +202,7 @@
       line-height: 1.4;
     }
     #death-restart, #death-menu,
-    #pause-restart, #pause-menu {
+    #pause-resume, #pause-restart, #pause-menu {
       margin-top: 20px;
       background: var(--panel);
       cursor: pointer;
@@ -221,7 +221,7 @@
       transition: color 0.1s, outline-color 0.1s;
     }
     #death-restart:hover, #death-menu:hover,
-    #pause-restart:hover, #pause-menu:hover {
+    #pause-resume:hover, #pause-restart:hover, #pause-menu:hover {
       color: var(--gold);
       outline-color: var(--accent);
     }
@@ -254,6 +254,12 @@
     #designer-topbar-spacer { flex: 1; }
     #designer-hint-top { color: var(--dim); font-size: 7px; letter-spacing: 0px; line-height: 1.6; }
     #designer-controls-hint { color: var(--dim); font-size: 9px; letter-spacing: 0px; line-height: 1.6; }
+    #designer-bottom-hint {
+      position: fixed; bottom: 18px; left: 0; right: 0;
+      text-align: center; pointer-events: none; z-index: 6;
+      color: var(--dim); font-size: 9px; letter-spacing: 1px; line-height: 1.6;
+      display: none;
+    }
 
     #designer-sidebar {
       position: fixed; left: 0; top: 38px; bottom: 0; width: 180px;
@@ -565,6 +571,7 @@
 
   <div id="pause">
     <h2>PAUSED</h2>
+    <button id="pause-resume">RESUME</button>
     <button id="pause-restart">RESTART</button>
     <button id="pause-menu">MAIN MENU</button>
   </div>
@@ -589,12 +596,12 @@
       <span id="designer-title">SELECT TANK</span>
       <span id="designer-topbar-spacer"></span>
       <span id="designer-controls-hint">A / D &mdash; TURRET &nbsp;|&nbsp; W / S &mdash; ELEVATION &nbsp;|&nbsp; SCROLL / = / - &mdash; ZOOM</span>
-      <button id="designer-confirm-btn" class="editor-btn" style="color:var(--cyan);border-color:var(--cyan)">CONFIRM [E]</button>
       <button id="designer-exit-btn" class="editor-btn">BACK [ESC]</button>
     </div>
   </div>
 
   <div id="designer-sidebar" style="display:none"></div>
+  <div id="designer-bottom-hint">[ E ] CONFIRM SELECTION &nbsp;&nbsp;|&nbsp;&nbsp; [ ESC ] BACK</div>
 
   <div id="editor-ui">
     <div id="editor-toolbar">
@@ -660,6 +667,7 @@
   </div>
 
   <div id="crt-off"></div>
+  <canvas id="transition-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99;display:none"></canvas>
 
   <script type="module" src="/src/main.js"></script>
 </body>
