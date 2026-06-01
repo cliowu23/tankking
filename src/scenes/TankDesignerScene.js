@@ -15,13 +15,16 @@ export default class TankDesignerScene {
     this.scene   = new Scene(engine);
     this.scene.clearColor = new Color4(0.84, 0.90, 0.96, 1.0);
 
-    this._turretPivot = null;
-    this._barrelPivot = null;
-    this._toDispose   = [];
-    this._activeBtn   = null;
-    this._keys        = {};
-    this._barrelUp    = -0.349; // max upward rotation.x (−20° default)
-    this._barrelDown  =  0.175; // max downward rotation.x (+10° default)
+    this._turretPivot      = null;
+    this._barrelPivot      = null;
+    this._toDispose        = [];
+    this._activeBtn        = null;
+    this._selectedBtn      = null; // button for the confirmed selection
+    this._keys             = {};
+    this._barrelUp         = -0.349;
+    this._barrelDown       =  0.175;
+    this._previewFilename  = null; // what's currently showing in the 3D view
+    this._selectedFilename = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
 
     this._setupCamera();
     this._setupLighting();
@@ -230,6 +233,16 @@ export default class TankDesignerScene {
 
   _setupUI() {
     document.getElementById('designer-exit-btn').addEventListener('click', () => this._onExit());
+    document.getElementById('designer-confirm-btn').addEventListener('click', () => this.confirmSelection());
+  }
+
+  confirmSelection() {
+    if (!this._previewFilename) return; // nothing previewed yet (primitive shown)
+    localStorage.setItem('selectedTank', this._previewFilename);
+    this._selectedFilename = this._previewFilename;
+    if (this._selectedBtn) this._selectedBtn.classList.remove('selected');
+    if (this._activeBtn)  { this._activeBtn.classList.add('selected'); this._selectedBtn = this._activeBtn; }
+    this._onExit();
   }
 
   _populateSidebar() {
@@ -249,16 +262,7 @@ export default class TankDesignerScene {
         divEl.className = 'ds-divider';
         sidebar.appendChild(divEl);
 
-        // Default primitive tank — always first
-        const primBtn = document.createElement('button');
-        primBtn.className = 'shape-btn';
-        primBtn.textContent = 'DEFAULT TANK';
-        primBtn.addEventListener('click', () => this._loadPrimitive(primBtn));
-        sidebar.appendChild(primBtn);
-
-        const div2 = document.createElement('div');
-        div2.className = 'ds-divider';
-        sidebar.appendChild(div2);
+        let autoBtn = null, autoConfig = null;
 
         for (const [filename, config] of Object.entries(manifest)) {
           const label = filename
@@ -271,12 +275,29 @@ export default class TankDesignerScene {
           const btn = document.createElement('button');
           btn.className = 'shape-btn';
           btn.textContent = label;
+
+          if (filename === this._selectedFilename) {
+            btn.classList.add('selected');
+            this._selectedBtn = btn;
+            autoBtn    = btn;
+            autoConfig = config;
+          }
+
           btn.addEventListener('click', () => this._loadModel(filename, config, btn, label));
           sidebar.appendChild(btn);
         }
 
-        // Auto-load primitive on open
-        this._loadPrimitive(primBtn);
+        // Auto-load the saved selection (or first available GLB)
+        if (autoBtn) {
+          this._loadModel(this._selectedFilename, autoConfig, autoBtn, autoBtn.textContent);
+        } else {
+          const firstEntry = Object.entries(manifest)[0];
+          if (firstEntry) {
+            const [fn, cfg] = firstEntry;
+            const firstBtn = sidebar.querySelector('.shape-btn');
+            this._loadModel(fn, cfg, firstBtn, firstBtn?.textContent ?? fn);
+          }
+        }
       });
   }
 
@@ -407,7 +428,8 @@ export default class TankDesignerScene {
   _loadModel(filename, config, btn, label) {
     if (this._activeBtn) this._activeBtn.classList.remove('active');
     btn.classList.add('active');
-    this._activeBtn = btn;
+    this._activeBtn      = btn;
+    this._previewFilename = filename;
 
     this._clearCurrentModel();
 
