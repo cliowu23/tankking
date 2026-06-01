@@ -1221,6 +1221,46 @@ export default class ArenaScene {
     }
   }
 
+  _spawnNormalImpact(pos) {
+    let slot = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!this._normalFlashes[i]._vfxActive) { slot = i; break; }
+    }
+    if (slot === -1) return;
+
+    const oy    = Math.max(0.3, pos.y);
+    const flash = this._normalFlashes[slot];
+    flash._vfxActive = true;
+    flash.isVisible  = true;
+    flash.position.set(pos.x, oy, pos.z);
+    flash.scaling.setAll(0.5);
+    flash.material.alpha = 1.0;
+
+    const sparks = [];
+    for (let s = 0; s < 7; s++) {
+      const mesh = this._normalSparks[slot * 7 + s];
+      mesh._vfxActive = true;
+      mesh.isVisible  = true;
+      sparks.push(mesh);
+    }
+
+    const smokes = [];
+    for (let s = 0; s < 2; s++) {
+      const mesh = this._normalSmokes[slot * 2 + s];
+      mesh._vfxActive = true;
+      mesh.isVisible  = true;
+      mesh.position.set(pos.x + (s === 0 ? 0.12 : -0.12), oy, pos.z + (s === 0 ? 0.08 : -0.08));
+      mesh.scaling.setAll(0.3);
+      mesh.material.alpha = 0.0;
+      smokes.push(mesh);
+    }
+
+    this._activeVFX.push({
+      type: 'normalImpact', slot, flash, sparks, smokes,
+      t: 0, duration: 0.75, ox: pos.x, oy, oz: pos.z,
+    });
+  }
+
   _spawnTankImpact(pos, isCritical = false) {
     let slot = -1;
     for (let i = 0; i < 4; i++) {
