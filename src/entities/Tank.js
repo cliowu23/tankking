@@ -360,13 +360,14 @@ export default class Tank {
   }
 
   _updateTurret(dt) {
-    // Compute turret pivot world XZ analytically from hull rotation — avoids Babylon's
-    // stale world-matrix cache and works for any turret geometry on any future tank.
-    const tp   = this.turretPivot.position; // hull-local offset
-    const cosY = Math.cos(this.rotY);
-    const sinY = Math.sin(this.rotY);
-    const pivotX = this.root.position.x + tp.x * cosY + tp.z * sinY;
-    const pivotZ = this.root.position.z - tp.x * sinY + tp.z * cosY;
+    // Compute turret pivot world XZ analytically: local offset rotated by hull angle,
+    // then scaled by root.scaling (GLB tanks have non-1 scale). Works for any tank.
+    const tp    = this.turretPivot.position; // hull-local, pre-scale
+    const scale = this.root.scaling.x;       // uniform scale set during GLB load (1.0 for primitives)
+    const cosY  = Math.cos(this.rotY);
+    const sinY  = Math.sin(this.rotY);
+    const pivotX = this.root.position.x + (tp.x * cosY + tp.z * sinY) * scale;
+    const pivotZ = this.root.position.z + (-tp.x * sinY + tp.z * cosY) * scale;
 
     if (this.lockTarget) {
       // Lock-on: traverse at limited rate toward locked enemy
