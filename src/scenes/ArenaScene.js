@@ -673,17 +673,8 @@ export default class ArenaScene {
       this.aiEnemy.update(dt, this.tank.position);
       for (const s of this.aiEnemy.shells) s.update(dt);
 
-      // --- Barrel elevation (tip-height formula: point barrel tip at cursor surface Y) ---
-      if (this.lockedEnemy) {
-        const targetElev = this._elevationForHeight(this.lockedEnemy.position.y + 0.75);
-        this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-10 * dt));
-      } else {
-        const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-        if (pick.hit && pick.pickedPoint) {
-          const targetElev = this._elevationForHeight(pick.pickedPoint.y);
-          this.tank.barrelElevation += (targetElev - this.tank.barrelElevation) * (1 - Math.exp(-20 * dt));
-        }
-      }
+      // Barrel elevation disabled for flat-shot mode — re-enable with _elevationForHeight when arc shots return
+      this.tank.barrelElevation = 0;
 
       // Barrel recoil: kick back on fire, spring back to rest over 0.22s (no overshoot)
       if (this.tank._recoil > 0) {
