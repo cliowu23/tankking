@@ -14,6 +14,18 @@ import AIEnemy from '../entities/AIEnemy.js';
 import Shell from '../entities/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 
+const NORMAL_SPARK_VELS = [
+  { vx:  0.0, vy: 7.0, vz:  0.0 },
+  { vx:  3.5, vy: 6.2, vz:  0.0 },
+  { vx: -3.5, vy: 6.2, vz:  0.0 },
+  { vx:  0.0, vy: 6.2, vz:  3.5 },
+  { vx:  0.0, vy: 6.2, vz: -3.5 },
+  { vx:  2.5, vy: 5.8, vz:  2.5 },
+  { vx: -2.5, vy: 5.8, vz: -2.5 },
+];
+const NORMAL_SPARK_GRAVITY = 14;  // units/s² downward (Babylon Y-up)
+const NORMAL_SPARK_TRAIL   = 0.07; // seconds of trail behind spark head
+
 export default class ArenaScene {
   constructor(engine) {
     this.scene = new Scene(engine);
@@ -1328,7 +1340,7 @@ export default class ArenaScene {
         if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
           const speed      = Math.hypot(shell.vx, shell.vz);
           const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;
-          const isCritical = perpDist < 0.15;
+          const isCritical = perpDist < 0.4;
           const damage     = isCritical ? 51 : 34;
           this._spawnTankImpact(shell.position.clone(), isCritical);
           shell.deactivate();
