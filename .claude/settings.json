@@ -12,6 +12,20 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(vercel --prod*)",
+            "command": "LATEST=$(vercel ls 2>/dev/null | grep -m1 'https://tankking-' | sed 's|https://||' | tr -d ' '); [ -n \"$LATEST\" ] && vercel alias set \"$LATEST\" tankking.vercel.app 2>&1 || true",
+            "statusMessage": "Updating tankking.vercel.app alias...",
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }
