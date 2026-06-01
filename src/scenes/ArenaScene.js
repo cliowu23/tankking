@@ -2,7 +2,7 @@ import {
   Scene, ArcRotateCamera, HemisphericLight, DirectionalLight,
   ShadowGenerator, MeshBuilder, StandardMaterial, Color3, Color4,
   Vector3, Matrix, DynamicTexture, GlowLayer, TransformNode, SceneLoader,
-  VertexBuffer, VertexData, Quaternion,
+  Quaternion,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
@@ -313,6 +313,11 @@ export default class ArenaScene {
       .catch(() => ({}))
       .then(manifest => {
         const modelFile = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
+        if (modelFile === 'primitive') {
+          // Primitive Tank.js entity already has turretPivot/barrelPivot — nothing to load
+          document.getElementById('controls-start').textContent = 'PRESS ENTER TO BATTLE';
+          return;
+        }
         this._loadPlayerGLB(modelFile, manifest[modelFile] ?? {});
       });
   }
@@ -470,38 +475,6 @@ export default class ArenaScene {
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
     });
-  }
-
-  _setupDevLabels() {
-    // Grid reference: label one square near origin (cyan)
-    const g = this._devLabel('grid: 2.5u', '#66ddff');
-    g.position.set(1.25, 0.15, 1.25);
-
-    // Tank hull dimensions (yellow), parented so they follow the tank
-    const w = this._devLabel('2.4u wide', '#ffee66');
-    w.parent = this.tank.root;
-    w.position.set(2.2, 0.8, 0);
-
-    const d = this._devLabel('3.2u deep', '#ffee66');
-    d.parent = this.tank.root;
-    d.position.set(0, 0.8, 2.4);
-  }
-
-  _devLabel(text, color) {
-    const plane = MeshBuilder.CreatePlane(`dl_${text}`, { width: 3.0, height: 0.72 }, this.scene);
-    plane.billboardMode = 7; // BILLBOARDMODE_ALL — always faces camera
-    plane.isPickable = false;
-
-    const tex = new DynamicTexture(`dlt_${text}`, { width: 384, height: 80 }, this.scene, false);
-    tex.drawText(text, null, null, 'bold 34px Arial', color, 'transparent', true);
-
-    const mat = new StandardMaterial(`dlm_${text}`, this.scene);
-    mat.diffuseTexture = tex;
-    mat.emissiveTexture = tex;
-    mat.backFaceCulling = false;
-    mat.useAlphaFromDiffuseTexture = true;
-    plane.material = mat;
-    return plane;
   }
 
   _setupLockOn() {
@@ -689,15 +662,7 @@ export default class ArenaScene {
       this._checkCollisions();
       this._checkObstacleCollisions();
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
-      // Snapshot active state before shell updates to catch ground deactivations
-      const wasActive = this.shells.map(s => s.active);
       for (const shell of this.shells) shell.update(dt);
-      for (let i = 0; i < this.shells.length; i++) {
-        if (wasActive[i] && !this.shells[i].active) {
-          const s = this.shells[i];
-          this._spawnImpact(new Vector3(s.position.x, 0, s.position.z), false);
-        }
-      }
       this._checkShellHits();
       this._updateVFX(dt);
       this._updateLockRing(dt);
@@ -1049,12 +1014,6 @@ export default class ArenaScene {
     return { x: px, z: pz };
   }
 
-  _elevationForHeight(targetY) {
-    const pivotY = this.tank.barrelPivot.getAbsolutePosition().y;
-    const ratio  = (targetY - pivotY) / this._barrelTipOffset;
-    return Math.asin(Math.max(-1, Math.min(1, ratio)));
-  }
-
   _shoot() {
     const shell = this.shells.find(s => !s.active);
     if (!shell) return;
@@ -1088,87 +1047,158 @@ export default class ArenaScene {
     this._muzzleFlashMesh.isPickable = false;
     this._muzzleFlashMesh._vfxActive = false;
 
-    // Impact cores — 4 spheres (one per simultaneous impact slot)
-    this._impactCores = [];
+    // --- Tank impact pools (4 slots) ---
+    this._tankCores = [];
     for (let i = 0; i < 4; i++) {
-      const mat = new StandardMaterial(`impactCoreMat_${i}`, this.scene);
-      mat.diffuseColor    = new Color3(1.0, 0.65, 0.0);
-      mat.emissiveColor   = new Color3(1.0, 0.6, 0.0);
+      const mat = new StandardMaterial(`tankCoreMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(1.0, 0.85, 0.3);
+      mat.emissiveColor   = new Color3(1.0, 0.75, 0.1);
       mat.disableLighting = true;
-      const mesh = MeshBuilder.CreateSphere(`impactCore_${i}`, { diameter: 1.0, segments: 5 }, this.scene);
+      const mesh = MeshBuilder.CreateSphere(`tankCore_${i}`, { diameter: 1.0, segments: 6 }, this.scene);
       mesh.material   = mat;
       mesh.isVisible  = false;
       mesh.isPickable = false;
       mesh._vfxActive = false;
-      this._impactCores.push(mesh);
+      this._tankCores.push(mesh);
     }
 
-    // Smoke puffs — 16 spheres (4 per impact slot). Each gets its own material
-    // so alpha can be animated independently.
-    this._smokePuffs = [];
+    this._tankFireBlobs = [];
     for (let i = 0; i < 16; i++) {
-      const mat = new StandardMaterial(`smokePuffMat_${i}`, this.scene);
-      mat.diffuseColor    = new Color3(0.65, 0.58, 0.50);
+      const mat = new StandardMaterial(`tankFireMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(1.0, 0.45, 0.05);
+      mat.emissiveColor   = new Color3(0.9, 0.30, 0.0);
       mat.disableLighting = true;
-      const mesh = MeshBuilder.CreateSphere(`smokePuff_${i}`, { diameter: 1.0, segments: 4 }, this.scene);
+      const mesh = MeshBuilder.CreateSphere(`tankFire_${i}`, { diameter: 1.0, segments: 4 }, this.scene);
       mesh.material   = mat;
       mesh.isVisible  = false;
       mesh.isPickable = false;
       mesh._vfxActive = false;
-      this._smokePuffs.push(mesh);
+      this._tankFireBlobs.push(mesh);
+    }
+
+    this._tankSmokes = [];
+    for (let i = 0; i < 8; i++) {
+      const mat = new StandardMaterial(`tankSmokeMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(0.25, 0.22, 0.20);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`tankSmoke_${i}`, { diameter: 1.0, segments: 4 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._tankSmokes.push(mesh);
+    }
+
+    // Blast ring disc — expands flat and fades (pressure shockwave)
+    const discMat = new StandardMaterial('muzzleDiscMat', this.scene);
+    discMat.diffuseColor    = new Color3(1.0, 0.90, 0.5);
+    discMat.emissiveColor   = new Color3(1.0, 0.85, 0.3);
+    discMat.disableLighting = true;
+    discMat.backFaceCulling = false;
+    this._muzzleDisc = MeshBuilder.CreateDisc('muzzleDisc', { radius: 0.5, tessellation: 16 }, this.scene);
+    this._muzzleDisc.rotation.x   = Math.PI / 2; // lay flat
+    this._muzzleDisc.material     = discMat;
+    this._muzzleDisc.isVisible    = false;
+    this._muzzleDisc.isPickable   = false;
+    this._muzzleDisc._vfxActive   = false;
+
+    // Muzzle smoke — 2 spheres that rise and fade after the flash
+    this._muzzleSmokes = [];
+    for (let i = 0; i < 2; i++) {
+      const mat = new StandardMaterial(`muzzleSmokeMat_${i}`, this.scene);
+      mat.diffuseColor    = new Color3(0.85, 0.82, 0.78);
+      mat.disableLighting = true;
+      const mesh = MeshBuilder.CreateSphere(`muzzleSmoke_${i}`, { diameter: 1.0, segments: 5 }, this.scene);
+      mesh.material   = mat;
+      mesh.isVisible  = false;
+      mesh.isPickable = false;
+      mesh._vfxActive = false;
+      this._muzzleSmokes.push(mesh);
     }
   }
 
   _spawnMuzzleFlash(pos) {
-    const mesh = this._muzzleFlashMesh;
-    if (mesh._vfxActive) return;
-    mesh._vfxActive = true;
-    mesh.isVisible  = true;
-    mesh.position.copyFrom(pos);
-    mesh.scaling.setAll(0.15);
-    mesh.material.alpha = 1.0;
-    this._activeVFX.push({ type: 'muzzleFlash', mesh, t: 0, duration: 0.10 });
+    // Layer 1: bright core sphere
+    const flash = this._muzzleFlashMesh;
+    if (!flash._vfxActive) {
+      flash._vfxActive = true;
+      flash.isVisible  = true;
+      flash.position.copyFrom(pos);
+      flash.scaling.setAll(0.4);
+      flash.material.alpha         = 1.0;
+      flash.material.diffuseColor  = new Color3(1.0, 0.97, 0.85);
+      flash.material.emissiveColor = new Color3(1.0, 0.95, 0.7);
+      this._activeVFX.push({ type: 'muzzleFlash', mesh: flash, t: 0, duration: 0.12 });
+    }
+
+    // Layer 2: expanding blast ring
+    const disc = this._muzzleDisc;
+    if (!disc._vfxActive) {
+      disc._vfxActive = true;
+      disc.isVisible  = true;
+      disc.position.copyFrom(pos);
+      disc.scaling.setAll(0.2);
+      disc.material.alpha = 0.75;
+      this._activeVFX.push({ type: 'muzzleDisc', mesh: disc, t: 0, duration: 0.10 });
+    }
+
+    // Layer 3: two smoke puffs that rise after the flash
+    for (let i = 0; i < 2; i++) {
+      const smoke = this._muzzleSmokes[i];
+      if (!smoke._vfxActive) {
+        smoke._vfxActive = true;
+        smoke.isVisible  = true;
+        smoke.position.set(pos.x + (i === 0 ? 0.1 : -0.1), pos.y, pos.z + (i === 0 ? 0.1 : -0.1));
+        smoke.scaling.setAll(0.3);
+        smoke.material.alpha = 0.0;
+        this._activeVFX.push({
+          type: 'muzzleSmoke', mesh: smoke, t: 0, duration: 0.55,
+          ox: smoke.position.x, oy: smoke.position.y, oz: smoke.position.z,
+        });
+      }
+    }
   }
 
-  _spawnImpact(pos, isEnemy, isCritical = false) {
+  _spawnTankImpact(pos, isCritical = false) {
     let slot = -1;
     for (let i = 0; i < 4; i++) {
-      if (!this._impactCores[i]._vfxActive) { slot = i; break; }
+      if (!this._tankCores[i]._vfxActive) { slot = i; break; }
     }
     if (slot === -1) return;
 
-    const oy   = Math.max(0.1, pos.y); // use actual hit height; clamp above floor
-    const core = this._impactCores[slot];
+    const oy   = Math.max(0.3, pos.y);
+    const core = this._tankCores[slot];
     core._vfxActive = true;
     core.isVisible  = true;
     core.position.set(pos.x, oy, pos.z);
-    core.scaling.setAll(0.1);
+    core.scaling.setAll(0.8);
     core.material.alpha = 1.0;
-    core.material.diffuseColor  = isCritical
-      ? new Color3(1.0, 0.92, 0.3)
-      : new Color3(1.0, 0.65, 0.0);
-    core.material.emissiveColor = isCritical
-      ? new Color3(1.0, 0.85, 0.2)
-      : new Color3(1.0, 0.6, 0.0);
 
-    const blobs = [];
+    const fireBlobs = [];
     for (let b = 0; b < 4; b++) {
-      const mesh = this._smokePuffs[slot * 4 + b];
+      const mesh = this._tankFireBlobs[slot * 4 + b];
       mesh._vfxActive = true;
       mesh.isVisible  = true;
       mesh.position.set(pos.x, oy, pos.z);
       mesh.scaling.setAll(0.1);
-      mesh.material.diffuseColor = isCritical
-        ? new Color3(0.70, 0.68, 0.60)
-        : (isEnemy ? new Color3(0.55, 0.50, 0.45) : new Color3(0.72, 0.62, 0.48));
-      mesh.material.alpha = 0.85;
-      blobs.push(mesh);
+      mesh.material.alpha = 1.0;
+      fireBlobs.push(mesh);
+    }
+
+    const smokeBlobs = [];
+    for (let s = 0; s < 2; s++) {
+      const mesh = this._tankSmokes[slot * 2 + s];
+      mesh._vfxActive = true;
+      mesh.isVisible  = true;
+      mesh.position.set(pos.x + (s === 0 ? 0.15 : -0.15), oy, pos.z + (s === 0 ? 0.1 : -0.1));
+      mesh.scaling.setAll(0.4);
+      mesh.material.alpha = 0.0;
+      smokeBlobs.push(mesh);
     }
 
     this._activeVFX.push({
-      type: 'impact', slot, core, blobs,
-      t: 0, duration: isCritical ? 0.55 : (isEnemy ? 0.40 : 0.30),
-      ox: pos.x, oy, oz: pos.z, isEnemy, isCritical,
+      type: 'tankImpact', slot, core, fireBlobs, smokeBlobs,
+      t: 0, duration: 0.65, ox: pos.x, oy, oz: pos.z, isCritical,
     });
   }
 
@@ -1178,13 +1208,13 @@ export default class ArenaScene {
       entry.t += dt;
 
       if (entry.t >= entry.duration) {
-        if (entry.type === 'muzzleFlash') {
-          entry.mesh.isVisible = false;
-          entry.mesh._vfxActive = false;
+        if (entry.type === 'tankImpact') {
+          entry.core.isVisible  = false; entry.core._vfxActive = false;
+          for (const b of entry.fireBlobs)  { b.isVisible = false; b._vfxActive = false; }
+          for (const b of entry.smokeBlobs) { b.isVisible = false; b._vfxActive = false; }
         } else {
-          entry.core.isVisible = false;
-          entry.core._vfxActive = false;
-          for (const b of entry.blobs) { b.isVisible = false; b._vfxActive = false; }
+          entry.mesh.isVisible  = false;
+          entry.mesh._vfxActive = false;
         }
         this._activeVFX.splice(i, 1);
         continue;
@@ -1195,34 +1225,76 @@ export default class ArenaScene {
       if (entry.type === 'muzzleFlash') {
         if (p < 0.4) {
           const phase = p / 0.4;
-          entry.mesh.scaling.setAll(0.15 + phase * 0.45);
+          entry.mesh.scaling.setAll(0.4 + phase * 0.8);  // 0.4 → 1.2
           entry.mesh.material.alpha = 1.0;
         } else {
           const phase = (p - 0.4) / 0.6;
-          entry.mesh.scaling.setAll(0.60 + phase * 0.30);
+          entry.mesh.scaling.setAll(1.2 + phase * 0.3);  // 1.2 → 1.5
           entry.mesh.material.alpha = 1.0 - phase;
         }
-      } else {
-        const eased        = 1 - (1 - p) * (1 - p);
-        const maxCoreScale = entry.isCritical ? 1.8  : (entry.isEnemy ? 1.2  : 0.8);
-        const maxRadius    = entry.isCritical ? 2.2  : (entry.isEnemy ? 1.8  : 1.2);
-        const maxBlobScale = entry.isCritical ? 1.0  : (entry.isEnemy ? 0.7  : 0.45);
-        const maxLift      = entry.isCritical ? 0.8  : (entry.isEnemy ? 0.6  : 0.35);
+      } else if (entry.type === 'muzzleDisc') {
+        entry.mesh.scaling.setAll(0.2 + p * 2.3);     // 0.2 → 2.5
+        entry.mesh.material.alpha = 0.75 * (1 - p);   // fade to 0
+      } else if (entry.type === 'muzzleSmoke') {
+        const delay = 0.08;
+        if (entry.t < delay) {
+          entry.mesh.material.alpha = 0;
+        } else {
+          const sp    = (entry.t - delay) / (entry.duration - delay);
+          const eased = 1 - (1 - sp) * (1 - sp);
+          entry.mesh.position.y = entry.oy + eased * 0.8;
+          entry.mesh.scaling.setAll(0.3 + eased * 0.8);
+          entry.mesh.material.alpha = sp < 0.5
+            ? sp * 1.4
+            : 0.7 * (1 - (sp - 0.5) / 0.5);
+        }
+      } else if (entry.type === 'tankImpact') {
+        const eased      = 1 - (1 - p) * (1 - p);
+        const maxCore    = entry.isCritical ? 2.4 : 1.8;
+        const maxRadius  = entry.isCritical ? 2.8 : 2.0;
+        const maxLift    = entry.isCritical ? 1.2 : 0.7;
+        const maxFire    = entry.isCritical ? 1.2 : 0.9;
 
-        entry.core.scaling.setAll(eased * maxCoreScale);
-        entry.core.material.alpha = 1.0 - p;
+        // Core: bright fireball, fades by 46%
+        if (p < 0.46) {
+          const cp = p / 0.46;
+          entry.core.scaling.setAll(0.8 + eased * (maxCore - 0.8));
+          entry.core.material.alpha = 1.0 - cp;
+        } else {
+          entry.core.isVisible = false;
+        }
 
+        // Fire blobs: scatter out and fade by 55%
         for (let b = 0; b < 4; b++) {
-          const angle = b * Math.PI / 2;
-          entry.blobs[b].position.set(
+          const angle = b * Math.PI * 0.55;
+          entry.fireBlobs[b].position.set(
             entry.ox + Math.sin(angle) * eased * maxRadius,
             entry.oy + eased * maxLift,
             entry.oz + Math.cos(angle) * eased * maxRadius,
           );
-          entry.blobs[b].scaling.setAll(eased * maxBlobScale);
-          entry.blobs[b].material.alpha = p < 0.4
-            ? 0.85
-            : 0.85 * (1 - (p - 0.4) / 0.6);
+          entry.fireBlobs[b].scaling.setAll(eased * maxFire);
+          if (p < 0.55) {
+            entry.fireBlobs[b].isVisible    = true;
+            entry.fireBlobs[b].material.alpha = p < 0.35 ? 1.0 : 1.0 - (p - 0.35) / 0.20;
+          } else {
+            entry.fireBlobs[b].isVisible = false;
+          }
+        }
+
+        // Smoke: delayed, rises slowly, lingers until end
+        const smokeDelay = 0.20;
+        for (let s = 0; s < 2; s++) {
+          if (entry.t < smokeDelay) {
+            entry.smokeBlobs[s].material.alpha = 0;
+          } else {
+            const sp    = (entry.t - smokeDelay) / (entry.duration - smokeDelay);
+            const seased = 1 - (1 - sp) * (1 - sp);
+            entry.smokeBlobs[s].position.y = entry.oy + seased * 1.5;
+            entry.smokeBlobs[s].scaling.setAll(0.4 + seased * 1.0);
+            entry.smokeBlobs[s].material.alpha = sp < 0.4
+              ? sp * 1.5
+              : 0.6 * (1 - (sp - 0.4) / 0.6);
+          }
         }
       }
     }
@@ -1246,8 +1318,6 @@ export default class ArenaScene {
 
     const allTargets = [...this.enemies, this.aiEnemy];
 
-    const TURRET_ZONE_Y = 0.55; // top of hull box — shells at/above this height hit the turret
-
     for (const shell of this.shells) {
       if (!shell.active) continue;
 
@@ -1255,10 +1325,12 @@ export default class ArenaScene {
         if (!enemy.alive) continue;
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
-        if (Math.abs(dx) < 0.25 + enemy.halfW && Math.abs(dz) < 0.25 + enemy.halfD) {
-          const isCritical = shell.position.y >= TURRET_ZONE_Y;
+        if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
+          const speed      = Math.hypot(shell.vx, shell.vz);
+          const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;
+          const isCritical = perpDist < 0.15;
           const damage     = isCritical ? 51 : 34;
-          this._spawnImpact(shell.position.clone(), true, isCritical);
+          this._spawnTankImpact(shell.position.clone(), isCritical);
           shell.deactivate();
           enemy.takeDamage(damage);
           this._triggerShake(0.12, 0.4);

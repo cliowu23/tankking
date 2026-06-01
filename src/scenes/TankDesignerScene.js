@@ -233,16 +233,21 @@ export default class TankDesignerScene {
 
   _setupUI() {
     document.getElementById('designer-exit-btn').addEventListener('click', () => this._onExit());
-    document.getElementById('designer-confirm-btn').addEventListener('click', () => this.confirmSelection());
+  }
+
+  _resetHint() {
+    const hint = document.getElementById('designer-bottom-hint');
+    if (hint) hint.textContent = '[ E ] CONFIRM SELECTION   |   [ ESC ] BACK';
   }
 
   confirmSelection() {
-    if (!this._previewFilename) return; // nothing previewed yet (primitive shown)
+    if (!this._previewFilename) return;
     localStorage.setItem('selectedTank', this._previewFilename);
     this._selectedFilename = this._previewFilename;
     if (this._selectedBtn) this._selectedBtn.classList.remove('selected');
     if (this._activeBtn)  { this._activeBtn.classList.add('selected'); this._selectedBtn = this._activeBtn; }
-    this._onExit();
+    const hint = document.getElementById('designer-bottom-hint');
+    if (hint) hint.textContent = '✓ SELECTED  —  [ ESC ] BACK TO MENU';
   }
 
   _populateSidebar() {
@@ -261,6 +266,25 @@ export default class TankDesignerScene {
         const divEl = document.createElement('div');
         divEl.className = 'ds-divider';
         sidebar.appendChild(divEl);
+
+        // DEFAULT TANK — always first
+        const primBtn = document.createElement('button');
+        primBtn.className = 'shape-btn';
+        primBtn.textContent = 'DEFAULT TANK';
+        if (this._selectedFilename === 'primitive') {
+          primBtn.classList.add('selected');
+          this._selectedBtn = primBtn;
+        }
+        primBtn.addEventListener('click', () => {
+          this._loadPrimitive(primBtn);
+          this._previewFilename = 'primitive';
+          this._resetHint();
+        });
+        sidebar.appendChild(primBtn);
+
+        const div2 = document.createElement('div');
+        div2.className = 'ds-divider';
+        sidebar.appendChild(div2);
 
         let autoBtn = null, autoConfig = null;
 
@@ -287,14 +311,17 @@ export default class TankDesignerScene {
           sidebar.appendChild(btn);
         }
 
-        // Auto-load the saved selection (or first available GLB)
-        if (autoBtn) {
+        // Auto-load the saved selection
+        if (this._selectedFilename === 'primitive') {
+          this._loadPrimitive(primBtn);
+          this._previewFilename = 'primitive';
+        } else if (autoBtn) {
           this._loadModel(this._selectedFilename, autoConfig, autoBtn, autoBtn.textContent);
         } else {
           const firstEntry = Object.entries(manifest)[0];
           if (firstEntry) {
             const [fn, cfg] = firstEntry;
-            const firstBtn = sidebar.querySelector('.shape-btn');
+            const firstBtn = sidebar.querySelectorAll('.shape-btn')[2]; // skip primBtn + divider
             this._loadModel(fn, cfg, firstBtn, firstBtn?.textContent ?? fn);
           }
         }
@@ -339,37 +366,24 @@ export default class TankDesignerScene {
       return mesh;
     };
 
-    // Hull
-    const hullLower = MeshBuilder.CreateBox('primHullLower', { width: 2.55, height: 0.20, depth: 3.20 }, this.scene);
-    hullLower.position.set(0, 0.10, 0); hullLower.material = hullMat; hullLower.parent = modelRoot; add(hullLower);
-
-    const hull = MeshBuilder.CreateBox('primHull', { width: 2.40, height: 0.50, depth: 3.20 }, this.scene);
-    hull.position.set(0, 0.35, 0); hull.material = hullMat; hull.parent = modelRoot; add(hull);
-
-    const hullTop = MeshBuilder.CreateBox('primHullTop', { width: 2.20, height: 0.08, depth: 2.40 }, this.scene);
-    hullTop.position.set(0, 0.615, -0.20); hullTop.material = hullMat; hullTop.parent = modelRoot; add(hullTop);
-
-    const frontSlope = MeshBuilder.CreateBox('primFrontSlope', { width: 2.20, height: 0.65, depth: 0.55 }, this.scene);
-    frontSlope.position.set(0, 0.35, 1.30); frontSlope.rotation.x = -Math.PI * 0.22;
-    frontSlope.material = hullMat; frontSlope.parent = modelRoot; add(frontSlope);
-
-    const engineDeck = MeshBuilder.CreateBox('primEngineDeck', { width: 1.80, height: 0.10, depth: 0.70 }, this.scene);
-    engineDeck.position.set(0, 0.62, -1.20); engineDeck.material = hullMat; engineDeck.parent = modelRoot; add(engineDeck);
+    // Hull — single rectangular prism
+    const hull = MeshBuilder.CreateBox('primHull', { width: 2.40, height: 0.65, depth: 2.50 }, this.scene);
+    hull.position.set(0, 0.325, 0); hull.material = hullMat; hull.parent = modelRoot; add(hull);
 
     const trackL = MeshBuilder.CreateBox('primTrackL', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
-    trackL.position.set(-1.26, 0.325, 0); trackL.material = trackMat; trackL.parent = modelRoot; add(trackL);
+    trackL.position.set(-1.34, 0.325, 0); trackL.material = trackMat; trackL.parent = modelRoot; add(trackL);
 
     const trackR = MeshBuilder.CreateBox('primTrackR', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
-    trackR.position.set(1.26, 0.325, 0); trackR.material = trackMat; trackR.parent = modelRoot; add(trackR);
+    trackR.position.set(1.34, 0.325, 0); trackR.material = trackMat; trackR.parent = modelRoot; add(trackR);
 
     const skirtL = MeshBuilder.CreateBox('primSkirtL', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
-    skirtL.position.set(-1.42, 0.125, 0); skirtL.material = trackMat; skirtL.parent = modelRoot; add(skirtL);
+    skirtL.position.set(-1.50, 0.125, 0); skirtL.material = trackMat; skirtL.parent = modelRoot; add(skirtL);
 
     const skirtR = MeshBuilder.CreateBox('primSkirtR', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
-    skirtR.position.set(1.42, 0.125, 0); skirtR.material = trackMat; skirtR.parent = modelRoot; add(skirtR);
+    skirtR.position.set(1.50, 0.125, 0); skirtR.material = trackMat; skirtR.parent = modelRoot; add(skirtR);
 
     for (const wz of [-1.0, -0.33, 0.33, 1.0]) {
-      for (const wx of [-1.26, 1.26]) {
+      for (const wx of [-1.34, 1.34]) {
         const w = MeshBuilder.CreateCylinder(`primWheel_${wx}_${wz}`, { height: 0.10, diameter: 0.32, tessellation: 10 }, this.scene);
         w.rotation.z = Math.PI / 2; w.position.set(wx, 0.18, wz);
         w.material = trackMat; w.parent = modelRoot; add(w);
@@ -428,8 +442,9 @@ export default class TankDesignerScene {
   _loadModel(filename, config, btn, label) {
     if (this._activeBtn) this._activeBtn.classList.remove('active');
     btn.classList.add('active');
-    this._activeBtn      = btn;
+    this._activeBtn       = btn;
     this._previewFilename = filename;
+    this._resetHint();
 
     this._clearCurrentModel();
 

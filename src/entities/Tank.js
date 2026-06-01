@@ -84,60 +84,36 @@ export default class Tank {
     this.treadTex.vScale = 3;
     trackMat.diffuseTexture = this.treadTex;
 
-    // --- Hull group ---
-    const hullLower = MeshBuilder.CreateBox('tankHullLower', { width: 2.55, height: 0.20, depth: 3.20 }, scene);
-    hullLower.position.set(0, 0.10, 0);
-    hullLower.material = hullMat;
-    hullLower.parent = this.root;
-
-    this.hull = MeshBuilder.CreateBox('tankHullMesh', { width: 2.40, height: 0.50, depth: 3.20 }, scene);
-    this.hull.position.set(0, 0.35, 0);
+    // --- Hull — single rectangular prism ---
+    this.hull = MeshBuilder.CreateBox('tankHullMesh', { width: 2.40, height: 0.65, depth: 2.50 }, scene);
+    this.hull.position.set(0, 0.325, 0);
     this.hull.material = hullMat;
     this.hull.parent = this.root;
 
-    // Top deck — shortened at front to leave room for the slope plate
-    const hullTop = MeshBuilder.CreateBox('tankHullTop', { width: 2.20, height: 0.08, depth: 2.40 }, scene);
-    hullTop.position.set(0, 0.615, -0.20);
-    hullTop.material = hullMat;
-    hullTop.parent = this.root;
-
-    // Angled front armor plate — the #1 low-poly tank silhouette cue
-    const hullFrontSlope = MeshBuilder.CreateBox('tankFrontSlope', { width: 2.20, height: 0.65, depth: 0.55 }, scene);
-    hullFrontSlope.position.set(0, 0.35, 1.30);
-    hullFrontSlope.rotation.x = -Math.PI * 0.22;
-    hullFrontSlope.material = hullMat;
-    hullFrontSlope.parent = this.root;
-
-    // Rear engine deck
-    const engineDeck = MeshBuilder.CreateBox('tankEngineDeck', { width: 1.80, height: 0.10, depth: 0.70 }, scene);
-    engineDeck.position.set(0, 0.62, -1.20);
-    engineDeck.material = hullMat;
-    engineDeck.parent = this.root;
-
     const trackLeft = MeshBuilder.CreateBox('tankTrackLeft', { width: 0.28, height: 0.65, depth: 3.25 }, scene);
-    trackLeft.position.set(-1.26, 0.325, 0);
+    trackLeft.position.set(-1.34, 0.325, 0);
     trackLeft.material = trackMat;
     trackLeft.parent = this.root;
 
     const trackRight = MeshBuilder.CreateBox('tankTrackRight', { width: 0.28, height: 0.65, depth: 3.25 }, scene);
-    trackRight.position.set(1.26, 0.325, 0);
+    trackRight.position.set(1.34, 0.325, 0);
     trackRight.material = trackMat;
     trackRight.parent = this.root;
 
     const skirtLeft = MeshBuilder.CreateBox('tankSkirtLeft', { width: 0.07, height: 0.25, depth: 2.90 }, scene);
-    skirtLeft.position.set(-1.42, 0.125, 0);
+    skirtLeft.position.set(-1.50, 0.125, 0);
     skirtLeft.material = trackMat;
     skirtLeft.parent = this.root;
 
     const skirtRight = MeshBuilder.CreateBox('tankSkirtRight', { width: 0.07, height: 0.25, depth: 2.90 }, scene);
-    skirtRight.position.set(1.42, 0.125, 0);
+    skirtRight.position.set(1.50, 0.125, 0);
     skirtRight.material = trackMat;
     skirtRight.parent = this.root;
 
     // Road wheels — 4 per side, visible below tracks
     const wheelZOffsets = [-1.0, -0.33, 0.33, 1.0];
     for (const wz of wheelZOffsets) {
-      for (const wx of [-1.26, 1.26]) {
+      for (const wx of [-1.34, 1.34]) {
         const w = MeshBuilder.CreateCylinder(`wheel_${wx}_${wz}`, { height: 0.10, diameter: 0.32, tessellation: 10 }, scene);
         w.rotation.z = Math.PI / 2;
         w.position.set(wx, 0.18, wz);
@@ -201,7 +177,7 @@ export default class Tank {
     muzzleBrake.material = turretMat;
     muzzleBrake.parent = this.barrelPivot;
 
-    this._shadowMeshes = [hullLower, this.hull, hullTop, hullFrontSlope, engineDeck, trackLeft, trackRight, turretBody, turretRoof, mantlet, this.barrel];
+    this._shadowMeshes = [this.hull, trackLeft, trackRight, turretBody, turretRoof, mantlet, this.barrel];
 
     // --- Input ---
     this.keys = { w: false, s: false, a: false, d: false, shift: false };
@@ -253,7 +229,7 @@ export default class Tank {
     this.fuel  = this.maxFuel;
     this.root.position.set(0, 0, 0);
     this.root.rotation.y = 0;
-    this.hullMat.diffuseColor  = new Color3(0.55, 0.55, 0.55);
+    this.hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
     this.hullMat.emissiveColor = new Color3(0, 0, 0);
   }
 
