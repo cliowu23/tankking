@@ -1052,7 +1052,7 @@ export default class ArenaScene {
 
     const tip    = this._barrelTip();
     const HSPEED = 16;
-    const aim      = this.tank.fireAimAngle;
+    const aim      = this.tank.turretAimAngle;
     const azSpread = (Math.random() - 0.5) * 2 * this.tank.dispersion;
     const vx = Math.sin(aim + azSpread) * HSPEED;
     const vz = Math.cos(aim + azSpread) * HSPEED;
