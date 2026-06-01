@@ -291,6 +291,13 @@
       border-color: var(--accent);
       background: rgba(233,69,96,0.08);
     }
+    .shape-btn.selected {
+      border-left: 2px solid var(--cyan);
+      color: var(--cyan);
+    }
+    .shape-btn.selected.active {
+      color: var(--white);
+    }
     .transform-btn {
       width: 100%; background: none; cursor: pointer;
       border: 1px solid rgba(255,255,255,0.06);
@@ -552,7 +559,7 @@
       <span class="menu-corner bl">◆</span>
       <h1>Tan<span class="king">KING</span></h1>
       <p id="menu-start">PRESS ENTER TO START</p>
-      <p id="menu-designer">[ T ] TANK DESIGNER</p>
+      <p id="menu-designer">[ T ] SELECT TANK</p>
     </div>
   </div>
 
@@ -579,10 +586,11 @@
   <div id="designer-vignette"></div>
   <div id="designer-ui">
     <div id="designer-topbar">
-      <span id="designer-title">MODEL INSPECTOR</span>
+      <span id="designer-title">SELECT TANK</span>
       <span id="designer-topbar-spacer"></span>
       <span id="designer-controls-hint">A / D &mdash; TURRET &nbsp;|&nbsp; W / S &mdash; ELEVATION &nbsp;|&nbsp; SCROLL / = / - &mdash; ZOOM</span>
-      <button id="designer-exit-btn" class="editor-btn">EXIT [ESC]</button>
+      <button id="designer-confirm-btn" class="editor-btn" style="color:var(--cyan);border-color:var(--cyan)">CONFIRM [E]</button>
+      <button id="designer-exit-btn" class="editor-btn">BACK [ESC]</button>
     </div>
   </div>
 

@@ -3,7 +3,7 @@ import ArenaScene        from './scenes/ArenaScene.js';
 import TankDesignerScene from './scenes/TankDesignerScene.js';
 
 const canvas = document.getElementById('renderCanvas');
-const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
 
 let arenaScene    = null;
 let designerScene = null;
@@ -94,8 +94,9 @@ document.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') startGame();
     if (e.code === 'KeyT')  startDesigner();
   }
-  if (window.__state === 'INSPECTOR' && e.code === 'Escape') {
-    exitDesigner();
+  if (window.__state === 'INSPECTOR') {
+    if (e.code === 'Escape') exitDesigner();
+    if (e.code === 'KeyE' && designerScene) designerScene.confirmSelection();
   }
 });
 

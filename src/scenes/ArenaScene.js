@@ -312,7 +312,7 @@ export default class ArenaScene {
       .then(r => r.json())
       .catch(() => ({}))
       .then(manifest => {
-        const modelFile = 'm26_pershing_war_thunder.glb';
+        const modelFile = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
         this._loadPlayerGLB(modelFile, manifest[modelFile] ?? {});
       });
   }
@@ -851,9 +851,10 @@ export default class ArenaScene {
       ),
     );
 
+    const dpr = window.devicePixelRatio || 1;
     this._aimEl.style.display = 'block';
-    this._aimEl.style.left    = screen.x + 'px';
-    this._aimEl.style.top     = screen.y + 'px';
+    this._aimEl.style.left    = (screen.x / dpr) + 'px';
+    this._aimEl.style.top     = (screen.y / dpr) + 'px';
   }
 
   _checkHazards(dt) {
