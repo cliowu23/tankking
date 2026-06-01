@@ -1305,7 +1305,7 @@ export default class ArenaScene {
 
     this._activeVFX.push({
       type: 'tankImpact', slot, core, fireBlobs, smokeBlobs,
-      t: 0, duration: 0.65, ox: pos.x, oy, oz: pos.z, isCritical,
+      t: 0, duration: 0.65, ox: pos.x, oy, oz: pos.z,
     });
   }
 
@@ -1361,10 +1361,10 @@ export default class ArenaScene {
         }
       } else if (entry.type === 'tankImpact') {
         const eased      = 1 - (1 - p) * (1 - p);
-        const maxCore    = entry.isCritical ? 2.4 : 1.8;
-        const maxRadius  = entry.isCritical ? 2.8 : 2.0;
-        const maxLift    = entry.isCritical ? 1.2 : 0.7;
-        const maxFire    = entry.isCritical ? 1.2 : 0.9;
+        const maxCore   = 2.4;
+        const maxRadius = 2.8;
+        const maxLift   = 1.2;
+        const maxFire   = 1.2;
 
         // Core: bright fireball, fades by 46%
         if (p < 0.46) {
