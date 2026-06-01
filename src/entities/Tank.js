@@ -360,16 +360,19 @@ export default class Tank {
   }
 
   _updateTurret(dt) {
+    // Use turret pivot world position as the aim origin — it's the actual centre of rotation,
+    // and sits slightly forward of the tank root. Computing angles from root caused a lateral
+    // offset when aiming 90° to either side.
+    const pivot = this.turretPivot.getAbsolutePosition();
+
     if (this.lockTarget) {
       // Lock-on: traverse at limited rate toward locked enemy
-      const dx = this.lockTarget.x - this.root.position.x;
-      const dz = this.lockTarget.z - this.root.position.z;
-      const targetAim = Math.atan2(dx, dz);
+      const targetAim = Math.atan2(this.lockTarget.x - pivot.x, this.lockTarget.z - pivot.z);
       const diff      = shortAngle(this.turretAimAngle, targetAim);
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
     } else {
-      // Mouse aim: turret traverses at limited rate (visual), fireAimAngle snaps to cursor (shot precision)
+      // Mouse aim: traverse at limited rate toward cursor
       const ray = this.scene.createPickingRay(
         this.scene.pointerX, this.scene.pointerY, null, this.scene.activeCamera,
       );
@@ -377,7 +380,7 @@ export default class Tank {
         const t         = -ray.origin.y / ray.direction.y;
         const hitX      = ray.origin.x + t * ray.direction.x;
         const hitZ      = ray.origin.z + t * ray.direction.z;
-        const targetAim = Math.atan2(hitX - this.root.position.x, hitZ - this.root.position.z);
+        const targetAim = Math.atan2(hitX - pivot.x, hitZ - pivot.z);
         const diff      = shortAngle(this.turretAimAngle, targetAim);
         const maxTurn   = this.turretSpeed * dt;
         this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
