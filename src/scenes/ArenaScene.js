@@ -1319,6 +1319,10 @@ export default class ArenaScene {
           entry.core.isVisible  = false; entry.core._vfxActive = false;
           for (const b of entry.fireBlobs)  { b.isVisible = false; b._vfxActive = false; }
           for (const b of entry.smokeBlobs) { b.isVisible = false; b._vfxActive = false; }
+        } else if (entry.type === 'normalImpact') {
+          entry.flash.isVisible  = false; entry.flash._vfxActive = false;
+          for (const s of entry.sparks) { s.isVisible = false; s._vfxActive = false; }
+          for (const s of entry.smokes) { s.isVisible = false; s._vfxActive = false; }
         } else {
           entry.mesh.isVisible  = false;
           entry.mesh._vfxActive = false;
