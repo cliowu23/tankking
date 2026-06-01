@@ -369,18 +369,15 @@ export default class Tank {
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
     } else {
-      // Mouse aim: turret follows cursor on the ground plane
+      // Mouse aim: snap instantly to cursor — no traverse lag for free-aim precision
       const ray = this.scene.createPickingRay(
         this.scene.pointerX, this.scene.pointerY, null, this.scene.activeCamera,
       );
       if (ray && Math.abs(ray.direction.y) > 0.0001) {
-        const t      = -ray.origin.y / ray.direction.y;
-        const hitX   = ray.origin.x + t * ray.direction.x;
-        const hitZ   = ray.origin.z + t * ray.direction.z;
-        const targetAim = Math.atan2(hitX - this.root.position.x, hitZ - this.root.position.z);
-        const diff      = shortAngle(this.turretAimAngle, targetAim);
-        const maxTurn   = this.turretSpeed * dt;
-        this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
+        const t    = -ray.origin.y / ray.direction.y;
+        const hitX = ray.origin.x + t * ray.direction.x;
+        const hitZ = ray.origin.z + t * ray.direction.z;
+        this.turretAimAngle = Math.atan2(hitX - this.root.position.x, hitZ - this.root.position.z);
       }
     }
 
