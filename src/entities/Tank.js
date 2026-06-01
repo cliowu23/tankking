@@ -376,12 +376,20 @@ export default class Tank {
       const maxTurn   = this.turretSpeed * dt;
       this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
     } else {
-      // Mouse aim: use scene.pick() so the XZ comes from the actual surface under the
-      // cursor, not a y=0 ground projection. The y=0 ray overshoots when the cursor is
-      // over an elevated mesh (enemy hull/turret) due to the tilted camera.
-      const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-      if (pick.hit && pick.pickedPoint) {
-        const targetAim = Math.atan2(pick.pickedPoint.x - pivotX, pick.pickedPoint.z - pivotZ);
+      // Mouse aim: intersect cursor ray with the barrel's firing plane (y = barrel tip height)
+      // rather than y=0 ground. The shot travels flat at tipY, so this plane is exactly where
+      // the shell passes — no camera-tilt overshoot regardless of what mesh is under the cursor.
+      const tipY = this.root.position.y
+        + this.turretPivot.position.y
+        + this.barrelPivot.position.y;
+      const ray = this.scene.createPickingRay(
+        this.scene.pointerX, this.scene.pointerY, null, this.scene.activeCamera,
+      );
+      if (ray && Math.abs(ray.direction.y) > 0.0001) {
+        const t         = (tipY - ray.origin.y) / ray.direction.y;
+        const hitX      = ray.origin.x + t * ray.direction.x;
+        const hitZ      = ray.origin.z + t * ray.direction.z;
+        const targetAim = Math.atan2(hitX - pivotX, hitZ - pivotZ);
         const diff      = shortAngle(this.turretAimAngle, targetAim);
         const maxTurn   = this.turretSpeed * dt;
         this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
