@@ -1303,8 +1303,23 @@ export default class ArenaScene {
       smokeBlobs.push(mesh);
     }
 
+    // Find a free spark slot (independent from the fireball slot)
+    let sparkSlot = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!this._normalSparks[i * 7]._vfxActive) { sparkSlot = i; break; }
+    }
+    const sparks = [];
+    if (sparkSlot !== -1) {
+      for (let s = 0; s < 7; s++) {
+        const mesh = this._normalSparks[sparkSlot * 7 + s];
+        mesh._vfxActive = true;
+        mesh.isVisible  = true;
+        sparks.push(mesh);
+      }
+    }
+
     this._activeVFX.push({
-      type: 'tankImpact', slot, core, fireBlobs, smokeBlobs,
+      type: 'tankImpact', slot, core, fireBlobs, smokeBlobs, sparks, sparkSlot,
       t: 0, duration: 0.65, ox: pos.x, oy, oz: pos.z,
     });
   }
@@ -1319,6 +1334,7 @@ export default class ArenaScene {
           entry.core.isVisible  = false; entry.core._vfxActive = false;
           for (const b of entry.fireBlobs)  { b.isVisible = false; b._vfxActive = false; }
           for (const b of entry.smokeBlobs) { b.isVisible = false; b._vfxActive = false; }
+          for (const s of entry.sparks)     { s.isVisible = false; s._vfxActive = false; }
         } else if (entry.type === 'normalImpact') {
           entry.flash.isVisible  = false; entry.flash._vfxActive = false;
           for (const s of entry.sparks) { s.isVisible = false; s._vfxActive = false; }
@@ -1405,6 +1421,42 @@ export default class ArenaScene {
             entry.smokeBlobs[s].material.alpha = sp < 0.4
               ? sp * 1.5
               : 0.6 * (1 - (sp - 0.4) / 0.6);
+          }
+        }
+
+        // Arc sparks (same physics as normalImpact)
+        if (entry.sparkSlot !== -1) {
+          const st = entry.t;
+          for (let s = 0; s < 7; s++) {
+            const vel  = NORMAL_SPARK_VELS[s];
+            const mesh = entry.sparks[s];
+            const pts  = this._sparkPts[entry.sparkSlot][s];
+            const cols = this._sparkCols[entry.sparkSlot][s];
+            const tt   = Math.max(0, st - NORMAL_SPARK_TRAIL);
+
+            pts[1].set(
+              entry.ox + vel.vx * st,
+              entry.oy + vel.vy * st - 0.5 * NORMAL_SPARK_GRAVITY * st * st,
+              entry.oz + vel.vz * st,
+            );
+            pts[0].set(
+              entry.ox + vel.vx * tt,
+              entry.oy + vel.vy * tt - 0.5 * NORMAL_SPARK_GRAVITY * tt * tt,
+              entry.oz + vel.vz * tt,
+            );
+
+            const sparkFade = Math.max(0, 1 - p / 0.75);
+            cols[0].set(1, 1, 1, sparkFade * 0.4);
+            cols[1].set(1, 0.9, 0.3, sparkFade);
+
+            if (sparkFade > 0 && pts[1].y > -1) {
+              mesh.isVisible = true;
+              MeshBuilder.CreateLines(`normalSpark_${entry.sparkSlot * 7 + s}`, {
+                points: pts, colors: cols, instance: mesh,
+              });
+            } else {
+              mesh.isVisible = false;
+            }
           }
         }
       } else if (entry.type === 'normalImpact') {
