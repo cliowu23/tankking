@@ -3,10 +3,10 @@ import { MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
 export default class Shell {
   constructor(scene) {
     const mat = new StandardMaterial('shellMat', scene);
-    mat.diffuseColor  = new Color3(1.0, 0.82, 0.0);
-    mat.emissiveColor = new Color3(0.9, 0.55, 0.0);
+    mat.diffuseColor  = new Color3(1.0, 0.95, 0.7);
+    mat.emissiveColor = new Color3(1.0, 0.88, 0.4);
 
-    this.mesh = MeshBuilder.CreateBox('shell', { width: 0.18, height: 0.18, depth: 0.55 }, scene);
+    this.mesh = MeshBuilder.CreateBox('shell', { width: 0.08, height: 0.08, depth: 1.5 }, scene);
     this.mesh.material = mat;
     this.mesh.isVisible = false;
 
@@ -38,7 +38,6 @@ export default class Shell {
     this.mesh.position.y += this.vy * dt;
     this.mesh.position.z += this.vz * dt;
 
-    // Orient along velocity vector so shell "noses down" on descent
     const hspd = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
     this.mesh.rotation.x = -Math.atan2(this.vy, hspd);
     this.mesh.rotation.y =  Math.atan2(this.vx, this.vz);
