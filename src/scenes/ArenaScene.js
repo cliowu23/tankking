@@ -1262,6 +1262,11 @@ export default class ArenaScene {
   }
 
   _spawnTankImpact(pos, isCritical = false) {
+    if (!isCritical) {
+      this._spawnNormalImpact(pos);
+      return;
+    }
+
     let slot = -1;
     for (let i = 0; i < 4; i++) {
       if (!this._tankCores[i]._vfxActive) { slot = i; break; }
