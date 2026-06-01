@@ -6,7 +6,7 @@ function shortAngle(from, to) {
   return d;
 }
 
-const HSPEED = 16;
+const HSPEED = 35;
 
 export default class AIEnemy {
   constructor(scene, x, z) {
@@ -24,20 +24,22 @@ export default class AIEnemy {
     this._rotateSpeed          = 1.2;
     this._turretSpeed          = 55 * Math.PI / 180;
     this._optimalRange         = 15;
+    this._aggroRange           = 22;
     this._aimTolerance         = 5 * Math.PI / 180;
     this._fireCooldownDuration = 2.0;
 
-    this.rotY            = 0;
+    this.rotY            = Math.PI; // face south toward player spawn
     this.speed           = 0;
-    this.turretAimAngle  = 0;
+    this.turretAimAngle  = Math.PI;
     this.barrelElevation = 0;
-    this.state           = 'APPROACH';
+    this.state           = 'IDLE';
     this.fireCooldown    = 1.5; // brief delay before first shot
     this._recoil         = 0;
 
     // --- Root ---
     this.root = new TransformNode('aiEnemy_root', scene);
     this.root.position.set(x, 0, z);
+    this.root.rotation.y = Math.PI;
 
     // --- Materials ---
     this.hullMat = new StandardMaterial('aiHull', scene);
@@ -154,10 +156,10 @@ export default class AIEnemy {
     this.vx    = 0;
     this.vz    = 0;
     this.speed = 0;
-    this.rotY  = 0;
-    this.turretAimAngle  = 0;
+    this.rotY  = Math.PI;
+    this.turretAimAngle  = Math.PI;
     this.barrelElevation = 0;
-    this.state           = 'APPROACH';
+    this.state           = 'IDLE';
     this.fireCooldown    = 1.5;
     this._recoil         = 0;
     this.barrelPivot.position.z = 0.6;
@@ -193,7 +195,9 @@ export default class AIEnemy {
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     // --- State transitions ---
-    if (this.state === 'APPROACH' && dist <= this._optimalRange + 4) {
+    if (this.state === 'IDLE' && dist <= this._aggroRange) {
+      this.state = 'APPROACH';
+    } else if (this.state === 'APPROACH' && dist <= this._optimalRange + 4) {
       this.state = 'COMBAT';
     } else if (this.state === 'COMBAT') {
       if (dist > this._optimalRange + 8) this.state = 'APPROACH';
@@ -205,7 +209,10 @@ export default class AIEnemy {
     // --- Per-state movement ---
     const angleToPlayer = Math.atan2(dx, dz);
 
-    if (this.state === 'APPROACH') {
+    if (this.state === 'IDLE') {
+      // do nothing — waiting for player to enter aggro range
+
+    } else if (this.state === 'APPROACH') {
       const hullDiff    = shortAngle(this.rotY, angleToPlayer);
       const maxHullTurn = this._rotateSpeed * dt;
       this.rotY += Math.sign(hullDiff) * Math.min(Math.abs(hullDiff), maxHullTurn);
@@ -245,6 +252,8 @@ export default class AIEnemy {
   }
 
   _updateTurret(dt, playerPos) {
+    if (this.state === 'IDLE') return;
+
     const dx        = playerPos.x - this.root.position.x;
     const dz        = playerPos.z - this.root.position.z;
     const targetAim = Math.atan2(dx, dz);
