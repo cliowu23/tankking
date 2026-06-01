@@ -1408,7 +1408,6 @@ export default class ArenaScene {
           }
         }
       } else if (entry.type === 'normalImpact') {
-        const p     = entry.t / entry.duration;
         const eased = 1 - (1 - p) * (1 - p);
 
         // Flash: scale up fast, fade out fully by p=0.5
