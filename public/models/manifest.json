@@ -8,7 +8,9 @@
     "zCenterAdjust": 0.9,
     "barrelTipOffset": 3.1,
     "elevationDeg": 18,
-    "depressionDeg": 5
+    "depressionDeg": 5,
+    "paintColor":    [0.92, 0.12, 0.08],
+    "paintColorAlt": [0.95, 0.42, 0.04]
   },
   "m26_pershing_war_thunder.glb": {
     "root": "Sketchfab_model",
@@ -21,6 +23,16 @@
     "barrelTipOffset": 3.8,
     "centerTurretX": true,
     "elevationDeg": 20,
-    "depressionDeg": 10
+    "depressionDeg": 10,
+    "paintColor": [0.12, 0.42, 0.88],
+    "tintColor":  [0.28, 0.26, 0.24],
+    "paintSkipMeshes": [
+      "Object_4",  "Object_6",
+      "Object_11", "Object_14", "Object_15", "Object_16",
+      "Object_8",  "Object_20",
+      "Object_5",  "Object_7",
+      "Object_19", "Object_21", "Object_3",
+      "wheel_l5"
+    ]
   }
 }
