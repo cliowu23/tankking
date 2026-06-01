@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(vercel --prod*)",
+            "command": "node /Users/cliowu/claude-workspace/game/scripts/pre-deploy-check.mjs || echo '{\"continue\": false, \"stopReason\": \"Pre-deploy check failed. Fix stale content before deploying.\"}'",
+            "statusMessage": "Running pre-deploy checks..."
+          }
+        ]
+      }
+    ]
+  }
+}
