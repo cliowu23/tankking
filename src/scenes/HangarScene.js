@@ -40,8 +40,8 @@ export default class HangarScene {
     floorMat.gridRatio           = 2.5;   // 2.5-unit slabs
     floorMat.majorUnitFrequency  = 1;     // bold line every slab
     floorMat.minorUnitVisibility = 0;     // no minor lines — clean grout only
-    floorMat.mainColor           = new Color3(0.24, 0.22, 0.20);
-    floorMat.lineColor           = new Color3(0.18, 0.16, 0.14);
+    floorMat.mainColor           = new Color3(0.13, 0.12, 0.11);
+    floorMat.lineColor           = new Color3(0.09, 0.08, 0.07);
     floorMat.opacity             = 1.0;
     floorMat.backFaceCulling     = false;
 
