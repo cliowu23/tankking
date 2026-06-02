@@ -145,20 +145,21 @@ export default class HangarScene {
     bulb2.intensity = 0.6;
     bulb2.range     = 14;
 
-    // Keep the room lights off the tunnel so it doesn't get flat global fill —
-    // the tunnel is lit only by its own mouth light below.
-    const roomLights = [ambient, overhead, bulb1, bulb2];
-    for (const light of roomLights) {
+    // Keep only the strong directional + bulbs off the tunnel so the deep end
+    // can fall into shadow. The soft hemispheric ambient still reaches every
+    // tunnel face (including the room-facing rim and roof) so nothing reads as
+    // pure black around the opening.
+    const shadowLights = [overhead, bulb1, bulb2];
+    for (const light of shadowLights) {
       light.excludedMeshes.push(...this._tunnelMeshes);
     }
 
     // Mouth light — sits just inside the tunnel entrance and falls off with
-    // distance, so the near corridor reads as concrete grey (matching the room)
-    // and recedes into black deeper in.
+    // distance, so the near corridor glows warm and recedes into darkness.
     const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.5, ROOM_D / 2 + 2.5), this.scene);
     mouth.diffuse            = new Color3(1.0, 0.94, 0.82); // warm, matches room bulbs
-    mouth.intensity          = 1.6;
-    mouth.range              = 18;
+    mouth.intensity          = 1.4;
+    mouth.range              = 16;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
   }
 
