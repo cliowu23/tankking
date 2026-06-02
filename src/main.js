@@ -1,14 +1,16 @@
 import { Engine } from '@babylonjs/core';
 import ArenaScene        from './scenes/ArenaScene.js';
 import TankDesignerScene from './scenes/TankDesignerScene.js';
+import HangarScene       from './scenes/HangarScene.js';
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
 
 let arenaScene    = null;
 let designerScene = null;
+let hangarScene   = null;
 
-window.__state = 'MENU'; // 'MENU' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
+window.__state = 'MENU'; // 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
 
 // ── Transition engine ────────────────────────────────────────────────────────
 const _tc   = document.getElementById('transition-canvas');
@@ -130,6 +132,48 @@ function startGame() {
   );
 }
 
+function startHangar() {
+  transition(
+    () => {
+      document.getElementById('menu').style.display          = 'none';
+      document.getElementById('death').style.display         = 'none';
+      document.getElementById('hud').style.display           = 'none';
+      document.getElementById('hangar-prompt').style.display = 'none';
+      document.getElementById('hangar-panel').style.display  = 'none';
+      engine.stopRenderLoop();
+      if (arenaScene) { arenaScene._paused = false; arenaScene = null; }
+    },
+    () => {
+      canvas.style.display = 'block';
+      window.__state = 'HANGAR';
+      hangarScene = new HangarScene(engine, deployToArena);
+      engine.runRenderLoop(() => hangarScene.scene.render());
+    },
+    'iris'
+  );
+}
+
+function deployToArena() {
+  if (_tBusy) return;
+  transition(
+    () => {
+      document.getElementById('hangar-prompt').style.display = 'none';
+      document.getElementById('hangar-panel').style.display  = 'none';
+      engine.stopRenderLoop();
+      if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
+    },
+    () => {
+      canvas.style.display = 'block';
+      document.getElementById('hud').style.display = 'block';
+      arenaScene = new ArenaScene(engine);
+      window.__arena = arenaScene;
+      engine.runRenderLoop(() => arenaScene.scene.render());
+      window.__state = 'GAME';
+    },
+    'checker'
+  );
+}
+
 function dismissControls() {
   if (window.__state !== 'CONTROLS') return;
   document.getElementById('controls-screen').style.display = 'none';
@@ -146,6 +190,7 @@ function goToMenu() {
   canvas.style.display = 'none';
   engine.stopRenderLoop();
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
+  if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
@@ -194,12 +239,25 @@ function exitDesigner() {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  if (window.__state === 'HANGAR' && hangarScene) {
+    if (e.code === 'KeyE') {
+      if (hangarScene._panelOpen) { hangarScene.closePanel(); return; }
+      const station = hangarScene._nearStation;
+      if (!station) return;
+      if (station.id === 'tank') { hangarScene.mountTank(); return; }
+      hangarScene.openPanel(station);
+    }
+    if (e.code === 'Escape' && hangarScene._panelOpen) {
+      hangarScene.closePanel();
+    }
+    return;
+  }
   if (window.__state === 'CONTROLS') {
     if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') dismissControls();
     return;
   }
   if (window.__state === 'MENU') {
-    if (e.code === 'Enter') startGame();
+    if (e.code === 'Enter') startHangar();
     if (e.code === 'KeyT')  startDesigner();
   }
   if (window.__state === 'INSPECTOR') {
@@ -219,7 +277,24 @@ document.getElementById('controls-start').addEventListener('click', dismissContr
 document.getElementById('menu-designer').addEventListener('click', startDesigner);
 document.getElementById('pause-resume').addEventListener('click', resumeGame);
 document.getElementById('pause-menu').addEventListener('click', goToMenu);
+document.getElementById('pause-restart').addEventListener('click', () => {
+  if (!arenaScene) return;
+  document.getElementById('pause').style.display = 'none';
+  document.getElementById('hud').style.display   = 'block';
+  arenaScene._paused = false;
+  arenaScene._restart();
+  window.__state = 'GAME';
+});
+document.getElementById('death-hangar').addEventListener('click', startHangar);
 document.getElementById('death-menu').addEventListener('click',  goToMenu);
+document.getElementById('death-restart').addEventListener('click', () => {
+  if (!arenaScene) return;
+  document.getElementById('death').style.display = 'none';
+  document.getElementById('hud').style.display   = 'block';
+  arenaScene._paused = false;
+  arenaScene._restart();
+  window.__state = 'GAME';
+});
 
 function autoPause() {
   if (window.__state !== 'GAME') return;
@@ -231,5 +306,10 @@ function autoPause() {
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 window.addEventListener('blur', autoPause);
 setInterval(() => { if (!document.hidden && !document.hasFocus()) autoPause(); }, 300);
+
+document.getElementById('hangar-panel-deploy').addEventListener('click', deployToArena);
+document.getElementById('hangar-panel-close').addEventListener('click', () => {
+  if (hangarScene) hangarScene.closePanel();
+});
 
 window.addEventListener('resize', () => engine.resize());
