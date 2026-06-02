@@ -45,13 +45,12 @@ export default class HangarScene {
     floorMat.opacity             = 1.0;
     floorMat.backFaceCulling     = false;
 
-    // Tunnel material — near-black, unlit, so the shaft reads as a dark void.
-    // disableLighting keeps it black regardless of room lights reaching in.
+    // Tunnel material — lit concrete. The shaft is lit ONLY by a dedicated
+    // mouth light (set up in _buildLighting) that falls off into blackness,
+    // so the corridor reads as receding into darkness rather than a flat wall.
     const tunnelMat = new StandardMaterial('tunnel', s);
-    tunnelMat.diffuseColor    = new Color3(0, 0, 0);
+    tunnelMat.diffuseColor    = new Color3(0.34, 0.32, 0.29);
     tunnelMat.specularColor   = new Color3(0, 0, 0);
-    tunnelMat.emissiveColor   = new Color3(0.02, 0.02, 0.03);
-    tunnelMat.disableLighting = true;
     tunnelMat.backFaceCulling = false;
 
     // Floor
@@ -109,10 +108,13 @@ export default class HangarScene {
     tunnelFloor.position = new Vector3(0, 0, tCenter);
     tunnelFloor.material = tunnelMat;
 
-    // End cap — seals the far end of the tunnel into black
+    // End cap — seals the far end of the tunnel
     const tunnelEnd = MeshBuilder.CreateBox('tunnel-end', { width: TUNNEL_W, height: ROOM_H, depth: WALL_T }, s);
     tunnelEnd.position = new Vector3(0, ROOM_H / 2, ROOM_D / 2 + TUNNEL_LEN);
     tunnelEnd.material = tunnelMat;
+
+    // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
+    this._tunnelMeshes = [tunnelTop, tunnelL, tunnelR, tunnelFloor, tunnelEnd];
 
     // Invisible wall at tunnel entrance — blocks driver from walking in
     const tunnelGate = MeshBuilder.CreateBox('tunnel-gate', {
@@ -142,6 +144,21 @@ export default class HangarScene {
     bulb2.diffuse   = new Color3(1.0, 0.92, 0.78);
     bulb2.intensity = 0.6;
     bulb2.range     = 14;
+
+    // Keep the room lights off the tunnel so it doesn't get flat global fill —
+    // the tunnel is lit only by its own mouth light below.
+    const roomLights = [ambient, overhead, bulb1, bulb2];
+    for (const light of roomLights) {
+      light.excludedMeshes.push(...this._tunnelMeshes);
+    }
+
+    // Mouth light — sits just inside the tunnel entrance and falls off with
+    // distance, so the near corridor is lit and it recedes into black.
+    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.2, ROOM_D / 2 + 1.5), this.scene);
+    mouth.diffuse           = new Color3(0.80, 0.82, 0.95); // cool daylight bleeding in
+    mouth.intensity         = 1.1;
+    mouth.range             = 13;
+    mouth.includedOnlyMeshes = this._tunnelMeshes;
   }
 
   _buildStations() {
