@@ -88,19 +88,23 @@ export default class HangarScene {
     wallNR.material      = concrete;
     wallNR.checkCollisions = true;
 
-    // Tunnel shaft extending north (visual only, no collision needed)
-    const tCenter = ROOM_D / 2 + TUNNEL_LEN / 2;
+    // Tunnel shaft extending north (visual only, no collision needed).
+    // Starts flush at the BACK face of the north wall (tFront) so the tunnel
+    // geometry never overlaps the wall pieces (which would z-fight).
+    const tFront  = ROOM_D / 2 + WALL_T / 2;       // back face of north wall
+    const tCenter = tFront + TUNNEL_LEN / 2;
+    const sideX   = TUNNEL_W / 2 + WALL_T / 2;      // side wall inner face = opening edge
 
     const tunnelTop = MeshBuilder.CreateBox('tunnel-top', { width: TUNNEL_W, height: WALL_T, depth: TUNNEL_LEN }, s);
     tunnelTop.position = new Vector3(0, ROOM_H + WALL_T / 2, tCenter);
     tunnelTop.material = tunnelMat;
 
     const tunnelL = MeshBuilder.CreateBox('tunnel-left', { width: WALL_T, height: ROOM_H, depth: TUNNEL_LEN }, s);
-    tunnelL.position = new Vector3(-TUNNEL_W / 2, ROOM_H / 2, tCenter);
+    tunnelL.position = new Vector3(-sideX, ROOM_H / 2, tCenter);
     tunnelL.material = tunnelMat;
 
     const tunnelR = MeshBuilder.CreateBox('tunnel-right', { width: WALL_T, height: ROOM_H, depth: TUNNEL_LEN }, s);
-    tunnelR.position = new Vector3(TUNNEL_W / 2, ROOM_H / 2, tCenter);
+    tunnelR.position = new Vector3(sideX, ROOM_H / 2, tCenter);
     tunnelR.material = tunnelMat;
 
     // Tunnel floor — dark, so the shaft reads as a solid void from above
@@ -110,7 +114,7 @@ export default class HangarScene {
 
     // End cap — seals the far end of the tunnel
     const tunnelEnd = MeshBuilder.CreateBox('tunnel-end', { width: TUNNEL_W, height: ROOM_H, depth: WALL_T }, s);
-    tunnelEnd.position = new Vector3(0, ROOM_H / 2, ROOM_D / 2 + TUNNEL_LEN);
+    tunnelEnd.position = new Vector3(0, ROOM_H / 2, tFront + TUNNEL_LEN);
     tunnelEnd.material = tunnelMat;
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
