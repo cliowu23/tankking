@@ -1,5 +1,5 @@
 import {
-  MeshBuilder, FollowCamera, StandardMaterial,
+  MeshBuilder, ArcRotateCamera, StandardMaterial,
   Color3, Vector3,
 } from '@babylonjs/core';
 
@@ -11,7 +11,7 @@ export default class DriverCharacter {
 
     // Capsule placeholder — swap for GLB later with no logic changes
     this.mesh = MeshBuilder.CreateCapsule('driver', { radius: 0.3, height: 1.8 }, scene);
-    this.mesh.position        = new Vector3(0, 0.9, -14); // center-south spawn
+    this.mesh.position        = new Vector3(0, 0.9, -6); // center-south spawn
     this.mesh.checkCollisions = true;
     this.mesh.ellipsoid       = new Vector3(0.3, 0.9, 0.3);
     this.mesh.ellipsoidOffset = new Vector3(0, 0.9, 0);
@@ -21,14 +21,10 @@ export default class DriverCharacter {
     mat.specularColor = new Color3(0.08, 0.08, 0.08);
     this.mesh.material = mat;
 
-    // Third-person follow camera
-    this.camera = new FollowCamera('driver-cam', new Vector3(0, 6, -14), scene);
-    this.camera.lockedTarget       = this.mesh;
-    this.camera.radius             = 8;
-    this.camera.heightOffset       = 5;
-    this.camera.rotationOffset     = 0;
-    this.camera.cameraAcceleration = 0.08;
-    this.camera.maxCameraSpeed     = 20;
+    // Top-down follow camera — same style as the arena
+    this.camera = new ArcRotateCamera('driver-cam', -Math.PI / 2, 0.62, 22, this.mesh.position.clone(), scene);
+    this.camera.lowerRadiusLimit = 28;
+    this.camera.upperRadiusLimit = 28;
     scene.activeCamera = this.camera;
 
     this._keys       = {};

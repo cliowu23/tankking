@@ -2,6 +2,7 @@ import {
   Scene, HemisphericLight, DirectionalLight,
   MeshBuilder, StandardMaterial, Color3, Color4, Vector3,
 } from '@babylonjs/core';
+import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
 
 const ROOM_W   = 30;    // width (X)
@@ -31,12 +32,17 @@ export default class HangarScene {
     const s = this.scene;
 
     const concrete = new StandardMaterial('concrete', s);
-    concrete.diffuseColor  = new Color3(0.28, 0.28, 0.30);
+    concrete.diffuseColor  = new Color3(0.45, 0.43, 0.40);
     concrete.specularColor = new Color3(0.04, 0.04, 0.04);
 
-    const floorMat = new StandardMaterial('floor', s);
-    floorMat.diffuseColor  = new Color3(0.18, 0.18, 0.20);
-    floorMat.specularColor = new Color3(0.02, 0.02, 0.02);
+    const floorMat = new GridMaterial('floor', s);
+    floorMat.majorUnitFrequency  = 5;
+    floorMat.minorUnitVisibility = 0.4;
+    floorMat.gridRatio           = 1;
+    floorMat.mainColor           = new Color3(0.22, 0.20, 0.18);
+    floorMat.lineColor           = new Color3(0.55, 0.52, 0.46);
+    floorMat.opacity             = 1.0;
+    floorMat.backFaceCulling     = false;
 
     const tunnelMat = new StandardMaterial('tunnel', s);
     tunnelMat.diffuseColor    = new Color3(0.10, 0.10, 0.11);
@@ -47,12 +53,6 @@ export default class HangarScene {
     const floor = MeshBuilder.CreateGround('floor', { width: ROOM_W, height: ROOM_D }, s);
     floor.material        = floorMat;
     floor.checkCollisions = true;
-
-    // Ceiling
-    const ceiling = MeshBuilder.CreateBox('ceiling', { width: ROOM_W, height: WALL_T, depth: ROOM_D }, s);
-    ceiling.position      = new Vector3(0, ROOM_H + WALL_T / 2, 0);
-    ceiling.material      = concrete;
-    ceiling.checkCollisions = true;
 
     // South wall (solid)
     const wallS = MeshBuilder.CreateBox('wall-s', { width: ROOM_W, height: ROOM_H, depth: WALL_T }, s);
@@ -102,21 +102,21 @@ export default class HangarScene {
 
   _buildLighting() {
     const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
-    ambient.intensity   = 0.6;
-    ambient.diffuse     = new Color3(0.88, 0.82, 0.72);
-    ambient.groundColor = new Color3(0.10, 0.10, 0.12);
+    ambient.intensity   = 1.0;
+    ambient.diffuse     = new Color3(0.90, 0.85, 0.75);
+    ambient.groundColor = new Color3(0.20, 0.18, 0.16);
 
-    const overhead = new DirectionalLight('overhead', new Vector3(0, -1, 0.3), this.scene);
-    overhead.intensity = 0.5;
-    overhead.position  = new Vector3(0, 12, -4);
+    const overhead = new DirectionalLight('overhead', new Vector3(-0.3, -1, 0.5), this.scene);
+    overhead.intensity = 0.8;
+    overhead.position  = new Vector3(5, 15, 0);
   }
 
   _buildStations() {
     const s = this.scene;
 
     const stationMat = new StandardMaterial('station', s);
-    stationMat.diffuseColor  = new Color3(0.22, 0.22, 0.26);
-    stationMat.specularColor = new Color3(0.08, 0.08, 0.08);
+    stationMat.diffuseColor  = new Color3(0.50, 0.46, 0.40);
+    stationMat.specularColor = new Color3(0.12, 0.12, 0.10);
 
     const tankMat = new StandardMaterial('tank-bay', s);
     tankMat.diffuseColor  = new Color3(0.12, 0.42, 0.88); // cobalt — matches player tank colour
@@ -183,6 +183,12 @@ export default class HangarScene {
       if (!this._panelOpen) {
         this.driver.update(dt);
         this._checkProximity(prompt, promptLabel);
+        // Keep camera locked onto driver, offset slightly north to centre the room view
+        this.driver.camera.target.set(
+          this.driver.mesh.position.x,
+          this.driver.mesh.position.y,
+          this.driver.mesh.position.z + 5
+        );
       }
     });
   }
