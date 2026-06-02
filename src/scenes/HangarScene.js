@@ -53,6 +53,11 @@ export default class HangarScene {
     tunnelMat.specularColor   = new Color3(0, 0, 0);
     tunnelMat.backFaceCulling = false;
 
+    // Tunnel road — dark asphalt, contrasts against the grey arched bore
+    const asphaltMat = new StandardMaterial('tunnel-asphalt', s);
+    asphaltMat.diffuseColor  = new Color3(0.06, 0.06, 0.07);
+    asphaltMat.specularColor = new Color3(0, 0, 0);
+
     // Floor
     const floor = MeshBuilder.CreateGround('floor', { width: ROOM_W, height: ROOM_D }, s);
     floor.material        = floorMat;
@@ -108,10 +113,10 @@ export default class HangarScene {
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
 
-    // Flat floor inside the bore so the tank's bay reads as level ground
+    // Flat asphalt road inside the bore — dark, for contrast against the arch
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
     tunnelFloor.position = new Vector3(0, 0, tCenter);
-    tunnelFloor.material = tunnelMat;
+    tunnelFloor.material = asphaltMat;
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
     this._tunnelMeshes = [bore, tunnelFloor];
