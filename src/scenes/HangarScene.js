@@ -1,16 +1,17 @@
 import {
-  Scene, HemisphericLight, DirectionalLight,
+  Scene, HemisphericLight, DirectionalLight, PointLight,
   MeshBuilder, StandardMaterial, Color3, Color4, Vector3,
 } from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
+import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf } from './HangarProps.js';
 
 const ROOM_W   = 30;    // width (X)
 const ROOM_D   = 40;    // depth (Z), north = positive Z
 const ROOM_H   = 5;     // ceiling height
 const WALL_T   = 0.5;   // wall thickness
 const TUNNEL_W = 5;     // tunnel opening width, centered on north wall
-const TUNNEL_LEN = 14;  // tunnel shaft extending north beyond the room wall
+const TUNNEL_LEN = 24;  // extended so fog fade reaches full black naturally
 
 export default class HangarScene {
   constructor(engine, onDeploy) {
@@ -21,6 +22,7 @@ export default class HangarScene {
     this.scene.collisionsEnabled = true;
 
     this._buildRoom();
+    this._buildWallDetails();
     this._buildLighting();
     this._buildStations();
 
@@ -32,21 +34,25 @@ export default class HangarScene {
     const s = this.scene;
 
     const concrete = new StandardMaterial('concrete', s);
-    concrete.diffuseColor  = new Color3(0.45, 0.43, 0.40);
-    concrete.specularColor = new Color3(0.04, 0.04, 0.04);
+    concrete.diffuseColor  = new Color3(0.38, 0.36, 0.33);
+    concrete.specularColor = new Color3(0.03, 0.03, 0.03);
 
     const floorMat = new GridMaterial('floor', s);
-    floorMat.majorUnitFrequency  = 5;
-    floorMat.minorUnitVisibility = 0.4;
-    floorMat.gridRatio           = 1;
-    floorMat.mainColor           = new Color3(0.22, 0.20, 0.18);
-    floorMat.lineColor           = new Color3(0.55, 0.52, 0.46);
+    floorMat.gridRatio           = 2.5;   // 2.5-unit slabs
+    floorMat.majorUnitFrequency  = 1;     // bold line every slab
+    floorMat.minorUnitVisibility = 0;     // no minor lines — clean grout only
+    floorMat.mainColor           = new Color3(0.24, 0.22, 0.20);
+    floorMat.lineColor           = new Color3(0.18, 0.16, 0.14);
     floorMat.opacity             = 1.0;
     floorMat.backFaceCulling     = false;
 
+    // Tunnel material — near-black, unlit, so the shaft reads as a dark void.
+    // disableLighting keeps it black regardless of room lights reaching in.
     const tunnelMat = new StandardMaterial('tunnel', s);
-    tunnelMat.diffuseColor    = new Color3(0.10, 0.10, 0.11);
-    tunnelMat.specularColor   = new Color3(0.01, 0.01, 0.01);
+    tunnelMat.diffuseColor    = new Color3(0, 0, 0);
+    tunnelMat.specularColor   = new Color3(0, 0, 0);
+    tunnelMat.emissiveColor   = new Color3(0.02, 0.02, 0.03);
+    tunnelMat.disableLighting = true;
     tunnelMat.backFaceCulling = false;
 
     // Floor
@@ -98,31 +104,151 @@ export default class HangarScene {
     const tunnelR = MeshBuilder.CreateBox('tunnel-right', { width: WALL_T, height: ROOM_H, depth: TUNNEL_LEN }, s);
     tunnelR.position = new Vector3(TUNNEL_W / 2, ROOM_H / 2, tCenter);
     tunnelR.material = tunnelMat;
+
+    // Tunnel floor — dark, so the shaft reads as a solid void from above
+    const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
+    tunnelFloor.position = new Vector3(0, 0, tCenter);
+    tunnelFloor.material = tunnelMat;
+
+    // End cap — seals the far end of the tunnel into black
+    const tunnelEnd = MeshBuilder.CreateBox('tunnel-end', { width: TUNNEL_W, height: ROOM_H, depth: WALL_T }, s);
+    tunnelEnd.position = new Vector3(0, ROOM_H / 2, ROOM_D / 2 + TUNNEL_LEN);
+    tunnelEnd.material = tunnelMat;
+
+    // Invisible wall at tunnel entrance — blocks driver from walking in
+    const tunnelGate = MeshBuilder.CreateBox('tunnel-gate', {
+      width: TUNNEL_W, height: ROOM_H, depth: 0.2,
+    }, s);
+    tunnelGate.position        = new Vector3(0, ROOM_H / 2, ROOM_D / 2 + 0.2);
+    tunnelGate.isVisible       = false;
+    tunnelGate.checkCollisions = true;
+  }
+
+  _buildWallDetails() {
+    const s = this.scene;
+
+    const formMat = new StandardMaterial('form-line', s);
+    formMat.diffuseColor  = new Color3(0.20, 0.19, 0.17);
+    formMat.specularColor = new Color3(0.01, 0.01, 0.01);
+
+    const holeMat = new StandardMaterial('tie-hole', s);
+    holeMat.diffuseColor  = new Color3(0.12, 0.11, 0.10);
+    holeMat.specularColor = new Color3(0.0,  0.0,  0.0);
+
+    const rustMat = new StandardMaterial('rust', s);
+    rustMat.diffuseColor  = new Color3(0.30, 0.14, 0.04);
+    rustMat.specularColor = new Color3(0.0,  0.0,  0.0);
+
+    const sideW = (ROOM_W - TUNNEL_W) / 2;
+
+    // South wall inner face (z = -ROOM_D/2 + WALL_T/2)
+    this._addFormLines(s,
+      { pos: new Vector3(0, 0, -ROOM_D / 2 + WALL_T / 2 + 0.03), axis: 'x', span: ROOM_W },
+      formMat, holeMat, rustMat
+    );
+    // West wall inner face (x = -ROOM_W/2 + WALL_T/2)
+    this._addFormLines(s,
+      { pos: new Vector3(-ROOM_W / 2 + WALL_T / 2 + 0.03, 0, 0), axis: 'z', span: ROOM_D },
+      formMat, holeMat, rustMat
+    );
+    // East wall inner face
+    this._addFormLines(s,
+      { pos: new Vector3(ROOM_W / 2 - WALL_T / 2 - 0.03, 0, 0), axis: 'z', span: ROOM_D },
+      formMat, holeMat, rustMat
+    );
+    // North left wall inner face (z = ROOM_D/2 - WALL_T/2)
+    this._addFormLines(s,
+      { pos: new Vector3(-(TUNNEL_W / 2 + sideW / 2), 0, ROOM_D / 2 - WALL_T / 2 - 0.03), axis: 'x', span: sideW },
+      formMat, holeMat, rustMat
+    );
+    // North right wall
+    this._addFormLines(s,
+      { pos: new Vector3(TUNNEL_W / 2 + sideW / 2, 0, ROOM_D / 2 - WALL_T / 2 - 0.03), axis: 'x', span: sideW },
+      formMat, holeMat, rustMat
+    );
+  }
+
+  _addFormLines(s, wall, formMat, holeMat, rustMat) {
+    const LINE_YS    = [1.5, 3.0];
+    const HOLE_EVERY = 2.5;
+    const holeCount  = Math.floor(wall.span / HOLE_EVERY);
+    const rustChance = 0.35;
+
+    for (const lineY of LINE_YS) {
+      // Form line strip
+      const lineSize = wall.axis === 'x'
+        ? { width: wall.span, height: 0.04, depth: 0.05 }
+        : { width: 0.05,      height: 0.04, depth: wall.span };
+      const line = MeshBuilder.CreateBox(
+        `form-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`,
+        lineSize, s
+      );
+      line.position        = new Vector3(wall.pos.x, lineY, wall.pos.z);
+      line.material        = formMat;
+      line.isPickable      = false;
+      line.checkCollisions = false;
+
+      // Tie holes along this line
+      for (let i = 0; i < holeCount; i++) {
+        const holeX = wall.axis === 'x'
+          ? wall.pos.x - wall.span / 2 + HOLE_EVERY * 0.5 + i * HOLE_EVERY
+          : wall.pos.x;
+        const holeZ = wall.axis === 'z'
+          ? wall.pos.z - wall.span / 2 + HOLE_EVERY * 0.5 + i * HOLE_EVERY
+          : wall.pos.z;
+
+        const hole = MeshBuilder.CreateCylinder(`hole-${i}-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`, {
+          radius: 0.06, height: 0.09, tessellation: 6,
+        }, s);
+        hole.position        = new Vector3(holeX, lineY, holeZ);
+        hole.material        = holeMat;
+        hole.isPickable      = false;
+        hole.checkCollisions = false;
+        if (wall.axis === 'x') {
+          hole.rotation.x = Math.PI / 2;
+        } else {
+          hole.rotation.z = Math.PI / 2;
+        }
+
+        // Rust streak below ~35% of holes
+        if (Math.random() < rustChance) {
+          const rust = MeshBuilder.CreateBox(
+            `rust-${i}-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`,
+            { width: 0.04, height: 0.6, depth: 0.04 }, s
+          );
+          rust.position        = new Vector3(holeX, lineY - 0.35, holeZ);
+          rust.material        = rustMat;
+          rust.isPickable      = false;
+          rust.checkCollisions = false;
+        }
+      }
+    }
   }
 
   _buildLighting() {
     const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
-    ambient.intensity   = 1.0;
-    ambient.diffuse     = new Color3(0.90, 0.85, 0.75);
-    ambient.groundColor = new Color3(0.20, 0.18, 0.16);
+    ambient.intensity   = 0.55;
+    ambient.diffuse     = new Color3(0.85, 0.80, 0.70);
+    ambient.groundColor = new Color3(0.15, 0.14, 0.12);
 
     const overhead = new DirectionalLight('overhead', new Vector3(-0.3, -1, 0.5), this.scene);
-    overhead.intensity = 0.8;
+    overhead.intensity = 0.4;
     overhead.position  = new Vector3(5, 15, 0);
+
+    const bulb1 = new PointLight('bulb1', new Vector3(0, 4.5, 5), this.scene);
+    bulb1.diffuse   = new Color3(1.0, 0.92, 0.78);
+    bulb1.intensity = 0.8;
+    bulb1.range     = 18;
+
+    const bulb2 = new PointLight('bulb2', new Vector3(0, 4.5, -5), this.scene);
+    bulb2.diffuse   = new Color3(1.0, 0.92, 0.78);
+    bulb2.intensity = 0.6;
+    bulb2.range     = 14;
   }
 
   _buildStations() {
     const s = this.scene;
 
-    const stationMat = new StandardMaterial('station', s);
-    stationMat.diffuseColor  = new Color3(0.50, 0.46, 0.40);
-    stationMat.specularColor = new Color3(0.12, 0.12, 0.10);
-
-    const tankMat = new StandardMaterial('tank-bay', s);
-    tankMat.diffuseColor  = new Color3(0.12, 0.42, 0.88); // cobalt — matches player tank colour
-    tankMat.specularColor = new Color3(0.1,  0.1,  0.1);
-
-    // Station interaction data — read by the E-key handler in main.js
     this._stationDefs = {
       map:      { id: 'map',      label: 'INTERACT', title: 'TACTICAL MAP',  body: 'MISSION SELECT\nComing soon.',         showDeploy: true  },
       radio:    { id: 'radio',    label: 'INTERACT', title: 'RADIO / INTEL', body: 'STAND BY FOR BRIEFING.\nComing soon.', showDeploy: false },
@@ -130,15 +256,18 @@ export default class HangarScene {
       qm:       { id: 'qm',       label: 'INTERACT', title: 'QUARTERMASTER', body: 'AMMO & SUPPLIES\nComing soon.',        showDeploy: false },
     };
 
-    // Station props and their world positions
+    const propMats = makeMats(s);
     this._stationMeshes = [
-      this._makeStation('map',      new Vector3(-11, 0.5, 17.5), { width: 2.5, height: 1.0, depth: 1.2 }, stationMat, s),
-      this._makeStation('radio',    new Vector3( 11, 0.5, 17.5), { width: 2.5, height: 1.0, depth: 1.2 }, stationMat, s),
-      this._makeStation('mechanic', new Vector3(-14, 0.5, 0),    { width: 1.2, height: 1.0, depth: 3.5 }, stationMat, s),
-      this._makeStation('qm',       new Vector3( 14, 0.5, 0),    { width: 1.2, height: 1.0, depth: 3.5 }, stationMat, s),
+      { mesh: buildMapTable(s,   -11,  17.5, propMats), data: this._stationDefs.map      },
+      { mesh: buildRadioShelf(s,  11,  17.5, propMats), data: this._stationDefs.radio    },
+      { mesh: buildWorkbench(s,  -14,  0,    propMats), data: this._stationDefs.mechanic },
+      { mesh: buildQMCrates(s,    14,  0,    propMats), data: this._stationDefs.qm       },
     ];
 
-    // Tank placeholder in bay
+    const tankMat = new StandardMaterial('tank-bay', s);
+    tankMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
+    tankMat.specularColor = new Color3(0.1,  0.1,  0.1);
+
     const hull = MeshBuilder.CreateBox('tank-hull', { width: 3, height: 1.2, depth: 5 }, s);
     hull.position = new Vector3(0, 0.6, 16);
     hull.material = tankMat;
@@ -151,16 +280,7 @@ export default class HangarScene {
     barrel.position = new Vector3(0, 1.65, 18.2);
     barrel.material = tankMat;
 
-    // Tank proximity position (centroid used for distance checks)
     this._tankPosition = new Vector3(0, 0, 16);
-  }
-
-  _makeStation(id, position, size, mat, scene) {
-    const mesh = MeshBuilder.CreateBox(`station-${id}`, size, scene);
-    mesh.position        = position;
-    mesh.material        = mat;
-    mesh.checkCollisions = true;
-    return { mesh, data: this._stationDefs[id] };
   }
 
   _setupDriver() {

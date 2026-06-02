@@ -37,16 +37,16 @@ All detail geometry uses `isPickable=false, checkCollisions=false`.
 
 ## 3. Tunnel
 
-**Add fog to the HangarScene** and extend the tunnel geometry.
+Create a dark-void tunnel using an unlit near-black material plus a sealed shaft.
 
-- `scene.fogMode = Scene.FOGMODE_LINEAR`
-- `scene.fogColor = new Color3(0.04, 0.04, 0.06)` — matches clearColor
-- `scene.fogStart = 22` — fog begins just past the north wall (z=20)
-- `scene.fogEnd = 30` — fully black 10 units into the tunnel
-- **Invisible wall**: `MeshBuilder.CreateBox` at z=20.5, x=0, width=TUNNEL_W, height=ROOM_H — `isVisible=false, checkCollisions=true` — blocks the driver from entering
-- **Extend tunnel**: increase `TUNNEL_LEN` from 14 → 24 so geometry extends far enough to fade naturally
+> **Note (revised during implementation):** Babylon.js linear fog measures distance from the *camera*, not world position. With the camera following the driver from ~22 units back, scene fog blacked out the entire north half of the room (tank + stations), not just the tunnel. Fog was removed; the void is achieved with material + sealed geometry instead.
 
-The effect: concrete walls and floor visible for ~2–3 units past the opening, then swallowed by darkness.
+- **Tunnel material**: `StandardMaterial` with `diffuseColor=(0,0,0)`, `specularColor=(0,0,0)`, faint `emissiveColor=(0.02,0.02,0.03)`, and `disableLighting=true` — stays black regardless of room lights reaching in
+- **Sealed shaft**: tunnel top, left wall, right wall, plus a **floor** and an **end cap** at the far end — so from the top-down camera the shaft reads as a solid black box, no gaps showing through
+- **Extend tunnel**: `TUNNEL_LEN` from 14 → 24 for a deeper void
+- **Invisible wall**: `MeshBuilder.CreateBox` at z=ROOM_D/2+0.2, width=TUNNEL_W, height=ROOM_H — `isVisible=false, checkCollisions=true` — blocks the driver from entering
+
+The effect: the tunnel mouth behind the tank reads as a deep black void the tank's barrel points into.
 
 ---
 
