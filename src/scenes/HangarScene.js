@@ -49,7 +49,7 @@ export default class HangarScene {
     // mouth light (set up in _buildLighting) that falls off into blackness,
     // so the corridor reads as receding into darkness rather than a flat wall.
     const tunnelMat = new StandardMaterial('tunnel', s);
-    tunnelMat.diffuseColor    = new Color3(0.34, 0.32, 0.29);
+    tunnelMat.diffuseColor    = new Color3(0.38, 0.36, 0.33); // matches room concrete
     tunnelMat.specularColor   = new Color3(0, 0, 0);
     tunnelMat.backFaceCulling = false;
 
@@ -153,11 +153,12 @@ export default class HangarScene {
     }
 
     // Mouth light — sits just inside the tunnel entrance and falls off with
-    // distance, so the near corridor is lit and it recedes into black.
-    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.2, ROOM_D / 2 + 1.5), this.scene);
-    mouth.diffuse           = new Color3(0.80, 0.82, 0.95); // cool daylight bleeding in
-    mouth.intensity         = 1.1;
-    mouth.range             = 13;
+    // distance, so the near corridor reads as concrete grey (matching the room)
+    // and recedes into black deeper in.
+    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.5, ROOM_D / 2 + 2.5), this.scene);
+    mouth.diffuse            = new Color3(1.0, 0.94, 0.82); // warm, matches room bulbs
+    mouth.intensity          = 1.6;
+    mouth.range              = 18;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
   }
 
