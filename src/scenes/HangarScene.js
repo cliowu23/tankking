@@ -22,7 +22,6 @@ export default class HangarScene {
     this.scene.collisionsEnabled = true;
 
     this._buildRoom();
-    this._buildWallDetails();
     this._buildLighting();
     this._buildStations();
 
@@ -122,107 +121,6 @@ export default class HangarScene {
     tunnelGate.position        = new Vector3(0, ROOM_H / 2, ROOM_D / 2 + 0.2);
     tunnelGate.isVisible       = false;
     tunnelGate.checkCollisions = true;
-  }
-
-  _buildWallDetails() {
-    const s = this.scene;
-
-    const formMat = new StandardMaterial('form-line', s);
-    formMat.diffuseColor  = new Color3(0.20, 0.19, 0.17);
-    formMat.specularColor = new Color3(0.01, 0.01, 0.01);
-
-    const holeMat = new StandardMaterial('tie-hole', s);
-    holeMat.diffuseColor  = new Color3(0.12, 0.11, 0.10);
-    holeMat.specularColor = new Color3(0.0,  0.0,  0.0);
-
-    const rustMat = new StandardMaterial('rust', s);
-    rustMat.diffuseColor  = new Color3(0.30, 0.14, 0.04);
-    rustMat.specularColor = new Color3(0.0,  0.0,  0.0);
-
-    const sideW = (ROOM_W - TUNNEL_W) / 2;
-
-    // South wall inner face (z = -ROOM_D/2 + WALL_T/2)
-    this._addFormLines(s,
-      { pos: new Vector3(0, 0, -ROOM_D / 2 + WALL_T / 2 + 0.03), axis: 'x', span: ROOM_W },
-      formMat, holeMat, rustMat
-    );
-    // West wall inner face (x = -ROOM_W/2 + WALL_T/2)
-    this._addFormLines(s,
-      { pos: new Vector3(-ROOM_W / 2 + WALL_T / 2 + 0.03, 0, 0), axis: 'z', span: ROOM_D },
-      formMat, holeMat, rustMat
-    );
-    // East wall inner face
-    this._addFormLines(s,
-      { pos: new Vector3(ROOM_W / 2 - WALL_T / 2 - 0.03, 0, 0), axis: 'z', span: ROOM_D },
-      formMat, holeMat, rustMat
-    );
-    // North left wall inner face (z = ROOM_D/2 - WALL_T/2)
-    this._addFormLines(s,
-      { pos: new Vector3(-(TUNNEL_W / 2 + sideW / 2), 0, ROOM_D / 2 - WALL_T / 2 - 0.03), axis: 'x', span: sideW },
-      formMat, holeMat, rustMat
-    );
-    // North right wall
-    this._addFormLines(s,
-      { pos: new Vector3(TUNNEL_W / 2 + sideW / 2, 0, ROOM_D / 2 - WALL_T / 2 - 0.03), axis: 'x', span: sideW },
-      formMat, holeMat, rustMat
-    );
-  }
-
-  _addFormLines(s, wall, formMat, holeMat, rustMat) {
-    const LINE_YS    = [1.5, 3.0];
-    const HOLE_EVERY = 2.5;
-    const holeCount  = Math.floor(wall.span / HOLE_EVERY);
-    const rustChance = 0.35;
-
-    for (const lineY of LINE_YS) {
-      // Form line strip
-      const lineSize = wall.axis === 'x'
-        ? { width: wall.span, height: 0.04, depth: 0.05 }
-        : { width: 0.05,      height: 0.04, depth: wall.span };
-      const line = MeshBuilder.CreateBox(
-        `form-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`,
-        lineSize, s
-      );
-      line.position        = new Vector3(wall.pos.x, lineY, wall.pos.z);
-      line.material        = formMat;
-      line.isPickable      = false;
-      line.checkCollisions = false;
-
-      // Tie holes along this line
-      for (let i = 0; i < holeCount; i++) {
-        const holeX = wall.axis === 'x'
-          ? wall.pos.x - wall.span / 2 + HOLE_EVERY * 0.5 + i * HOLE_EVERY
-          : wall.pos.x;
-        const holeZ = wall.axis === 'z'
-          ? wall.pos.z - wall.span / 2 + HOLE_EVERY * 0.5 + i * HOLE_EVERY
-          : wall.pos.z;
-
-        const hole = MeshBuilder.CreateCylinder(`hole-${i}-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`, {
-          radius: 0.06, height: 0.09, tessellation: 6,
-        }, s);
-        hole.position        = new Vector3(holeX, lineY, holeZ);
-        hole.material        = holeMat;
-        hole.isPickable      = false;
-        hole.checkCollisions = false;
-        if (wall.axis === 'x') {
-          hole.rotation.x = Math.PI / 2;
-        } else {
-          hole.rotation.z = Math.PI / 2;
-        }
-
-        // Rust streak below ~35% of holes
-        if (Math.random() < rustChance) {
-          const rust = MeshBuilder.CreateBox(
-            `rust-${i}-${lineY}-${wall.pos.x.toFixed(0)}-${wall.pos.z.toFixed(0)}`,
-            { width: 0.04, height: 0.6, depth: 0.04 }, s
-          );
-          rust.position        = new Vector3(holeX, lineY - 0.35, holeZ);
-          rust.material        = rustMat;
-          rust.isPickable      = false;
-          rust.checkCollisions = false;
-        }
-      }
-    }
   }
 
   _buildLighting() {
