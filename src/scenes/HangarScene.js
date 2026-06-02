@@ -1,6 +1,6 @@
 import {
   Scene, HemisphericLight, DirectionalLight, PointLight,
-  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh,
+  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh, VertexBuffer,
 } from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
@@ -112,6 +112,24 @@ export default class HangarScene {
     bore.rotation.x = Math.PI / 2;                  // lay the axis along Z (CAP_END → far end)
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
+
+    // Shade the roof darker than the side walls via vertex colours so the two
+    // surfaces read as distinct. In local space the cross-section circle lies
+    // in X/Z; after the X rotation, world-up (+Y) maps to local -Z, so the most
+    // negative local-Z verts are the roof peak (darkest), local-Z≈0 the sides.
+    {
+      const boreR    = 3.5;                          // diameter 7 / 2
+      const positions = bore.getVerticesData(VertexBuffer.PositionKind);
+      const colors    = [];
+      for (let i = 0; i < positions.length; i += 3) {
+        const lz    = positions[i + 2];              // local z
+        const t     = Math.max(0, Math.min(1, -lz / boreR)); // 0 = sides, 1 = roof peak
+        const shade = 1.0 - 0.6 * t;                 // roof ~40% brightness, sides full
+        colors.push(shade, shade, shade, 1);
+      }
+      bore.setVerticesData(VertexBuffer.ColorKind, colors);
+      bore.useVertexColors = true;
+    }
 
     // Flat asphalt road inside the bore — dark, for contrast against the arch
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
