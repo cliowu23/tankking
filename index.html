@@ -8,14 +8,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:     #1a1a2e;
-      --panel:  #0f1b38;
-      --accent: #e94560;
-      --gold:   #f5a623;
-      --white:  #e8e8f0;
-      --dim:    #6868a0;
-      --blue:   #2b7fff;
-      --green:  #4ade80;
+      --bg:     #050d1a;
+      --panel:  #081830;
+      --accent: #00eedd;
+      --gold:   #ffcc00;
+      --white:  #ddfff8;
+      --dim:    #206878;
+      --blue:   #00eedd;
+      --green:  #55ffbb;
+      --cyan:   #00eedd;
+      --danger: #e94560;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: inherit; }
@@ -26,6 +28,7 @@
         linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
       background-size: 4px 4px;
       overflow: hidden;
+      cursor: none;
       font-family: 'Press Start 2P', monospace;
       -webkit-font-smoothing: none;
       font-smooth: never;
@@ -33,7 +36,17 @@
 
     #renderCanvas {
       width: 100vw; height: 100vh; display: block;
-      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cline x1='2' y1='16' x2='12' y2='16' stroke='white' stroke-width='2'/%3E%3Cline x1='20' y1='16' x2='30' y2='16' stroke='white' stroke-width='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='12' stroke='white' stroke-width='2'/%3E%3Cline x1='16' y1='20' x2='16' y2='30' stroke='white' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23e94560'/%3E%3C/svg%3E") 16 16, crosshair;
+      cursor: none;
+    }
+
+    /* ─── DOM RETICLE (replaces CSS cursor — immune to window re-entry loss) ── */
+    #reticle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+      display: none;
+      filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
     }
 
     /* ─── MENU ─────────────────────────────────────────── */
@@ -103,7 +116,7 @@
       color: var(--dim);
       font-size: 9px;
       margin-top: 20px;
-      cursor: pointer;
+      cursor: none;
       letter-spacing: 1px;
       line-height: 1.8;
       transition: color 0.1s;
@@ -121,7 +134,7 @@
       border-left:   2px solid rgba(255,255,255,0.1);
       border-bottom: 2px solid rgba(0,0,0,0.45);
       border-right:  2px solid rgba(0,0,0,0.45);
-      outline: 1px solid rgba(233,69,96,0.45);
+      outline: 1px solid rgba(0,238,221,0.45);
       outline-offset: 2px;
       padding: 12px 16px 13px;
     }
@@ -137,7 +150,7 @@
     #hud-track {
       width: 220px; height: 12px;
       background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(43,127,255,0.3);
+      border: 1px solid rgba(0,238,221,0.3);
       overflow: hidden;
     }
     #hud-fill {
@@ -163,7 +176,7 @@
     #hud-hp-track {
       width: 220px; height: 12px;
       background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(74,222,128,0.3);
+      border: 1px solid rgba(85,255,187,0.3);
       overflow: hidden;
     }
     #hud-hp-fill {
@@ -188,7 +201,7 @@
     #pause { background: rgba(10, 10, 26, 0.80); }
 
     #death h2 {
-      color: var(--accent);
+      color: var(--danger);
       font-size: 30px;
       letter-spacing: 5px;
       text-shadow: 4px 4px 0 #5a0015;
@@ -201,17 +214,17 @@
       text-shadow: 3px 3px 0 #000;
       line-height: 1.4;
     }
-    #death-restart, #death-menu,
+    #death-restart, #death-menu, #death-hangar,
     #pause-resume, #pause-restart, #pause-menu {
       margin-top: 20px;
       background: var(--panel);
-      cursor: pointer;
+      cursor: none;
       color: var(--white);
       border-top:    2px solid rgba(255,255,255,0.1);
       border-left:   2px solid rgba(255,255,255,0.1);
       border-bottom: 2px solid rgba(0,0,0,0.5);
       border-right:  2px solid rgba(0,0,0,0.5);
-      outline: 1px solid rgba(233,69,96,0.35);
+      outline: 1px solid rgba(0,238,221,0.35);
       outline-offset: 2px;
       font-size: 11px;
       letter-spacing: 1px;
@@ -220,10 +233,16 @@
       line-height: 1.6;
       transition: color 0.1s, outline-color 0.1s;
     }
-    #death-restart:hover, #death-menu:hover,
+    #death-restart, #death-menu, #death-hangar {
+      outline-color: rgba(233,69,96,0.35);
+    }
+    #death-restart:hover, #death-menu:hover, #death-hangar:hover,
     #pause-resume:hover, #pause-restart:hover, #pause-menu:hover {
       color: var(--gold);
       outline-color: var(--accent);
+    }
+    #death-restart:hover, #death-menu:hover, #death-hangar:hover {
+      outline-color: var(--danger);
     }
 
     /* ─── TANK DESIGNER ────────────────────────────────── */
@@ -278,10 +297,10 @@
       text-transform: uppercase;
       line-height: 1.6;
     }
-    .ds-divider { border-top: 1px solid rgba(233,69,96,0.2); margin: 5px 0; }
+    .ds-divider { border-top: 1px solid rgba(0,238,221,0.2); margin: 5px 0; }
 
     .shape-btn {
-      width: 100%; background: none; cursor: pointer;
+      width: 100%; background: none; cursor: none;
       border-top:    1px solid rgba(255,255,255,0.08);
       border-left:   1px solid rgba(255,255,255,0.08);
       border-bottom: 1px solid rgba(0,0,0,0.35);
@@ -295,7 +314,7 @@
     .shape-btn.active {
       color: var(--gold);
       border-color: var(--accent);
-      background: rgba(233,69,96,0.08);
+      background: rgba(0,238,221,0.08);
     }
     .shape-btn.selected {
       border-left: 2px solid var(--cyan);
@@ -304,8 +323,20 @@
     .shape-btn.selected.active {
       color: var(--white);
     }
+    .shape-btn.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      color: var(--dim);
+      font-style: italic;
+    }
+    .shape-btn.disabled::after {
+      content: ' [DESTROYED]';
+      color: var(--accent);
+      font-size: 6px;
+      opacity: 0.7;
+    }
     .transform-btn {
-      width: 100%; background: none; cursor: pointer;
+      width: 100%; background: none; cursor: none;
       border: 1px solid rgba(255,255,255,0.06);
       color: var(--dim);
       font-size: 7px; letter-spacing: 0px; text-align: left;
@@ -317,12 +348,12 @@
 
     #designer-color {
       width: 100%; height: 32px;
-      border: 1px solid rgba(233,69,96,0.3);
-      background: none; cursor: pointer; margin-top: 2px;
+      border: 1px solid rgba(0,238,221,0.3);
+      background: none; cursor: none; margin-top: 2px;
     }
     #designer-swatches { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
     .swatch {
-      width: 24px; height: 24px; cursor: pointer;
+      width: 24px; height: 24px; cursor: none;
       border-top:    2px solid rgba(255,255,255,0.2);
       border-left:   2px solid rgba(255,255,255,0.2);
       border-bottom: 2px solid rgba(0,0,0,0.4);
@@ -343,7 +374,7 @@
     #editor-toolbar {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 16px;
-      border-bottom: 1px solid rgba(233,69,96,0.2);
+      border-bottom: 1px solid rgba(0,238,221,0.2);
     }
     #editor-title {
       color: var(--gold);
@@ -356,7 +387,7 @@
     #editor-spacer { flex: 1; }
 
     .editor-btn {
-      background: none; cursor: pointer;
+      background: none; cursor: none;
       border-top:    1px solid rgba(255,255,255,0.1);
       border-left:   1px solid rgba(255,255,255,0.1);
       border-bottom: 1px solid rgba(0,0,0,0.4);
@@ -370,16 +401,16 @@
     .editor-btn.active {
       color: var(--gold);
       border-color: var(--accent);
-      background: rgba(233,69,96,0.08);
+      background: rgba(0,238,221,0.08);
     }
 
     #editor-palette {
       display: none; align-items: center; gap: 8px;
       padding: 6px 16px;
-      border-bottom: 1px solid rgba(233,69,96,0.15);
+      border-bottom: 1px solid rgba(0,238,221,0.15);
     }
     .palette-btn {
-      background: none; cursor: pointer;
+      background: none; cursor: none;
       border: 1px solid rgba(255,255,255,0.08);
       color: var(--dim);
       font-size: 7px; letter-spacing: 0px;
@@ -390,7 +421,7 @@
     .palette-btn.active {
       color: var(--gold);
       border-color: var(--accent);
-      background: rgba(233,69,96,0.08);
+      background: rgba(0,238,221,0.08);
     }
     #editor-palette-hint { color: var(--dim); font-size: 6px; margin-left: 8px; line-height: 1.6; }
     #editor-hint { padding: 6px 16px; color: var(--dim); font-size: 6px; line-height: 1.6; }
@@ -443,7 +474,7 @@
 
     .controls-divider {
       width: 1px;
-      background: rgba(233,69,96,0.25);
+      background: rgba(0,238,221,0.25);
       margin: 0 8px;
       flex-shrink: 0;
     }
@@ -454,7 +485,7 @@
       letter-spacing: 2px;
       margin-bottom: 18px;
       padding-bottom: 9px;
-      border-bottom: 1px solid rgba(233,69,96,0.2);
+      border-bottom: 1px solid rgba(0,238,221,0.2);
       line-height: 1.6;
     }
 
@@ -489,7 +520,7 @@
     }
 
     #controls-tip {
-      color: rgba(104,104,160,0.6);
+      color: rgba(32,104,120,0.8);
       font-size: 8px;
       letter-spacing: 1px;
       margin-top: 24px;
@@ -505,7 +536,7 @@
       animation: blink 1.0s step-end infinite;
       text-shadow: 2px 2px 0 #000;
       line-height: 1.8;
-      cursor: pointer;
+      cursor: none;
     }
     #controls-start::before { content: '▶  '; color: var(--accent); }
 
@@ -536,6 +567,54 @@
       border-bottom: 2px solid rgba(255,255,255,0.9);
       border-right: 2px solid rgba(255,255,255,0.9); }
 
+    /* ─── CANNON DROPDOWN ────────────────────────────────── */
+    .cannon-dropdown {
+      position: fixed;
+      z-index: 15;
+      background: var(--panel);
+      border-top:    2px solid rgba(255,255,255,0.08);
+      border-left:   2px solid rgba(255,255,255,0.08);
+      border-bottom: 2px solid rgba(0,0,0,0.50);
+      border-right:  2px solid rgba(0,0,0,0.50);
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+      min-width: 190px;
+      pointer-events: auto;
+    }
+    .cannon-dropdown-title {
+      color: var(--dim);
+      font-size: 7px;
+      letter-spacing: 2px;
+      padding: 8px 12px 6px;
+      border-bottom: 1px solid rgba(0,238,221,0.2);
+      line-height: 1.6;
+    }
+    .cannon-dropdown-title::before { content: '▶  '; color: var(--accent); }
+    .cannon-dropdown-item {
+      padding: 9px 12px;
+      cursor: none;
+      border-bottom: 1px solid rgba(0,238,221,0.08);
+      transition: background 0.1s;
+    }
+    .cannon-dropdown-item:last-child { border-bottom: none; }
+    .cannon-dropdown-item:hover { background: rgba(0,238,221,0.08); }
+    .cannon-dropdown-item.active { background: rgba(0,238,221,0.12); }
+    .cannon-dropdown-item.active .cannon-dd-name::before { content: '✔  '; color: var(--accent); }
+    .cannon-dd-name {
+      color: var(--white);
+      font-size: 7px;
+      letter-spacing: 0.5px;
+      display: block;
+      line-height: 1.8;
+    }
+    .cannon-dd-stats {
+      color: var(--dim);
+      font-size: 6px;
+      display: block;
+      line-height: 1.6;
+      margin-top: 2px;
+    }
+
     /* ─── CRT POWER-OFF ────────────────────────────────── */
     #crt-off {
       position: fixed; inset: 0;
@@ -554,6 +633,80 @@
       66%  { opacity: 0.7; transform: scaleY(0.018); filter: brightness(1);   }
       100% { opacity: 0;   transform: scaleY(0.018);                          }
     }
+    #hangar-prompt {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: #00e5ff;
+      pointer-events: none;
+      z-index: 10;
+      text-shadow: 0 0 8px rgba(0,229,255,0.6);
+    }
+    #hangar-prompt-key {
+      border: 1px solid #00e5ff;
+      padding: 3px 7px;
+      box-shadow: 0 0 6px rgba(0,229,255,0.4);
+    }
+    #hangar-panel {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,8,20,0.88);
+      z-index: 20;
+    }
+    #hangar-panel-inner {
+      background: #000810;
+      border: 1px solid #00e5ff;
+      box-shadow: 0 0 24px rgba(0,229,255,0.15);
+      padding: 40px 56px;
+      min-width: 320px;
+      text-align: center;
+      font-family: 'Press Start 2P', monospace;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    #hangar-panel-title {
+      color: #00e5ff;
+      font-size: 14px;
+      letter-spacing: 3px;
+      margin: 0;
+    }
+    #hangar-panel-body {
+      color: #4a7a8a;
+      font-size: 9px;
+      line-height: 2;
+      margin: 0;
+      white-space: pre-line;
+    }
+    #hangar-panel-deploy,
+    #hangar-panel-close {
+      background: transparent;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      padding: 10px 20px;
+      cursor: none;
+      letter-spacing: 2px;
+    }
+    #hangar-panel-deploy {
+      border: 1px solid #ff2060;
+      color: #ff2060;
+      box-shadow: 0 0 8px rgba(255,32,96,0.3);
+    }
+    #hangar-panel-deploy:hover { background: rgba(255,32,96,0.1); }
+    #hangar-panel-close {
+      border: 1px solid #00e5ff;
+      color: #00e5ff;
+    }
+    #hangar-panel-close:hover { background: rgba(0,229,255,0.08); }
   </style>
 </head>
 <body>
@@ -578,6 +731,7 @@
 
   <div id="death">
     <h2>YOU DIED</h2>
+    <button id="death-hangar">RETURN TO HANGAR</button>
     <button id="death-restart">RESTART</button>
     <button id="death-menu">MAIN MENU</button>
   </div>
@@ -659,6 +813,22 @@
     </div>
   </div>
 
+  <!-- Hangar interact prompt -->
+  <div id="hangar-prompt" style="display:none">
+    <span id="hangar-prompt-key">[E]</span>
+    <span id="hangar-prompt-label">INTERACT</span>
+  </div>
+
+  <!-- Hangar station panel (shared by all stations) -->
+  <div id="hangar-panel" style="display:none">
+    <div id="hangar-panel-inner">
+      <h2 id="hangar-panel-title">STATION</h2>
+      <p id="hangar-panel-body">Coming soon.</p>
+      <button id="hangar-panel-deploy" style="display:none">DEPLOY</button>
+      <button id="hangar-panel-close">CLOSE [ESC]</button>
+    </div>
+  </div>
+
   <div id="aim-indicator">
     <div class="aim-corner tl"></div>
     <div class="aim-corner tr"></div>
@@ -666,9 +836,30 @@
     <div class="aim-corner br"></div>
   </div>
 
+  <div id="reticle">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <line x1="2"  y1="16" x2="12" y2="16" stroke="white" stroke-width="2"/>
+      <line x1="20" y1="16" x2="30" y2="16" stroke="white" stroke-width="2"/>
+      <line x1="16" y1="2"  x2="16" y2="12" stroke="white" stroke-width="2"/>
+      <line x1="16" y1="20" x2="16" y2="30" stroke="white" stroke-width="2"/>
+      <circle cx="16" cy="16" r="2" fill="#e94560"/>
+    </svg>
+  </div>
+
   <div id="crt-off"></div>
   <canvas id="transition-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99;display:none"></canvas>
 
+  <script>
+    (function() {
+      const r = document.getElementById('reticle');
+      document.addEventListener('mousemove', e => {
+        r.style.left = e.clientX + 'px';
+        r.style.top  = e.clientY + 'px';
+      });
+      document.addEventListener('mouseenter', () => { r.style.display = 'block'; });
+      document.addEventListener('mouseleave', () => { r.style.display = 'none'; });
+    })();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
