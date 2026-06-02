@@ -113,18 +113,17 @@ export default class HangarScene {
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
 
-    // Shade the roof darker than the side walls via vertex colours so the two
-    // surfaces read as distinct. In local space the cross-section circle lies
-    // in X/Z; after the X rotation, world-up (+Y) maps to local -Z, so the most
-    // negative local-Z verts are the roof peak (darkest), local-Z≈0 the sides.
+    // Fade the bore to dark with DEPTH via vertex colours so the whole tunnel
+    // (roof, walls, all of it) reads as receding into blackness — lit at the
+    // mouth, black deep in. Local Y is the cylinder's length axis; after the X
+    // rotation local +Y maps to world +Z (far end), so local Y is depth.
     {
-      const boreR    = 3.5;                          // diameter 7 / 2
       const positions = bore.getVerticesData(VertexBuffer.PositionKind);
       const colors    = [];
       for (let i = 0; i < positions.length; i += 3) {
-        const lz    = positions[i + 2];              // local z
-        const t     = Math.max(0, Math.min(1, -lz / boreR)); // 0 = sides, 1 = roof peak
-        const shade = 1.0 - 0.6 * t;                 // roof ~40% brightness, sides full
+        const ly    = positions[i + 1];                              // local y = depth
+        const t     = Math.max(0, Math.min(1, (ly + TUNNEL_LEN / 2) / TUNNEL_LEN)); // 0 mouth → 1 far
+        const shade = 1.0 - 0.9 * t;                                 // mouth full bright → far ~10%
         colors.push(shade, shade, shade, 1);
       }
       bore.setVerticesData(VertexBuffer.ColorKind, colors);
