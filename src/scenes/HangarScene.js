@@ -1,6 +1,6 @@
 import {
   Scene, HemisphericLight, DirectionalLight, PointLight,
-  MeshBuilder, StandardMaterial, Color3, Color4, Vector3,
+  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh,
 } from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
@@ -93,32 +93,28 @@ export default class HangarScene {
     // geometry never overlaps the wall pieces (which would z-fight).
     const tFront  = ROOM_D / 2 + WALL_T / 2;       // back face of north wall
     const tCenter = tFront + TUNNEL_LEN / 2;
-    const sideX   = TUNNEL_W / 2 + WALL_T / 2;      // side wall inner face = opening edge
 
-    const tunnelTop = MeshBuilder.CreateBox('tunnel-top', { width: TUNNEL_W, height: WALL_T, depth: TUNNEL_LEN }, s);
-    tunnelTop.position = new Vector3(0, ROOM_H + WALL_T / 2, tCenter);
-    tunnelTop.material = tunnelMat;
+    // Rounded bore — a cylinder laid along Z, rendered inside-out (BACKSIDE)
+    // with the far end capped. Bottom half sits below the floor so what shows
+    // is a smooth arch rising from the floor instead of blocky corners.
+    const bore = MeshBuilder.CreateCylinder('tunnel-bore', {
+      height: TUNNEL_LEN,
+      diameter: 7,
+      tessellation: 40,
+      cap: Mesh.CAP_END,
+      sideOrientation: Mesh.BACKSIDE,
+    }, s);
+    bore.rotation.x = Math.PI / 2;                  // lay the axis along Z (CAP_END → far end)
+    bore.position   = new Vector3(0, 1.5, tCenter);
+    bore.material   = tunnelMat;
 
-    const tunnelL = MeshBuilder.CreateBox('tunnel-left', { width: WALL_T, height: ROOM_H, depth: TUNNEL_LEN }, s);
-    tunnelL.position = new Vector3(-sideX, ROOM_H / 2, tCenter);
-    tunnelL.material = tunnelMat;
-
-    const tunnelR = MeshBuilder.CreateBox('tunnel-right', { width: WALL_T, height: ROOM_H, depth: TUNNEL_LEN }, s);
-    tunnelR.position = new Vector3(sideX, ROOM_H / 2, tCenter);
-    tunnelR.material = tunnelMat;
-
-    // Tunnel floor — dark, so the shaft reads as a solid void from above
+    // Flat floor inside the bore so the tank's bay reads as level ground
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
     tunnelFloor.position = new Vector3(0, 0, tCenter);
     tunnelFloor.material = tunnelMat;
 
-    // End cap — seals the far end of the tunnel
-    const tunnelEnd = MeshBuilder.CreateBox('tunnel-end', { width: TUNNEL_W, height: ROOM_H, depth: WALL_T }, s);
-    tunnelEnd.position = new Vector3(0, ROOM_H / 2, tFront + TUNNEL_LEN);
-    tunnelEnd.material = tunnelMat;
-
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
-    this._tunnelMeshes = [tunnelTop, tunnelL, tunnelR, tunnelFloor, tunnelEnd];
+    this._tunnelMeshes = [bore, tunnelFloor];
 
     // Invisible wall at tunnel entrance — blocks driver from walking in
     const tunnelGate = MeshBuilder.CreateBox('tunnel-gate', {
