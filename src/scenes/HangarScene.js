@@ -1,6 +1,6 @@
 import {
   Scene, HemisphericLight, DirectionalLight, PointLight,
-  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh, VertexBuffer,
+  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh,
 } from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
@@ -115,44 +115,11 @@ export default class HangarScene {
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
 
-    // Shade the bore via vertex colours for a "lit road into shadow" read:
-    //   • ROOF in shadow — the higher up the arch, the darker (ceiling is dark)
-    //   • recedes with DEPTH — lit at the mouth, black deep in
-    // Local Y is the length axis (→ world Z depth); world height = 1.5 - localZ.
-    {
-      const positions = bore.getVerticesData(VertexBuffer.PositionKind);
-      const colors    = [];
-      for (let i = 0; i < positions.length; i += 3) {
-        const ly      = positions[i + 1];
-        const lz      = positions[i + 2];
-        const worldY  = 1.5 - lz;                                       // 0 at floor → 5 at roof peak
-        const tRoof   = Math.max(0, Math.min(1, worldY / 5));          // 0 floor, 1 roof
-        const tDepth  = Math.max(0, Math.min(1, (ly + TUNNEL_LEN / 2) / TUNNEL_LEN)); // 0 mouth, 1 far
-        const shade   = (1.0 - 0.85 * tRoof) * (1.0 - 0.8 * tDepth);   // dark roof × recede
-        colors.push(shade, shade, shade, 1);
-      }
-      bore.setVerticesData(VertexBuffer.ColorKind, colors);
-      bore.useVertexColors = true;
-    }
 
     // Flat asphalt road inside the bore — the lit surface receding into shadow
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
     tunnelFloor.position = new Vector3(0, 0, tCenter);
     tunnelFloor.material = asphaltMat;
-
-    // Fade the road to black with depth so it recedes into the tunnel
-    {
-      const positions = tunnelFloor.getVerticesData(VertexBuffer.PositionKind);
-      const colors    = [];
-      for (let i = 0; i < positions.length; i += 3) {
-        const lz     = positions[i + 2];                              // box local z = depth
-        const tDepth = Math.max(0, Math.min(1, (lz + TUNNEL_LEN / 2) / TUNNEL_LEN));
-        const shade  = 1.0 - 0.85 * tDepth;                           // mouth lit → far black
-        colors.push(shade, shade, shade, 1);
-      }
-      tunnelFloor.setVerticesData(VertexBuffer.ColorKind, colors);
-      tunnelFloor.useVertexColors = true;
-    }
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
     this._tunnelMeshes = [bore, tunnelFloor];
