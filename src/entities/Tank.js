@@ -16,7 +16,7 @@ export default class Tank {
     this.rotY             = 0; // start facing north (+Z, away from camera)
     this.acceleration     = 6;
     this.maxSpeed         = 8;
-    this.drag             = 4;
+    this.drag             = 20;   // units/s² — high so tank stops fast when gas released (not slidey)
     this.rotateSpeed      = 2.1;    // rad/s
     this.maxFuel          = 100;
     this.fuel             = 100;

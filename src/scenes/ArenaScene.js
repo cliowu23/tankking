@@ -6,8 +6,6 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
-import LevelEditor from '../editor/LevelEditor.js';
-import { loadLayout } from '../editor/SceneSerializer.js';
 import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
@@ -64,8 +62,6 @@ export default class ArenaScene {
     this._setupHazards();
     this._setupEntities();
     // this._setupDevLabels();
-    this._initEditor();
-    this._loadLayout();
     this._setupLockOn();
     this._setupFiring();
     this._setupVFX();
@@ -575,35 +571,6 @@ export default class ArenaScene {
     }
     this.lockedEnemy   = next;
     this._lockSnapTime = 0; // kick off snap animation
-  }
-
-  _initEditor() {
-    const canvas = document.getElementById('renderCanvas');
-    this.levelEditor = new LevelEditor(
-      this.scene, this.terrainMesh, this.shadowGen, this._obstacles,
-      {
-        onActivate: () => {
-          this._paused = true;
-          this.camera.target.set(0, 0, 0);
-          this.camera.detachControl();
-        },
-        onDeactivate: () => {
-          this._paused = false;
-          this.camera.attachControl(canvas, true);
-        },
-      },
-    );
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code !== 'KeyE') return;
-      if (window.__state !== 'GAME') return;
-      this.levelEditor.toggle();
-    });
-  }
-
-  _loadLayout() {
-    const data = loadLayout();
-    if (data) this.levelEditor.applyLayout(data);
   }
 
   _checkObstacleCollisions() {
