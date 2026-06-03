@@ -11,19 +11,14 @@
     "depressionDeg": 5,
     "paintColor":    [0.92, 0.12, 0.08],
     "paintColorAlt": [0.95, 0.42, 0.04],
-    "tintColor":     [0.28, 0.26, 0.24]
-  },
-  "sherman_jumbo.glb": {
-    "root": "Sketchfab_model",
-    "turret": "turret",
-    "mount": "mount",
-    "facingAxis": "+Z",
-    "targetWidth": 2.4,
-    "barrelTipOffset": 2.68,
-    "centerTurretX": true,
-    "elevationDeg": 25,
-    "depressionDeg": 10,
-    "paintColor": [0.22, 0.35, 0.12]
+    "tintColor":     [0.28, 0.26, 0.24],
+    "barrelMeshNames": ["weapon_t55-gun_5_0", "tube_t-72m1-k5extra_6_0"],
+    "barrelPivotX": 0.08,
+    "nativeCannon": "cannon-100mm",
+    "cannonOffsets": {
+      "cannon-90mm":  { "x": -0.06, "z": -0.55 },
+      "cannon-100mm": { "z": -0.3  }
+    }
   },
   "m26_pershing_war_thunder.glb": {
     "root": "Sketchfab_model",
@@ -39,6 +34,12 @@
     "depressionDeg": 10,
     "paintColor": [0.12, 0.42, 0.88],
     "tintColor":  [0.28, 0.26, 0.24],
+    "barrelMeshNames": ["Object_22"],
+    "nativeCannon": "cannon-90mm",
+    "cannonOffsets": {
+      "cannon-90mm":  { "z": -0.8           },
+      "cannon-100mm": { "z": -0.35, "scale": 1.22 }
+    },
     "paintSkipMeshes": [
       "Object_4",  "Object_6",
       "Object_11", "Object_14", "Object_15", "Object_16",
