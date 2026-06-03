@@ -134,9 +134,14 @@ export default class HangarScene {
       ribs.push(rib);
     }
 
-    // Flat asphalt road inside the bore — the lit surface receding into shadow
-    const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
-    tunnelFloor.position = new Vector3(0, 0, tCenter);
+    // Flat asphalt road inside the bore — the lit surface receding into shadow.
+    // Extends south to overlap the room floor so there's no gap at the threshold.
+    const floorStart  = ROOM_D / 2 - 0.3;          // 0.3u into the room
+    const floorEnd    = tFront + TUNNEL_LEN;
+    const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', {
+      width: TUNNEL_W, height: 0.1, depth: floorEnd - floorStart,
+    }, s);
+    tunnelFloor.position = new Vector3(0, 0, (floorStart + floorEnd) / 2);
     tunnelFloor.material = asphaltMat;
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
