@@ -6,6 +6,8 @@ import { StandardMaterial, Color3 } from '@babylonjs/core';
 const UNPAINTABLE = [
   'track', 'tread',
   'wheel', 'road_wheel', 'sprocket', 'idler', 'roller', 'bogie', 'suspension',
+  'tire',                    // rubber tires (t55-wheels naming)
+  'vehicle-gear',            // running gear sprockets (ussr-vehicle-gear naming)
   'lens', 'glass', 'optic', 'periscope', 'sight', 'vision',
   'interior', 'crew', 'engine',
   'rubber', 'seal',

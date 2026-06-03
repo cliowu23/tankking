@@ -306,7 +306,10 @@ export default class TankDesignerScene {
         // COMPOSED tanks — built from swappable hull + turret + cannon parts
         const composedEntries = [
           ['M26 (COMPOSED)',  { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm'  }],
-          // T-55 composed entries re-enabled once T-55 parts are re-exported (WIP)
+          ['T-55 (COMPOSED)', { hull: 'hull-t55', turret: 'turret-t55', cannon: 'cannon-100mm' }],
+          // Cross-tank mix entries are pending coordinate-system normalisation in the
+          // extraction pipeline (M26 old-pipeline vs T-55 new-pipeline use different Babylon
+          // height axes).  Re-enable after extract-parts.py adds +90°X normalisation step.
         ];
         for (const [label, loadout] of composedEntries) {
           const cb = document.createElement('button');
