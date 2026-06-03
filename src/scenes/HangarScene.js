@@ -115,6 +115,24 @@ export default class HangarScene {
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
 
+    // Support ribs — darker arched bands at intervals that protrude inward from
+    // the bore, giving the smooth tube real structural definition (an outline
+    // separating each section of wall/roof) like a reinforced mine tunnel.
+    const ribMat = new StandardMaterial('tunnel-rib', s);
+    ribMat.diffuseColor  = new Color3(0.55, 0.53, 0.48); // lighter than the bore so ribs read as bands
+    ribMat.specularColor = new Color3(0, 0, 0);
+
+    const ribs = [];
+    const RIB_ZS = [tFront + 0.6, tFront + 4, tFront + 8, tFront + 12];
+    for (let i = 0; i < RIB_ZS.length; i++) {
+      const rib = MeshBuilder.CreateTorus(`tunnel-rib-${i}`, {
+        diameter: 6.6, thickness: 0.45, tessellation: 40,
+      }, s);
+      rib.rotation.x = Math.PI / 2;                  // stand the ring up across the tunnel
+      rib.position   = new Vector3(0, 1.5, RIB_ZS[i]);
+      rib.material   = ribMat;
+      ribs.push(rib);
+    }
 
     // Flat asphalt road inside the bore — the lit surface receding into shadow
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
@@ -122,7 +140,7 @@ export default class HangarScene {
     tunnelFloor.material = asphaltMat;
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
-    this._tunnelMeshes = [bore, tunnelFloor];
+    this._tunnelMeshes = [bore, tunnelFloor, ...ribs];
 
     // Invisible wall at tunnel entrance — blocks driver from walking in
     const tunnelGate = MeshBuilder.CreateBox('tunnel-gate', {
@@ -164,12 +182,12 @@ export default class HangarScene {
 
     // Mouth light — sits just inside the tunnel entrance and falls off with
     // distance, so the near corridor glows warm and recedes into darkness.
-    // Low to the ground so light pools on the road and lower walls; the high
-    // arch roof stays in shadow (reinforced by the bore's roof vertex shading).
-    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 0.8, ROOM_D / 2 + 2.5), this.scene);
+    // Central so the curved bore and the ribs shade evenly across the arch
+    // rather than pooling a hotspot on the floor.
+    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.4, ROOM_D / 2 + 3), this.scene);
     mouth.diffuse            = new Color3(1.0, 0.94, 0.82); // warm, matches room bulbs
-    mouth.intensity          = 1.5;
-    mouth.range              = 16;
+    mouth.intensity          = 1.3;
+    mouth.range              = 18;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
   }
 
