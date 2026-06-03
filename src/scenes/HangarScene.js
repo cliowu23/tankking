@@ -53,9 +53,11 @@ export default class HangarScene {
     tunnelMat.specularColor   = new Color3(0, 0, 0);
     tunnelMat.backFaceCulling = false;
 
-    // Tunnel road — dark asphalt, contrasts against the grey arched bore
+    // Tunnel road — asphalt, the lit surface that recedes into the tunnel.
+    // Kept fairly dark but light enough to read when the low mouth light pools
+    // on it. The roof/ceiling above stays in shadow (see bore vertex colours).
     const asphaltMat = new StandardMaterial('tunnel-asphalt', s);
-    asphaltMat.diffuseColor  = new Color3(0.06, 0.06, 0.07);
+    asphaltMat.diffuseColor  = new Color3(0.16, 0.15, 0.14);
     asphaltMat.specularColor = new Color3(0, 0, 0);
 
     // Floor
@@ -113,27 +115,44 @@ export default class HangarScene {
     bore.position   = new Vector3(0, 1.5, tCenter);
     bore.material   = tunnelMat;
 
-    // Fade the bore to dark with DEPTH via vertex colours so the whole tunnel
-    // (roof, walls, all of it) reads as receding into blackness — lit at the
-    // mouth, black deep in. Local Y is the cylinder's length axis; after the X
-    // rotation local +Y maps to world +Z (far end), so local Y is depth.
+    // Shade the bore via vertex colours for a "lit road into shadow" read:
+    //   • ROOF in shadow — the higher up the arch, the darker (ceiling is dark)
+    //   • recedes with DEPTH — lit at the mouth, black deep in
+    // Local Y is the length axis (→ world Z depth); world height = 1.5 - localZ.
     {
       const positions = bore.getVerticesData(VertexBuffer.PositionKind);
       const colors    = [];
       for (let i = 0; i < positions.length; i += 3) {
-        const ly    = positions[i + 1];                              // local y = depth
-        const t     = Math.max(0, Math.min(1, (ly + TUNNEL_LEN / 2) / TUNNEL_LEN)); // 0 mouth → 1 far
-        const shade = 1.0 - 0.9 * t;                                 // mouth full bright → far ~10%
+        const ly      = positions[i + 1];
+        const lz      = positions[i + 2];
+        const worldY  = 1.5 - lz;                                       // 0 at floor → 5 at roof peak
+        const tRoof   = Math.max(0, Math.min(1, worldY / 5));          // 0 floor, 1 roof
+        const tDepth  = Math.max(0, Math.min(1, (ly + TUNNEL_LEN / 2) / TUNNEL_LEN)); // 0 mouth, 1 far
+        const shade   = (1.0 - 0.85 * tRoof) * (1.0 - 0.8 * tDepth);   // dark roof × recede
         colors.push(shade, shade, shade, 1);
       }
       bore.setVerticesData(VertexBuffer.ColorKind, colors);
       bore.useVertexColors = true;
     }
 
-    // Flat asphalt road inside the bore — dark, for contrast against the arch
+    // Flat asphalt road inside the bore — the lit surface receding into shadow
     const tunnelFloor = MeshBuilder.CreateBox('tunnel-floor', { width: TUNNEL_W, height: 0.1, depth: TUNNEL_LEN }, s);
     tunnelFloor.position = new Vector3(0, 0, tCenter);
     tunnelFloor.material = asphaltMat;
+
+    // Fade the road to black with depth so it recedes into the tunnel
+    {
+      const positions = tunnelFloor.getVerticesData(VertexBuffer.PositionKind);
+      const colors    = [];
+      for (let i = 0; i < positions.length; i += 3) {
+        const lz     = positions[i + 2];                              // box local z = depth
+        const tDepth = Math.max(0, Math.min(1, (lz + TUNNEL_LEN / 2) / TUNNEL_LEN));
+        const shade  = 1.0 - 0.85 * tDepth;                           // mouth lit → far black
+        colors.push(shade, shade, shade, 1);
+      }
+      tunnelFloor.setVerticesData(VertexBuffer.ColorKind, colors);
+      tunnelFloor.useVertexColors = true;
+    }
 
     // Tunnel meshes are lit only by the dedicated mouth light (see _buildLighting)
     this._tunnelMeshes = [bore, tunnelFloor];
@@ -178,9 +197,11 @@ export default class HangarScene {
 
     // Mouth light — sits just inside the tunnel entrance and falls off with
     // distance, so the near corridor glows warm and recedes into darkness.
-    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.5, ROOM_D / 2 + 2.5), this.scene);
+    // Low to the ground so light pools on the road and lower walls; the high
+    // arch roof stays in shadow (reinforced by the bore's roof vertex shading).
+    const mouth = new PointLight('tunnel-mouth', new Vector3(0, 0.8, ROOM_D / 2 + 2.5), this.scene);
     mouth.diffuse            = new Color3(1.0, 0.94, 0.82); // warm, matches room bulbs
-    mouth.intensity          = 1.4;
+    mouth.intensity          = 1.5;
     mouth.range              = 16;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
   }
