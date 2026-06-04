@@ -137,7 +137,10 @@ sketchfab_root.matrix_parent_inverse = part_root.matrix_world.inverted()  # iden
 # +90°X cancels the -90°X net rotation in the Sketchfab hierarchy.
 # After this: original model Y-axis (height) → Blender Z → Babylon Y. Same as M26.
 # Game scale baked here so JS build() can use getAbsolutePosition() directly (no manual scaling).
-part_root.rotation_euler = (math.pi / 2, 0, 0)
+part_root.rotation_euler = (math.pi / 2, 0, math.pi / 2)
+# +90°X fixes the height axis: Babylon Y = height (same convention as M26).
+# +90°Z (in the post-X frame) rotates the T-55 from facing Babylon +X to facing Babylon +Z,
+# matching the M26's facing direction so cross-mix parts assemble correctly.
 part_root.scale = (args.scale, args.scale, args.scale)
 
 # Force Blender to recompute all matrix_world values in the scene.
@@ -154,21 +157,23 @@ for obj in remaining_meshes:
     for corner in obj.bound_box:
         pts.append(obj.matrix_world @ Vector(corner))
 
-if args.part == "hull":
-    if pts:
-        cx    = (min(p.x for p in pts) + max(p.x for p in pts)) / 2
-        cy    = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
-        min_z = min(p.z for p in pts)  # Blender Z = Babylon Y = height; min = hull bottom
-        center = Vector((cx, cy, min_z))
-    else:
-        center = Vector((0.0, 0.0, 0.0))
-        min_z = 0.0
-    print(f"[extract-parts] hull ground-center: z_min={min_z:.3f} → hull bottom will be Babylon Y=0")
+if pts:
+    cx    = (min(p.x for p in pts) + max(p.x for p in pts)) / 2
+    cy    = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
+    min_z = min(p.z for p in pts)  # Blender Z = Babylon Y = height; min = part base
+    center = Vector((cx, cy, min_z))
+else:
+    center = Vector((0.0, 0.0, 0.0))
+    min_z = 0.0
 
+if args.part == "hull":
+    print(f"[extract-parts] hull ground-center: z_min={min_z:.3f} → hull bottom at Babylon Y=0")
 elif args.part == "turret":
-    # Turret ring in the rotated+scaled world — this is what assembleTank reads as turretPivot height
-    center = turret_empty.matrix_world.translation.copy()
-    print(f"[extract-parts] turret ring (rotated+scaled): {tuple(round(v,3) for v in center)}")
+    # Center at the BOTTOM of the turret geometry (same ground-center logic as hull).
+    # The `turret` empty in the source GLB is an interior rotation pivot, not the base —
+    # centering at it buries the dome inside the hull.  Base-centering puts the turret
+    # at Y=0, extending upward, so it sits on the hull ring correctly.
+    print(f"[extract-parts] turret base-center: z_min={min_z:.3f} → turret base at Babylon Y=0")
 
 # Shift entire hierarchy so centering target lands at world origin
 part_root.location = -center
