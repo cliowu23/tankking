@@ -333,6 +333,9 @@ export default class TankDesignerScene {
             hb.classList.add('active');
             this._activeHullBtn = hb;
             this._equippedHull  = hull.id;
+            // Adopt the equipped turret's natural gun so the cannon matches the turret.
+            const turret = PARTS_BY_ID[this._equippedTurret];
+            if (turret?.defaultCannon) this._equippedCannon = turret.defaultCannon;
             this._rebuildComposed();
           });
           sidebar.appendChild(hb);
@@ -1002,6 +1005,7 @@ export default class TankDesignerScene {
       item.appendChild(stats);
       item.addEventListener('click', () => {
         this._equippedTurret = part.id;
+        if (part.defaultCannon) this._equippedCannon = part.defaultCannon;
         this._rebuildComposed();
         this._hideTurretDropdown();
       });
