@@ -6,8 +6,8 @@ import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf } from './HangarProps.js';
 
-const ROOM_W   = 30;    // width (X)
-const ROOM_D   = 40;    // depth (Z), north = positive Z
+const ROOM_W   = 24;    // width (X)
+const ROOM_D   = 32;    // depth (Z), north = positive Z
 const ROOM_H   = 5;     // ceiling height
 const WALL_T   = 0.15;  // wall thickness
 const TUNNEL_W = 5;     // tunnel opening width, centered on north wall
@@ -208,10 +208,10 @@ export default class HangarScene {
 
     const propMats = makeMats(s);
     this._stationMeshes = [
-      { mesh: buildMapTable(s,   -12,  18, propMats), data: this._stationDefs.map      },
-      { mesh: buildRadioShelf(s,   9,  19.0, propMats), data: this._stationDefs.radio    },
-      { mesh: buildWorkbench(s,   -8,  -2, propMats), data: this._stationDefs.mechanic },
-      { mesh: buildQMCrates(s,  13.8,   0, propMats), data: this._stationDefs.qm       },
+      { mesh: buildMapTable(s,    -8,  14, propMats), data: this._stationDefs.map      },
+      { mesh: buildRadioShelf(s,    7,  15, propMats), data: this._stationDefs.radio    },
+      { mesh: buildWorkbench(s,  -11,  -2, propMats), data: this._stationDefs.mechanic },
+      { mesh: buildQMCrates(s,    11,   0, propMats), data: this._stationDefs.qm       },
     ];
 
     const tankMat = new StandardMaterial('tank-bay', s);
@@ -220,18 +220,18 @@ export default class HangarScene {
 
     // Tank bay placeholder — large enough to read as a real tank from above
     const hull = MeshBuilder.CreateBox('tank-hull', { width: 5, height: 1.8, depth: 8 }, s);
-    hull.position = new Vector3(0, 0.9, 15);
+    hull.position = new Vector3(0, 0.9, 10);
     hull.material = tankMat;
 
     const turret = MeshBuilder.CreateBox('tank-turret', { width: 3.2, height: 1.2, depth: 3.5 }, s);
-    turret.position = new Vector3(0, 2.4, 14.5);
+    turret.position = new Vector3(0, 2.4, 9.5);
     turret.material = tankMat;
 
     const barrel = MeshBuilder.CreateBox('tank-barrel', { width: 0.45, height: 0.45, depth: 4 }, s);
-    barrel.position = new Vector3(0, 2.4, 17.5);
+    barrel.position = new Vector3(0, 2.4, 12.5);
     barrel.material = tankMat;
 
-    this._tankPosition = new Vector3(0, 0, 15);
+    this._tankPosition = new Vector3(0, 0, 10);
   }
 
   _setupDriver() {
