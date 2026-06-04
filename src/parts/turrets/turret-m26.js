@@ -1,5 +1,6 @@
 import { TransformNode, SceneLoader } from '@babylonjs/core';
 import { applyModelPaint } from '../../utils/modelPaint.js';
+import { measureBase } from '../measureBase.js';
 
 // M26 Pershing turret shell — extracted from m26_pershing_war_thunder.glb
 // (turret body, mantlet, cupola; barrel removed). Centered on its ring, materials kept.
@@ -21,6 +22,7 @@ export default {
   category: 'turret',
   stats: { traverseSpeed: 72 },
   mountEmpty: 'mount',
+  defaultCannon: 'cannon-90mm',
 
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-m26.glb', scene);
@@ -30,8 +32,12 @@ export default {
     const root = new TransformNode('turret_m26_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
+    for (const m of meshes) m.computeWorldMatrix(true);
+
+    const base = measureBase(meshes);
+    console.log(`[turret-m26] base center=(${base.center.x.toFixed(2)},${base.center.y.toFixed(2)},${base.center.z.toFixed(2)}) diameter=${base.diameter.toFixed(2)}`);
 
     applyModelPaint(meshes, PAINT, scene);
-    return { root, meshes, mount };
+    return { root, meshes, mount, base };
   },
 };
