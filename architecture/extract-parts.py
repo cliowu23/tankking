@@ -158,22 +158,26 @@ for obj in remaining_meshes:
         pts.append(obj.matrix_world @ Vector(corner))
 
 if pts:
-    cx    = (min(p.x for p in pts) + max(p.x for p in pts)) / 2
-    cy    = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
     min_z = min(p.z for p in pts)  # Blender Z = Babylon Y = height; min = part base
-    center = Vector((cx, cy, min_z))
 else:
-    center = Vector((0.0, 0.0, 0.0))
     min_z = 0.0
 
+# The turret ring (turret_empty) is the single shared reference point.
+ring_world = turret_empty.matrix_world.translation.copy()
+
 if args.part == "hull":
-    print(f"[extract-parts] hull ground-center: z_min={min_z:.3f} → hull bottom at Babylon Y=0")
+    # Hull: ring-center in XY (ring at Babylon X=0, Z=0 — the tank's vertical axis),
+    # ground-center in Z (hull bottom at Babylon Y=0).  Gives a clean turretRing mount.
+    center = Vector((ring_world.x, ring_world.y, min_z))
+    print(f"[extract-parts] hull center: ring_xy=({ring_world.x:.3f},{ring_world.y:.3f})  z_min={min_z:.3f}")
 elif args.part == "turret":
-    # Center at the BOTTOM of the turret geometry (same ground-center logic as hull).
-    # The `turret` empty in the source GLB is an interior rotation pivot, not the base —
-    # centering at it buries the dome inside the hull.  Base-centering puts the turret
-    # at Y=0, extending upward, so it sits on the hull ring correctly.
-    print(f"[extract-parts] turret base-center: z_min={min_z:.3f} → turret base at Babylon Y=0")
+    # Turret: ring-center in ALL THREE axes so the ring sits at the GLB origin.
+    # assembleTank places the turret root AT the hull's ring, so the turret ring
+    # lands flush on the hull deck and the dome rises above it.  The barrel mount
+    # is NOT read from the (unreliable) `mount` empty — it's an explicit offset in
+    # turret-*.js, dialed in live in the designer.
+    center = ring_world.copy()
+    print(f"[extract-parts] turret center: full ring-center at {tuple(round(v,3) for v in center)}")
 
 # Shift entire hierarchy so centering target lands at world origin
 part_root.location = -center
