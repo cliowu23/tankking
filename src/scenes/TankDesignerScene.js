@@ -29,18 +29,28 @@ export default class TankDesignerScene {
     this._selectedFilename = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
 
     // Cannon parts state
-    this._equippedCannon          = 'cannon-90mm'; // last selected part ID
+    this._equippedCannon          = 'cannon-90mm';
     this._cannonRoot              = null;
-    this._cannonMeshes            = [];            // meshes belonging to the active part
-    this._glbBarrelMeshes         = [];            // original GLB barrel meshes (hidden when part active)
+    this._cannonMeshes            = [];
+    this._glbBarrelMeshes         = [];
     this._turretMat               = null;
-    this._activeModelConfig       = null;           // manifest config for the current model
-    this._glbBarrelCenterX        = 0;             // world X of the GLB barrel — cannon parts align to this
-    this._modelCannonZOffset      = 0;             // fallback (overridden per-cannon via _activeModelConfig)
+    this._activeModelConfig       = null;
+    this._glbBarrelCenterX        = 0;
+    this._modelCannonZOffset      = 0;
     this._cannonDropdown          = null;
     this._hideCannonDropdownTimer = null;
-    this._lastPointerX          = 0;
-    this._lastPointerY          = 0;
+
+    // Modular parts state
+    this._equippedHull            = 'hull-m26';
+    this._equippedTurret          = 'turret-m26';
+    this._isComposedMode          = false;
+    this._turretMeshesComposed    = [];
+    this._turretDropdown          = null;
+    this._hideTurretDropdownTimer = null;
+    this._activeHullBtn           = null;
+
+    this._lastPointerX = 0;
+    this._lastPointerY = 0;
 
     // Track pointer position for dropdown placement
     this._onPointerMove = (e) => { this._lastPointerX = e.clientX; this._lastPointerY = e.clientY; };
@@ -52,6 +62,7 @@ export default class TankDesignerScene {
     this._setupControls();
     this._setupUI();
     this._setupCannonDropdown();
+    this._setupTurretDropdown();
     this._populateSidebar();
   }
 
@@ -303,23 +314,28 @@ export default class TankDesignerScene {
         });
         sidebar.appendChild(primBtn);
 
-        // COMPOSED tanks — built from swappable hull + turret + cannon parts
-        const composedEntries = [
-          ['M26 (COMPOSED)',  { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm'  }],
-          ['T-55 (COMPOSED)', { hull: 'hull-t55', turret: 'turret-t55', cannon: 'cannon-100mm' }],
-          ['M26 hull / T-55 turret', { hull: 'hull-m26', turret: 'turret-t55', cannon: 'cannon-100mm' }],
-          ['T-55 hull / M26 turret', { hull: 'hull-t55', turret: 'turret-m26', cannon: 'cannon-90mm'  }],
-        ];
-        for (const [label, loadout] of composedEntries) {
-          const cb = document.createElement('button');
-          cb.className = 'shape-btn';
-          cb.textContent = label;
-          cb.addEventListener('click', () => {
-            this._loadComposed(cb, loadout);
-            this._previewFilename = 'composed';
-            this._resetHint();
+        // HULL selector — click a hull to rebuild the composed tank
+        const hullTitleEl = document.createElement('div');
+        hullTitleEl.className = 'ds-title';
+        hullTitleEl.textContent = 'HULL';
+        sidebar.appendChild(hullTitleEl);
+
+        for (const hull of PARTS.hulls) {
+          const hb = document.createElement('button');
+          hb.className = 'shape-btn';
+          hb.textContent = hull.name.toUpperCase();
+          if (hull.id === this._equippedHull) {
+            hb.classList.add('active');
+            this._activeHullBtn = hb;
+          }
+          hb.addEventListener('click', () => {
+            if (this._activeHullBtn) this._activeHullBtn.classList.remove('active');
+            hb.classList.add('active');
+            this._activeHullBtn = hb;
+            this._equippedHull  = hull.id;
+            this._rebuildComposed();
           });
-          sidebar.appendChild(cb);
+          sidebar.appendChild(hb);
         }
 
         const div2 = document.createElement('div');
@@ -358,12 +374,8 @@ export default class TankDesignerScene {
         } else if (autoBtn) {
           this._loadModel(this._selectedFilename, autoConfig, autoBtn, autoBtn.textContent);
         } else {
-          const firstEntry = Object.entries(manifest)[0];
-          if (firstEntry) {
-            const [fn, cfg] = firstEntry;
-            const firstBtn = sidebar.querySelectorAll('.shape-btn')[2]; // skip primBtn + divider
-            this._loadModel(fn, cfg, firstBtn, firstBtn?.textContent ?? fn);
-          }
+          // Default: load the modular composed tank
+          this._rebuildComposed();
         }
       });
   }
@@ -468,11 +480,22 @@ export default class TankDesignerScene {
     this.camera.beta   = 0.72;
   }
 
+  _rebuildComposed() {
+    this._isComposedMode   = true;
+    this._previewFilename  = 'composed';
+    this._resetHint();
+    this._loadComposed(null, {
+      hull:   this._equippedHull,
+      turret: this._equippedTurret,
+      cannon: this._equippedCannon || 'cannon-90mm',
+    });
+  }
+
   // Composed tank — built from swappable hull + turret + cannon parts via assembleTank.
-  // Proves the mount-point/composition architecture; supports cross-mixing parts.
   _loadComposed(btn, loadout = { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' }) {
     if (this._activeBtn) this._activeBtn.classList.remove('active');
     if (btn) { btn.classList.add('active'); this._activeBtn = btn; }
+    this._isComposedMode = true;
 
     this._clearCurrentModel();
 
@@ -485,12 +508,15 @@ export default class TankDesignerScene {
 
     assembleTank(this.scene, loadout, { cannon: cannonMat })
       .then(tank => {
-        // assembleTank grounds the tank (root.position.y = -minY); keep that, add pad offset
         tank.root.position.x = 0;
         tank.root.position.z = 0;
         tank.root.position.y += PAD_Y + 0.01;
         this._turretPivot = tank.turretPivot;
         this._barrelPivot = tank.barrelPivot;
+
+        // Expose meshes for hover dropdowns
+        this._turretMeshesComposed = tank.parts.turretBuilt.meshes;
+        this._cannonMeshes         = tank.parts.cannonBuilt.meshes;
 
         // Track everything for disposal + shadows
         const allMeshes = [
@@ -522,9 +548,17 @@ export default class TankDesignerScene {
   }
 
   _clearCurrentModel() {
+    // Gather every material on the things we're about to dispose. Babylon's
+    // mesh.dispose() leaves materials + their textures resident in GPU memory,
+    // so on repeated model switches the GPU steadily leaks multi-MB GLB textures
+    // until the renderer OOMs. We free them explicitly below.
+    const mats = new Set();
+    const collectMat = (m) => { if (m && m.material) mats.add(m.material); };
+
     // Cannon part is tracked separately — dispose before main model
     if (this._cannonRoot) {
       for (const m of this._cannonMeshes) {
+        collectMat(m);
         if (!m.isDisposed()) m.dispose();
       }
       this._cannonRoot.dispose();
@@ -536,14 +570,23 @@ export default class TankDesignerScene {
       if (!m.isDisposed()) m.setEnabled(true);
     }
     for (const item of this._toDispose) {
-      if (item) item.dispose();
+      collectMat(item);
     }
-    this._toDispose        = [];
-    this._turretPivot      = null;
-    this._barrelPivot      = null;
-    this._turretMat        = null;
-    this._glbBarrelMeshes  = [];
-    this._glbBarrelCenterX = 0;
+    for (const item of this._toDispose) {
+      if (item && !(item.isDisposed && item.isDisposed())) item.dispose();
+    }
+    // Free materials and their textures (forceDisposeTextures = true)
+    for (const mat of mats) {
+      if (mat && !(mat.isDisposed && mat.isDisposed())) mat.dispose(false, true);
+    }
+    this._toDispose              = [];
+    this._turretPivot            = null;
+    this._barrelPivot            = null;
+    this._turretMat              = null;
+    this._glbBarrelMeshes        = [];
+    this._glbBarrelCenterX       = 0;
+    this._turretMeshesComposed   = [];
+    this._cannonMeshes           = [];
   }
 
   _loadModel(filename, config, btn, label) {
@@ -551,6 +594,7 @@ export default class TankDesignerScene {
     btn.classList.add('active');
     this._activeBtn       = btn;
     this._previewFilename = filename;
+    this._isComposedMode  = false;
     this._resetHint();
 
     this._clearCurrentModel();
@@ -799,6 +843,11 @@ export default class TankDesignerScene {
 
   async _swapCannon(partId) {
     if (partId === this._equippedCannon) return;
+    if (this._isComposedMode) {
+      this._equippedCannon = partId;
+      this._rebuildComposed();
+      return;
+    }
     const isNative = partId === this._activeModelConfig?.nativeCannon;
     if (isNative) {
       // Native cannon = the original GLB barrel; just restore it and re-label
@@ -921,6 +970,90 @@ export default class TankDesignerScene {
     if (this._cannonDropdown) this._cannonDropdown.style.display = 'none';
   }
 
+  // ── Turret hover-dropdown (composed mode only) ────────────────────────────
+
+  _setupTurretDropdown() {
+    const dd = document.createElement('div');
+    dd.className   = 'cannon-dropdown'; // reuse same CSS
+    dd.style.display = 'none';
+
+    const title = document.createElement('div');
+    title.className   = 'cannon-dropdown-title';
+    title.textContent = 'TURRET';
+    dd.appendChild(title);
+
+    for (const part of PARTS.turrets) {
+      const item = document.createElement('div');
+      item.className      = 'cannon-dropdown-item';
+      item.dataset.partId = part.id;
+      if (part.id === this._equippedTurret) item.classList.add('active');
+
+      const name = document.createElement('span');
+      name.className   = 'cannon-dd-name';
+      name.textContent = part.name;
+
+      const stats = document.createElement('span');
+      stats.className   = 'cannon-dd-stats';
+      stats.textContent = part.stats?.traverseSpeed
+        ? `traverse ${part.stats.traverseSpeed}°/s`
+        : 'standard turret';
+
+      item.appendChild(name);
+      item.appendChild(stats);
+      item.addEventListener('click', () => {
+        this._equippedTurret = part.id;
+        this._rebuildComposed();
+        this._hideTurretDropdown();
+      });
+      dd.appendChild(item);
+    }
+
+    dd.addEventListener('mouseenter', () => clearTimeout(this._hideTurretDropdownTimer));
+    dd.addEventListener('mouseleave', () => {
+      this._hideTurretDropdownTimer = setTimeout(() => this._hideTurretDropdown(), 120);
+    });
+
+    this._turretDropdown = dd;
+    document.body.appendChild(dd);
+
+    let _wasOver = false;
+    this.scene.registerBeforeRender(() => {
+      if (!this._isComposedMode || this._turretMeshesComposed.length === 0) return;
+      const hit  = this.scene.pick(this.scene.pointerX, this.scene.pointerY)?.pickedMesh;
+      const over = this._turretMeshesComposed.includes(hit);
+      if (over && !_wasOver) {
+        clearTimeout(this._hideTurretDropdownTimer);
+        this._showTurretDropdown(this._lastPointerX ?? 0, this._lastPointerY ?? 0);
+      } else if (!over && _wasOver) {
+        clearTimeout(this._hideTurretDropdownTimer);
+        this._hideTurretDropdownTimer = setTimeout(() => this._hideTurretDropdown(), 320);
+      }
+      _wasOver = over;
+    });
+  }
+
+  _showTurretDropdown(x, y) {
+    const dd = this._turretDropdown;
+    if (!dd) return;
+    dd.querySelectorAll('.cannon-dropdown-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.partId === this._equippedTurret);
+    });
+    dd.style.display = 'block';
+    const margin = 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = x + 18;
+    let top  = y - 10;
+    if (left + 210 > vw - margin) left = x - 210;
+    if (top  + 120 > vh - margin) top  = vh - 120 - margin;
+    dd.style.left = left + 'px';
+    dd.style.top  = top  + 'px';
+  }
+
+  _hideTurretDropdown() {
+    if (this._turretDropdown) this._turretDropdown.style.display = 'none';
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
   dispose() {
@@ -928,6 +1061,7 @@ export default class TankDesignerScene {
     window.removeEventListener('keyup',       this._onKeyUp);
     window.removeEventListener('pointermove', this._onPointerMove);
     if (this._cannonDropdown) { this._cannonDropdown.remove(); this._cannonDropdown = null; }
+    if (this._turretDropdown) { this._turretDropdown.remove(); this._turretDropdown = null; }
     this.scene.dispose();
   }
 }
