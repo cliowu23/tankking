@@ -307,9 +307,8 @@ export default class TankDesignerScene {
         const composedEntries = [
           ['M26 (COMPOSED)',  { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm'  }],
           ['T-55 (COMPOSED)', { hull: 'hull-t55', turret: 'turret-t55', cannon: 'cannon-100mm' }],
-          // Cross-tank mix entries are pending coordinate-system normalisation in the
-          // extraction pipeline (M26 old-pipeline vs T-55 new-pipeline use different Babylon
-          // height axes).  Re-enable after extract-parts.py adds +90°X normalisation step.
+          ['M26 hull / T-55 turret', { hull: 'hull-m26', turret: 'turret-t55', cannon: 'cannon-100mm' }],
+          ['T-55 hull / M26 turret', { hull: 'hull-t55', turret: 'turret-m26', cannon: 'cannon-90mm'  }],
         ];
         for (const [label, loadout] of composedEntries) {
           const cb = document.createElement('button');
