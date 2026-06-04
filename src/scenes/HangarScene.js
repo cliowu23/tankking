@@ -9,7 +9,7 @@ import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf
 const ROOM_W   = 30;    // width (X)
 const ROOM_D   = 40;    // depth (Z), north = positive Z
 const ROOM_H   = 5;     // ceiling height
-const WALL_T   = 0.5;   // wall thickness
+const WALL_T   = 0.15;  // wall thickness
 const TUNNEL_W = 5;     // tunnel opening width, centered on north wall
 const TUNNEL_LEN = 24;  // extended so fog fade reaches full black naturally
 
@@ -208,29 +208,30 @@ export default class HangarScene {
 
     const propMats = makeMats(s);
     this._stationMeshes = [
-      { mesh: buildMapTable(s,   -11,  17.5, propMats), data: this._stationDefs.map      },
-      { mesh: buildRadioShelf(s,  11,  17.5, propMats), data: this._stationDefs.radio    },
-      { mesh: buildWorkbench(s,  -14,  0,    propMats), data: this._stationDefs.mechanic },
-      { mesh: buildQMCrates(s,    14,  0,    propMats), data: this._stationDefs.qm       },
+      { mesh: buildMapTable(s,   -12,  18, propMats), data: this._stationDefs.map      },
+      { mesh: buildRadioShelf(s,   9,  19.0, propMats), data: this._stationDefs.radio    },
+      { mesh: buildWorkbench(s,   -8,  -2, propMats), data: this._stationDefs.mechanic },
+      { mesh: buildQMCrates(s,  13.8,   0, propMats), data: this._stationDefs.qm       },
     ];
 
     const tankMat = new StandardMaterial('tank-bay', s);
     tankMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
     tankMat.specularColor = new Color3(0.1,  0.1,  0.1);
 
-    const hull = MeshBuilder.CreateBox('tank-hull', { width: 3, height: 1.2, depth: 5 }, s);
-    hull.position = new Vector3(0, 0.6, 16);
+    // Tank bay placeholder — large enough to read as a real tank from above
+    const hull = MeshBuilder.CreateBox('tank-hull', { width: 5, height: 1.8, depth: 8 }, s);
+    hull.position = new Vector3(0, 0.9, 15);
     hull.material = tankMat;
 
-    const turret = MeshBuilder.CreateBox('tank-turret', { width: 2, height: 0.8, depth: 2.2 }, s);
-    turret.position = new Vector3(0, 1.6, 16);
+    const turret = MeshBuilder.CreateBox('tank-turret', { width: 3.2, height: 1.2, depth: 3.5 }, s);
+    turret.position = new Vector3(0, 2.4, 14.5);
     turret.material = tankMat;
 
-    const barrel = MeshBuilder.CreateBox('tank-barrel', { width: 0.25, height: 0.25, depth: 3 }, s);
-    barrel.position = new Vector3(0, 1.65, 18.2);
+    const barrel = MeshBuilder.CreateBox('tank-barrel', { width: 0.45, height: 0.45, depth: 4 }, s);
+    barrel.position = new Vector3(0, 2.4, 17.5);
     barrel.material = tankMat;
 
-    this._tankPosition = new Vector3(0, 0, 16);
+    this._tankPosition = new Vector3(0, 0, 15);
   }
 
   _setupDriver() {
@@ -253,11 +254,11 @@ export default class HangarScene {
       if (!this._panelOpen) {
         this.driver.update(dt);
         this._checkProximity(prompt, promptLabel);
-        // Keep camera locked onto driver, offset slightly north to centre the room view
+        // Keep camera locked onto driver, offset north to frame the room well
         this.driver.camera.target.set(
           this.driver.mesh.position.x,
           this.driver.mesh.position.y,
-          this.driver.mesh.position.z + 5
+          this.driver.mesh.position.z + 8
         );
       }
     });
