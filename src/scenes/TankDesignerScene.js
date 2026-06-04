@@ -502,11 +502,12 @@ export default class TankDesignerScene {
 
     this._clearCurrentModel();
 
-    // Hull + turret self-paint (textures tinted via applyModelPaint). Barrel = flat body color.
+    // Hull + turret self-paint. Barrel = neutral dark gunmetal so the gun reads as a gun
+    // on any tank color (it's a "non-hull/turret part", so it darkens rather than paints).
     const cannonMat = new StandardMaterial('compCannon', this.scene);
-    cannonMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
-    cannonMat.specularColor = new Color3(0.05, 0.06, 0.07);
-    cannonMat.specularPower = 8;
+    cannonMat.diffuseColor  = new Color3(0.22, 0.22, 0.24);
+    cannonMat.specularColor = new Color3(0.10, 0.10, 0.12);
+    cannonMat.specularPower = 16;
     this._toDispose.push(cannonMat);
 
     assembleTank(this.scene, loadout, { cannon: cannonMat })
