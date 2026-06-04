@@ -2,17 +2,20 @@ import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 import { applyModelPaint } from '../../utils/modelPaint.js';
 import { measureBase } from '../measureBase.js';
 
-// T-44-100 turret — extracted by explicit mesh list (no rig empties). Gun removed (it's a
-// swappable cannon — defaultCannon below). Standard orientation, no rotation: the mantlet
-// faces Babylon +Z (game-forward). Scale 0.92.
+// T-44-100 turret — extracted by mesh list (no rig empties) via architecture/extract-t44.py.
+// The source fused the mantlet + barrel into one mesh (Object_11); the extraction BISECTS it,
+// keeping the mantlet (+breech) with the turret and dropping the barrel tube — the barrel is
+// the swappable cannon (defaultCannon below) which seats in the mantlet hole. Normals are
+// recalculated outward in extraction so the dome/mantlet don't render see-through. Scale 0.92.
 
-// Barrel pivot in the turret's local frame — gun exit at the mantlet front. Dial in designer.
-const BARREL_MOUNT = new Vector3(0, 0.45, 1.0);
+// Barrel pivot in the turret's local frame — the gun exits the mantlet hole. y = gun-axis
+// height above the turret base; z = mantlet front. Dialed live in the designer.
+const BARREL_MOUNT = new Vector3(0, 0.6, 1.0);
 
 const PAINT = {
   paintColor: [0.92, 0.12, 0.08],   // red body
   tintColor:  [0.28, 0.26, 0.24],
-  paintSkipMeshes: [],              // turret is all body; add darken-targets if any appear
+  paintSkipMeshes: [],              // turret + mantlet are all body
 };
 
 export default {
@@ -21,6 +24,7 @@ export default {
   category: 'turret',
   stats: { traverseSpeed: 65 },
   defaultCannon: 'cannon-100mm',
+  paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-t44.glb', scene);

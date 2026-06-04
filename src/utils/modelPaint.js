@@ -52,6 +52,9 @@ export function applyModelPaint(meshes, config, scene, colorOverride = null) {
     mat.diffuseColor  = new Color3(r, g, b);
     mat.specularColor = new Color3(0.05, 0.06, 0.07);
     mat.specularPower = 8;
+    // Render both faces — web-optimized GLBs (e.g. the T-44) have thin single-sided
+    // plates and the odd inward-facing mesh that otherwise vanish under backface culling.
+    mat.backFaceCulling = false;
   }
 
   const tintColor  = config.tintColor ?? null;
