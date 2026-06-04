@@ -114,17 +114,40 @@ centering/seating correctness.
 - `src/scenes/TankDesignerScene.js` — on turret swap, default the cannon to the turret's
   `defaultCannon` before `_rebuildComposed()`.
 
-## Testing / verification
+## Composition self-check (`validateComposition`)
 
-Drive the designer headlessly (Playwright) and screenshot all four combinations after the
-change. For each, confirm by eye:
+`assembleTank` runs a self-check after building, in dev mode, that asserts the geometric
+invariants and `console.warn`s (with the loadout) on any violation. This is the automatic
+"is the turret oriented right and does it fit" gate — it catches a 180°-wrong, floating,
+off-center, or mis-scaled turret without a human looking, so dropping in a **new** turret GLB
+is self-policing. Checks (each with a small tolerance):
+
+1. **Orientation — gun points forward.** `turret.mount.z > 0` in the turret's post-yaw frame
+   (the barrel mount / mantlet is on the +Z side of the turret base center). A turret yawed
+   the wrong way puts the mount behind center and fails this. Also assert the assembled barrel
+   tip has greater world Z than the turret pivot (gun extends game-forward).
+2. **Centered.** Turret base-center world X/Z ≈ hull ringCenter X/Z (|Δ| < ~0.05 u).
+3. **Seated, not floating/sunk.** Turret base-plane world Y ≈ hull deck Y (|Δ| < ~0.05 u).
+4. **Fits.** `turret.base.diameter × scale` ≈ ringDiameter (by construction; asserts the scale
+   math and guards bad data).
+5. **Sane scale.** `0.3 < scale < 3.0`; outside that range warn (likely a bad base measurement
+   or wrong-units GLB) and clamp/fall back to `scale = 1`.
+
+These are cheap (a few vector comparisons) and run only in dev; they don't gate production.
+
+## Visual verification
+
+Programmatic checks confirm the numbers; the eye confirms it *looks* right. Drive the designer
+headlessly (Playwright) and screenshot all four combinations, confirming for each:
 - Turret centered over the hull (no left/right or front/back drift).
 - Turret seated on the deck (no gap, not sunk).
 - Turret sized sensibly for the hull (base fills the ring; not oversized/undersized).
 - Barrel emerges from the mantlet, pointing game-forward (+Z), matching the hull facing.
 - All four: M26+M26, T-55+T-55, M26 hull + T-55 turret, T-55 hull + M26 turret.
 
-Also re-run the leak stress check (≥20 hull switches, zero errors) since assembleTank changes.
+The plan's verification step is **not complete** until both the self-check passes (no warnings)
+**and** the four screenshots are confirmed by eye. Also re-run the leak stress check
+(≥20 hull switches, zero errors) since assembleTank changes.
 
 ## Edge cases & decisions
 
