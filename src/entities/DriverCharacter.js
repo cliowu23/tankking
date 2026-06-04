@@ -22,9 +22,9 @@ export default class DriverCharacter {
     this.mesh.material = mat;
 
     // Top-down follow camera — same style as the arena
-    this.camera = new ArcRotateCamera('driver-cam', -Math.PI / 2, 0.62, 22, this.mesh.position.clone(), scene);
-    this.camera.lowerRadiusLimit = 28;
-    this.camera.upperRadiusLimit = 28;
+    this.camera = new ArcRotateCamera('driver-cam', -Math.PI / 2, 0.62, 24, this.mesh.position.clone(), scene);
+    this.camera.lowerRadiusLimit = 24;
+    this.camera.upperRadiusLimit = 24;
     scene.activeCamera = this.camera;
 
     this._keys       = {};

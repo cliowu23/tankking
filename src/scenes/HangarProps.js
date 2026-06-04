@@ -1,4 +1,4 @@
-import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
+import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode } from '@babylonjs/core';
 
 // All visual meshes: isPickable=false, checkCollisions=false
 function vis(mesh) {
@@ -71,172 +71,219 @@ export function makeMats(s) {
            plankDark, crateMed, crateLight, screenDark };
 }
 
-// ── 4a: Mechanic Workbench (left/west wall, x≈-14, z=0) ─────────────────────
-export function buildWorkbench(s, cx, cz, M) {
+// ── 4a: Mechanic Workbench (left/west wall) ──────────────────────────────────
+export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
+  const root = new TransformNode('wb-root', s);
+  root.position = new Vector3(cx, 0, cz);
+  root.scaling  = new Vector3(scale, scale, scale);
+  const vp = m => { vis(m); m.parent = root; return m; };
 
   const top = MeshBuilder.CreateBox('wb-top', { width: 2.8, height: 0.12, depth: 1.0 }, s);
-  top.position = new Vector3(cx, 0.88, cz);
-  top.material = M.wood; vis(top);
+  top.position = new Vector3(0, 0.88, 0);
+  top.material = M.wood; vp(top);
 
   const shelf = MeshBuilder.CreateBox('wb-shelf', { width: 2.6, height: 0.08, depth: 0.9 }, s);
-  shelf.position = new Vector3(cx, 0.42, cz);
-  shelf.material = M.wood; vis(shelf);
+  shelf.position = new Vector3(0, 0.42, 0);
+  shelf.material = M.wood; vp(shelf);
 
   [[-1.25, -0.4], [-1.25, 0.4], [1.25, -0.4], [1.25, 0.4]].forEach(([dx, dz], i) => {
     const leg = MeshBuilder.CreateBox(`wb-leg${i}`, { width: 0.1, height: 0.88, depth: 0.1 }, s);
-    leg.position = new Vector3(cx + dx, 0.44, cz + dz);
-    leg.material = M.metal; vis(leg);
+    leg.position = new Vector3(dx, 0.44, dz);
+    leg.material = M.metal; vp(leg);
   });
 
   const viceBody = MeshBuilder.CreateBox('wb-vice-body', { width: 0.25, height: 0.28, depth: 0.22 }, s);
-  viceBody.position = new Vector3(cx - 1.1, 0.94, cz - 0.3);
-  viceBody.material = M.metal; vis(viceBody);
+  viceBody.position = new Vector3(-1.1, 0.94, -0.3);
+  viceBody.material = M.metal; vp(viceBody);
 
   const viceJaw = MeshBuilder.CreateBox('wb-vice-jaw', { width: 0.28, height: 0.06, depth: 0.22 }, s);
-  viceJaw.position = new Vector3(cx - 1.1, 1.02, cz - 0.3);
-  viceJaw.material = M.metal; vis(viceJaw);
+  viceJaw.position = new Vector3(-1.1, 1.02, -0.3);
+  viceJaw.material = M.metal; vp(viceJaw);
 
   const tbox = MeshBuilder.CreateBox('wb-toolbox', { width: 0.55, height: 0.25, depth: 0.40 }, s);
-  tbox.position = new Vector3(cx + 0.6, 1.065, cz + 0.1);
-  tbox.material = M.darkGreen; vis(tbox);
+  tbox.position = new Vector3(0.6, 1.065, 0.1);
+  tbox.material = M.darkGreen; vp(tbox);
 
   const pegboard = MeshBuilder.CreateBox('wb-pegboard', { width: 2.4, height: 1.6, depth: 0.04 }, s);
-  pegboard.position = new Vector3(cx, 1.88, cz - 0.52);
-  pegboard.material = M.wood; vis(pegboard);
+  pegboard.position = new Vector3(0, 1.88, -0.52);
+  pegboard.material = M.wood; vp(pegboard);
 
   const wrench = MeshBuilder.CreateBox('wb-wrench', { width: 0.08, height: 0.9, depth: 0.03 }, s);
-  wrench.position = new Vector3(cx - 0.7, 1.68, cz - 0.54);
-  wrench.material = M.metal; vis(wrench);
+  wrench.position = new Vector3(-0.7, 1.68, -0.54);
+  wrench.material = M.metal; vp(wrench);
 
   const wrenchHead = MeshBuilder.CreateBox('wb-wrenchh', { width: 0.28, height: 0.14, depth: 0.03 }, s);
-  wrenchHead.position = new Vector3(cx - 0.7, 1.24, cz - 0.54);
-  wrenchHead.material = M.metal; vis(wrenchHead);
+  wrenchHead.position = new Vector3(-0.7, 1.24, -0.54);
+  wrenchHead.material = M.metal; vp(wrenchHead);
 
   const hammer = MeshBuilder.CreateBox('wb-hammer', { width: 0.07, height: 0.8, depth: 0.03 }, s);
-  hammer.position = new Vector3(cx + 0.2, 1.72, cz - 0.54);
-  hammer.material = M.wood; vis(hammer);
+  hammer.position = new Vector3(0.2, 1.72, -0.54);
+  hammer.material = M.wood; vp(hammer);
 
   const hammerHead = MeshBuilder.CreateBox('wb-hammerh', { width: 0.32, height: 0.18, depth: 0.07 }, s);
-  hammerHead.position = new Vector3(cx + 0.2, 1.28, cz - 0.54);
-  hammerHead.material = M.metal; vis(hammerHead);
+  hammerHead.position = new Vector3(0.2, 1.28, -0.54);
+  hammerHead.material = M.metal; vp(hammerHead);
 
   return makeCollider('station-mechanic', { width: 1.4, height: 1.0, depth: 3.5 }, new Vector3(cx, 0.5, cz), s);
 }
 
-// ── 4b: Quartermaster Crates (right/east wall, x≈14, z=0) ───────────────────
-export function buildQMCrates(s, cx, cz, M) {
+// ── 4b: Quartermaster — warehouse module (rack + cabinet + drums) ─────────────
+export function buildQMCrates(s, cx, cz, M, scale = 1.8) {
+  const root = new TransformNode('qm-root', s);
+  root.position  = new Vector3(cx, 0, cz);
+  root.scaling   = new Vector3(scale, scale, scale);
+  root.rotation.y = Math.PI / 2;    // face rack toward room (west), back to east wall
+  const vp = m => { vis(m); m.parent = root; return m; };
 
-  const crate1 = MeshBuilder.CreateBox('qm-crate1', { width: 2.4, height: 0.9, depth: 1.8 }, s);
-  crate1.position = new Vector3(cx, 0.45, cz);
-  crate1.material = M.crate; vis(crate1);
+  // ── Heavy-duty pallet rack (center) ───────────────────────────────────────
+  [[-1.1, -0.5], [-1.1, 0.5], [1.1, -0.5], [1.1, 0.5]].forEach(([dx, dz], i) => {
+    const post = MeshBuilder.CreateBox(`qm-post${i}`, { width: 0.1, height: 3.2, depth: 0.1 }, s);
+    post.position = new Vector3(dx, 1.6, dz);
+    post.material = M.metal; vp(post);
+  });
 
-  const plank1 = MeshBuilder.CreateBox('qm-plank1', { width: 2.4, height: 0.03, depth: 0.06 }, s);
-  plank1.position = new Vector3(cx, 0.905, cz);
-  plank1.material = M.plankDark; vis(plank1);
-  const plank2 = MeshBuilder.CreateBox('qm-plank2', { width: 0.06, height: 0.03, depth: 1.8 }, s);
-  plank2.position = new Vector3(cx, 0.905, cz);
-  plank2.material = M.plankDark; vis(plank2);
+  [0.65, 1.55, 2.5].forEach((y, i) => {
+    const shelf = MeshBuilder.CreateBox(`qm-shelf${i}`, { width: 2.3, height: 0.06, depth: 1.1 }, s);
+    shelf.position = new Vector3(0, y, 0);
+    shelf.material = M.darkMetal; vp(shelf);
+  });
 
-  const crate2 = MeshBuilder.CreateBox('qm-crate2', { width: 1.8, height: 0.75, depth: 1.4 }, s);
-  crate2.position = new Vector3(cx + 0.2, 1.27, cz - 0.1);
-  crate2.material = M.crateMed; vis(crate2);
+  // top beam
+  const topBeam = MeshBuilder.CreateBox('qm-topbeam', { width: 2.3, height: 0.1, depth: 0.08 }, s);
+  topBeam.position = new Vector3(0, 3.18, 0.46);
+  topBeam.material = M.metal; vp(topBeam);
 
-  const crate3 = MeshBuilder.CreateBox('qm-crate3', { width: 1.0, height: 0.6, depth: 0.9 }, s);
-  crate3.position = new Vector3(cx - 0.3, 1.95, cz + 0.2);
-  crate3.material = M.crateLight; vis(crate3);
+  // bottom shelf: 2 large crates
+  [[-0.55, 0], [0.55, 0]].forEach(([dx, dz], i) => {
+    const c = MeshBuilder.CreateBox(`qm-bc${i}`, { width: 0.9, height: 0.5, depth: 0.85 }, s);
+    c.position = new Vector3(dx, 0.93, dz);
+    c.material = M.crate; vp(c);
+  });
 
-  const bracketH = MeshBuilder.CreateBox('qm-brack-h', { width: 1.8, height: 0.06, depth: 0.5 }, s);
-  bracketH.position = new Vector3(cx, 2.4, cz);
-  bracketH.material = M.metal; vis(bracketH);
+  // middle shelf: 3 ammo boxes
+  [[-0.65, 0], [0, 0], [0.65, 0]].forEach(([dx, dz], i) => {
+    const a = MeshBuilder.CreateBox(`qm-ammo${i}`, { width: 0.55, height: 0.28, depth: 0.42 }, s);
+    a.position = new Vector3(dx, 1.83, dz);
+    a.material = M.darkGreen; vp(a);
+  });
 
-  const bracketV = MeshBuilder.CreateBox('qm-brack-v', { width: 1.8, height: 0.4, depth: 0.06 }, s);
-  bracketV.position = new Vector3(cx, 2.2, cz - 0.22);
-  bracketV.material = M.metal; vis(bracketV);
+  // top shelf: 2 mixed boxes
+  [[-0.5, 0], [0.5, 0]].forEach(([dx, dz], i) => {
+    const b = MeshBuilder.CreateBox(`qm-top${i}`, { width: 0.7, height: 0.35, depth: 0.6 }, s);
+    b.position = new Vector3(dx, 2.72, dz);
+    b.material = i === 0 ? M.crateMed : M.crateLight; vp(b);
+  });
 
-  [[-0.55, 0], [0.0, 0.02], [0.58, -0.02]].forEach(([dx, dz], i) => {
-    const abox = MeshBuilder.CreateBox(`qm-ammo${i}`, { width: 0.55, height: 0.28, depth: 0.42 }, s);
-    abox.position = new Vector3(cx + dx, 2.57, cz + dz);
-    abox.material = M.darkGreen; vis(abox);
+  // ── Tall metal locker / cabinet (east side of rack) ───────────────────────
+  const cab = MeshBuilder.CreateBox('qm-cab', { width: 0.8, height: 2.3, depth: 0.55 }, s);
+  cab.position = new Vector3(1.75, 1.15, 0);
+  cab.material = M.darkGreen; vp(cab);
+
+  const seam = MeshBuilder.CreateBox('qm-seam', { width: 0.025, height: 2.28, depth: 0.57 }, s);
+  seam.position = new Vector3(1.75, 1.15, 0);
+  seam.material = M.darkMetal; vp(seam);
+
+  const handle = MeshBuilder.CreateBox('qm-handle', { width: 0.06, height: 0.2, depth: 0.07 }, s);
+  handle.position = new Vector3(1.75 + 0.22, 1.1, -0.3);
+  handle.material = M.metal; vp(handle);
+
+  // ── Fuel drums (west side, floor) ─────────────────────────────────────────
+  [[-1.75, -0.55], [-1.75, 0.1]].forEach(([dx, dz], i) => {
+    const drum = MeshBuilder.CreateCylinder(`qm-drum${i}`, { diameter: 0.44, height: 0.72, tessellation: 12 }, s);
+    drum.position = new Vector3(dx, 0.36, dz);
+    drum.material = M.darkMetal; vp(drum);
+
+    const band = MeshBuilder.CreateCylinder(`qm-band${i}`, { diameter: 0.45, height: 0.04, tessellation: 12 }, s);
+    band.position = new Vector3(dx, 0.52, dz);
+    band.material = M.metal; vp(band);
   });
 
   return makeCollider('station-qm', { width: 1.4, height: 1.0, depth: 3.5 }, new Vector3(cx, 0.5, cz), s);
 }
 
-// ── 4c: Tactical Map Table (north-left corner, x≈-11, z≈17.5) ───────────────
-export function buildMapTable(s, cx, cz, M) {
+// ── 4c: Tactical Map Table (north-left area) ─────────────────────────────────
+export function buildMapTable(s, cx, cz, M, scale = 1.8) {
+  const root = new TransformNode('mt-root', s);
+  root.position = new Vector3(cx, 0, cz);
+  root.scaling  = new Vector3(scale, scale, scale);
+  const vp = m => { vis(m); m.parent = root; return m; };
 
   const tabletop = MeshBuilder.CreateBox('map-top', { width: 2.2, height: 0.08, depth: 1.4 }, s);
-  tabletop.position = new Vector3(cx, 0.88, cz);
-  tabletop.material = M.wood; vis(tabletop);
+  tabletop.position = new Vector3(0, 0.88, 0);
+  tabletop.material = M.wood; vp(tabletop);
 
   [[-0.98, -0.6], [-0.98, 0.6], [0.98, -0.6], [0.98, 0.6]].forEach(([dx, dz], i) => {
     const leg = MeshBuilder.CreateBox(`map-leg${i}`, { width: 0.1, height: 0.88, depth: 0.1 }, s);
-    leg.position = new Vector3(cx + dx, 0.44, cz + dz);
-    leg.material = M.metal; vis(leg);
+    leg.position = new Vector3(dx, 0.44, dz);
+    leg.material = M.metal; vp(leg);
   });
 
-  const mapMesh = MeshBuilder.CreateBox('map-map', { width: 2.0, height: 0.015, depth: 1.25 }, s);
-  mapMesh.position = new Vector3(cx, 0.947, cz);
-  mapMesh.material = M.parchment; vis(mapMesh);
+  const mapMesh = MeshBuilder.CreateBox('map-map', { width: 2.0, height: 0.012, depth: 1.25 }, s);
+  mapMesh.position = new Vector3(0, 0.947, 0);
+  mapMesh.material = M.parchment; vp(mapMesh);
 
   const radio = MeshBuilder.CreateBox('map-radio', { width: 0.45, height: 0.32, depth: 0.35 }, s);
-  radio.position = new Vector3(cx + 0.8, 1.04, cz - 0.45);
-  radio.material = M.darkMetal; vis(radio);
+  radio.position = new Vector3(0.8, 1.04, 0.35);
+  radio.material = M.darkMetal; vp(radio);
 
   const screen = MeshBuilder.CreateBox('map-screen', { width: 0.26, height: 0.18, depth: 0.02 }, s);
-  screen.position = new Vector3(cx + 0.8, 1.12, cz - 0.63);
-  screen.material = M.screenDark; vis(screen);
+  screen.position = new Vector3(0.8, 1.12, 0.17);
+  screen.material = M.screenDark; vp(screen);
 
   const ind = MeshBuilder.CreateCylinder('map-ind', { diameter: 0.06, height: 0.03, tessellation: 8 }, s);
-  ind.position = new Vector3(cx + 0.95, 1.22, cz - 0.63);
+  ind.position = new Vector3(0.95, 1.22, 0.17);
   ind.rotation.x = Math.PI / 2;
-  ind.material = M.redInd; vis(ind);
+  ind.material = M.redInd; vp(ind);
 
   const pole = MeshBuilder.CreateCylinder('map-pole', { diameter: 0.05, height: 1.8, tessellation: 6 }, s);
-  pole.position = new Vector3(cx - 0.8, 1.78, cz - 0.4);
-  pole.material = M.metal; vis(pole);
+  pole.position = new Vector3(-0.8, 1.78, 0.35);
+  pole.material = M.metal; vp(pole);
 
   const shade = MeshBuilder.CreateCylinder('map-shade', { diameterTop: 0.28, diameterBottom: 0.06, height: 0.18, tessellation: 10 }, s);
-  shade.position = new Vector3(cx - 0.8, 2.72, cz - 0.4);
-  shade.material = M.lampGlow; vis(shade);
+  shade.position = new Vector3(-0.8, 2.72, 0.35);
+  shade.material = M.lampGlow; vp(shade);
 
   return makeCollider('station-map', { width: 2.5, height: 1.0, depth: 1.2 }, new Vector3(cx, 0.5, cz), s);
 }
 
-// ── 4d: Radio / Intel Shelf (north-right corner, x≈11, z≈17.5) ──────────────
-export function buildRadioShelf(s, cx, cz, M) {
+// ── 4d: Radio / Intel Shelf (north-right area) ───────────────────────────────
+export function buildRadioShelf(s, cx, cz, M, scale = 1.8) {
+  const root = new TransformNode('rs-root', s);
+  root.position = new Vector3(cx, 0, cz);
+  root.scaling  = new Vector3(scale, scale, scale);
+  const vp = m => { vis(m); m.parent = root; return m; };
 
   [-0.85, 0.85].forEach((dx, i) => {
-    const post = MeshBuilder.CreateBox(`rs-post${i}`, { width: 0.07, height: 2.4, depth: 0.07 }, s);
-    post.position = new Vector3(cx + dx, 1.2, cz - 0.22);
-    post.material = M.metal; vis(post);
+    const post = MeshBuilder.CreateBox(`rs-post${i}`, { width: 0.12, height: 2.4, depth: 0.12 }, s);
+    post.position = new Vector3(dx, 1.2, 0);   // center depth — structural spine of the shelf
+    post.material = M.metal; vp(post);
   });
 
   [0.6, 1.6].forEach((y, i) => {
     const board = MeshBuilder.CreateBox(`rs-board${i}`, { width: 1.8, height: 0.06, depth: 0.52 }, s);
-    board.position = new Vector3(cx, y, cz);
-    board.material = M.metal; vis(board);
+    board.position = new Vector3(0, y, 0);
+    board.material = M.metal; vp(board);
   });
 
   [[0, 0.18, 0.40], [0, 0.18, 0.36], [0, 0.14, 0.32]].forEach(([dx, h, w], i) => {
     const unit = MeshBuilder.CreateBox(`rs-unit${i}`, { width: w, height: h, depth: 0.38 }, s);
-    unit.position = new Vector3(cx + dx, 1.69 + i * 0.18, cz + 0.02);
-    unit.material = M.darkMetal; vis(unit);
+    unit.position = new Vector3(dx, 1.69 + i * 0.18, 0.02);
+    unit.material = M.darkMetal; vp(unit);
 
     const det = MeshBuilder.CreateBox(`rs-det${i}`, { width: w * 0.55, height: 0.08, depth: 0.02 }, s);
-    det.position = new Vector3(cx + dx, 1.69 + i * 0.18 + 0.02, cz - 0.18);
-    det.material = M.screenDark; vis(det);
+    det.position = new Vector3(dx, 1.69 + i * 0.18 + 0.02, -0.18);
+    det.material = M.screenDark; vp(det);
   });
 
   const ri = MeshBuilder.CreateCylinder('rs-ind', { diameter: 0.05, height: 0.03, tessellation: 6 }, s);
-  ri.position = new Vector3(cx + 0.38, 2.07, cz - 0.18);
+  ri.position = new Vector3(0.06, 2.07, -0.20);  // on the front face of the top radio unit
   ri.rotation.x = Math.PI / 2;
-  ri.material = M.redInd; vis(ri);
+  ri.material = M.redInd; vp(ri);
 
   [-0.5, 0, 0.5].forEach((dx, i) => {
     const can = MeshBuilder.CreateCylinder(`rs-can${i}`, { diameter: 0.22, height: 0.38, tessellation: 10 }, s);
-    can.position = new Vector3(cx + dx, 0.82, cz + 0.02);
-    can.material = M.olive; vis(can);
+    can.position = new Vector3(dx, 0.82, 0.02);
+    can.material = M.olive; vp(can);
   });
 
   return makeCollider('station-radio', { width: 2.5, height: 1.0, depth: 1.2 }, new Vector3(cx, 0.5, cz), s);
