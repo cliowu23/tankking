@@ -137,10 +137,15 @@ sketchfab_root.matrix_parent_inverse = part_root.matrix_world.inverted()  # iden
 # +90°X cancels the -90°X net rotation in the Sketchfab hierarchy.
 # After this: original model Y-axis (height) → Blender Z → Babylon Y. Same as M26.
 # Game scale baked here so JS build() can use getAbsolutePosition() directly (no manual scaling).
-part_root.rotation_euler = (math.pi / 2, 0, math.pi / 2)
-# +90°X fixes the height axis: Babylon Y = height (same convention as M26).
-# +90°Z (in the post-X frame) rotates the T-55 from facing Babylon +X to facing Babylon +Z,
-# matching the M26's facing direction so cross-mix parts assemble correctly.
+part_root.rotation_euler = (0, 0, math.pi / 2)
+# T-55 GLB axes (Sketchfab_model rotation = 0, no import correction):
+#   original X = tank forward (gun points +X)
+#   original Y = tank width
+#   original Z = tank height (ground at Z≈0)
+#
+# Rz(+90°) maps: X→BlenderY→BabylonZ(forward) ✓
+#                Y→Blender-X→BabylonX(width) ✓
+#                Z→BlenderZ→BabylonY(height) ✓
 part_root.scale = (args.scale, args.scale, args.scale)
 
 # Force Blender to recompute all matrix_world values in the scene.
@@ -166,17 +171,24 @@ else:
 ring_world = turret_empty.matrix_world.translation.copy()
 
 if args.part == "hull":
-    # Hull: ring-center in XY (ring at Babylon X=0, Z=0 — the tank's vertical axis),
-    # ground-center in Z (hull bottom at Babylon Y=0).  Gives a clean turretRing mount.
-    center = Vector((ring_world.x, ring_world.y, min_z))
-    print(f"[extract-parts] hull center: ring_xy=({ring_world.x:.3f},{ring_world.y:.3f})  z_min={min_z:.3f}")
+    # Hull: center at hull BODY midpoint in XY (not ring — the T-55 ring empty is at
+    # the left edge of the hull, not the center).  Ground at min_z.
+    # hull-t55.js reads the ring position from mesh max Y at runtime.
+    min_x = min(p.x for p in pts); max_x = max(p.x for p in pts)
+    min_y = min(p.y for p in pts); max_y = max(p.y for p in pts)
+    hull_cx = (min_x + max_x) / 2
+    hull_cy = (min_y + max_y) / 2
+    center = Vector((hull_cx, hull_cy, min_z))
+    print(f"[extract-parts] hull body-center: cx={hull_cx:.3f} cy={hull_cy:.3f} z_min={min_z:.3f}")
 elif args.part == "turret":
-    # Turret: ring-center in ALL THREE axes so the ring sits at the GLB origin.
-    # assembleTank places the turret root AT the hull's ring, so the turret ring
-    # lands flush on the hull deck and the dome rises above it.  The barrel mount
-    # is NOT read from the (unreliable) `mount` empty — it's an explicit offset in
-    # turret-*.js, dialed in live in the designer.
-    center = ring_world.copy()
+    # Turret: center at turret BODY midpoint in XY, ground at dome bottom (min_z).
+    # The T-55 ring empty is NOT at the dome center — center at mesh midpoint instead.
+    # BARREL_MOUNT in turret-t55.js places the cannon relative to the dome geometry.
+    min_x = min(p.x for p in pts); max_x = max(p.x for p in pts)
+    min_y = min(p.y for p in pts); max_y = max(p.y for p in pts)
+    turret_cx = (min_x + max_x) / 2
+    turret_cy = (min_y + max_y) / 2
+    center = Vector((turret_cx, turret_cy, min_z))
     print(f"[extract-parts] turret center: full ring-center at {tuple(round(v,3) for v in center)}")
 
 # Shift entire hierarchy so centering target lands at world origin
