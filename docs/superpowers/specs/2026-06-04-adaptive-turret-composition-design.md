@@ -13,18 +13,37 @@ Make **any** turret seat correctly on **any** hull, automatically: centered over
 ring, resting on the deck (no float), and uniformly scaled so its base fits the ring. Adding
 a new turret or hull GLB should require no hand-tuned offset numbers.
 
-## The mounting contract: "ring" meets "base"
+## The alignment chain (explicit, uniform, self-checking)
 
-- A **hull** has a *ring* — the circular opening a turret drops into. Defined by a center
-  point on the deck and a diameter.
-- A **turret** has a *base* — its circular bottom that seats in the ring. Defined by a
-  center point, a diameter, and a base-plane height.
+Composition is a chain of explicit, named alignment links: **hull → turret → barrel**. Every
+part exposes the same shape of interface — an *attach frame* it seats into, and (if it carries
+a child) an *attach point* it offers the next part. Composition walks the chain aligning each
+link; `validateComposition` checks each link. This is what makes the process repeatable: a new
+hull/turret/cannon just implements the same interface, and the checks confirm it aligned right
+without anyone eyeballing it.
 
-Composition performs three operations:
+| Part | Seats into (its attach frame) | Offers to child (attach point) |
+|------|-------------------------------|--------------------------------|
+| Hull | — (root reference frame)      | `ring = { center{x,y,z}, diameter }` |
+| Turret | hull `ring` (via its `base`) | `mount` (barrel attach point) |
+| Barrel / cannon | turret `mount` (via its `breech`) | — (leaf) |
 
+- A **hull** has a *ring* — the circular opening a turret drops into (center on the deck +
+  diameter). The hull is the root frame everything else aligns to.
+- A **turret** has a *base* — its circular bottom that seats in the ring (center, diameter,
+  base-plane Y) — and a *mount* — where its gun attaches.
+- A **barrel/cannon** has a *breech* — its attach point that seats at the turret's mount — and
+  points its tube +Z (game-forward).
+
+### Link 1 — turret base → hull ring (three operations)
 1. **Center** — align the turret base-center to the hull ring-center (X/Z).
 2. **Seat** — drop the turret so its base-plane rests at the hull deck height (no float).
 3. **Scale** — uniformly scale the turret so its base diameter equals the ring diameter.
+
+### Link 2 — barrel breech → turret mount
+4. **Attach** — place the barrel pivot at the turret's `mount × scale` (mount tracks the scaled
+   turret), and seat the cannon's `breech` there.
+5. **Aim** — the cannon tube points +Z so it emerges from the mantlet, game-forward.
 
 ## Where the numbers come from
 
@@ -58,6 +77,13 @@ symptom: the rear bustle no longer skews the center.
 ### Turret also declares
 - `defaultCannon` — the turret's own gun id (`turret-m26` → `cannon-90mm`,
   `turret-t55` → `cannon-100mm`). Used to default the cannon when a turret is swapped.
+
+### Cannon exposes its breech (attach point)
+The cannon already builds with its tube along +Z and its rear at the root origin. Make that
+explicit: the cannon returns `breech` — the local point that seats at the turret mount (the
+origin by extraction convention) — and the build guarantees the tube extends +Z from it. This
+gives the barrel the same explicit alignment interface as the turret, so the chain is uniform
+and the barrel link is checkable rather than assumed.
 
 ## assembleTank algorithm
 
@@ -110,7 +136,9 @@ centering/seating correctness.
 - `src/parts/turrets/turret-m26.js`, `turret-t55.js` — auto-measure `base`; add `defaultCannon`.
   Factor the measurement into a shared helper (`src/parts/measureBase.js`) so every turret and
   any future turret uses the same code.
-- `src/parts/assembleTank.js` — center/seat/scale logic + native-ring-diameter cache.
+- `src/parts/cannons/cannon-90mm.js`, `cannon-100mm.js` — expose explicit `breech` attach point.
+- `src/parts/assembleTank.js` — alignment chain (center/seat/scale + barrel attach), native-ring
+  cache, and `validateComposition` self-check.
 - `src/scenes/TankDesignerScene.js` — on turret swap, default the cannon to the turret's
   `defaultCannon` before `_rebuildComposed()`.
 
@@ -122,18 +150,29 @@ invariants and `console.warn`s (with the loadout) on any violation. This is the 
 off-center, or mis-scaled turret without a human looking, so dropping in a **new** turret GLB
 is self-policing. Checks (each with a small tolerance):
 
-1. **Orientation — gun points forward.** `turret.mount.z > 0` in the turret's post-yaw frame
-   (the barrel mount / mantlet is on the +Z side of the turret base center). A turret yawed
-   the wrong way puts the mount behind center and fails this. Also assert the assembled barrel
-   tip has greater world Z than the turret pivot (gun extends game-forward).
-2. **Centered.** Turret base-center world X/Z ≈ hull ringCenter X/Z (|Δ| < ~0.05 u).
-3. **Seated, not floating/sunk.** Turret base-plane world Y ≈ hull deck Y (|Δ| < ~0.05 u).
-4. **Fits.** `turret.base.diameter × scale` ≈ ringDiameter (by construction; asserts the scale
-   math and guards bad data).
-5. **Sane scale.** `0.3 < scale < 3.0`; outside that range warn (likely a bad base measurement
+The checks mirror the alignment chain — one per link:
+
+**Link 1 — turret on hull:**
+1. **Centered.** Turret base-center world X/Z ≈ hull ringCenter X/Z (|Δ| < ~0.05 u).
+2. **Seated, not floating/sunk.** Turret base-plane world Y ≈ hull deck Y (|Δ| < ~0.05 u).
+3. **Fits.** `turret.base.diameter × scale` ≈ ringDiameter (asserts the scale math + guards bad data).
+4. **Turret orientation — gun on the front.** `turret.mount.z > 0` in the turret's post-yaw
+   frame (the barrel mount / mantlet is on the +Z side of the base center). A turret yawed the
+   wrong way puts the mount behind center and fails this.
+
+**Link 2 — barrel on turret:**
+5. **Barrel seated.** Cannon `breech` world position ≈ `barrelPivot` world position (the gun
+   attaches at the mount, |Δ| small).
+6. **Barrel aimed forward.** Assembled barrel tip world Z > breech world Z (the tube extends
+   game-forward, +Z), and the tip is forward of the turret pivot.
+
+**Whole composition:**
+7. **Sane scale.** `0.3 < scale < 3.0`; outside that range warn (likely a bad base measurement
    or wrong-units GLB) and clamp/fall back to `scale = 1`.
 
-These are cheap (a few vector comparisons) and run only in dev; they don't gate production.
+These are cheap (a few vector comparisons) and run only in dev; they don't gate production. Any
+failure `console.warn`s the loadout and which link failed, so a bad new part is named, not just
+suspected.
 
 ## Visual verification
 
