@@ -74,8 +74,9 @@ export function makeMats(s) {
 // ── 4a: Mechanic Workbench (left/west wall) ──────────────────────────────────
 export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
   const root = new TransformNode('wb-root', s);
-  root.position = new Vector3(cx, 0, cz);
-  root.scaling  = new Vector3(scale, scale, scale);
+  root.position  = new Vector3(cx, 0, cz);
+  root.scaling   = new Vector3(scale, scale, scale);
+  root.rotation.y = Math.PI / 2;   // face east (toward room center), pegboard against west wall
   const vp = m => { vis(m); m.parent = root; return m; };
 
   const top = MeshBuilder.CreateBox('wb-top', { width: 2.8, height: 0.12, depth: 1.0 }, s);
@@ -124,7 +125,7 @@ export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
   hammerHead.position = new Vector3(0.2, 1.28, -0.54);
   hammerHead.material = M.metal; vp(hammerHead);
 
-  return makeCollider('station-mechanic', { width: 1.4, height: 1.0, depth: 3.5 }, new Vector3(cx, 0.5, cz), s);
+  return makeCollider('station-mechanic', { width: 2.0, height: 1.5, depth: 5.5 }, new Vector3(cx, 0.75, cz), s);
 }
 
 // ── 4b: Quartermaster — warehouse module (rack + cabinet + drums) ─────────────
