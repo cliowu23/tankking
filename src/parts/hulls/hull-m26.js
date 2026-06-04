@@ -23,6 +23,7 @@ export default {
   category: 'hull',
   stats: {},
   mountEmpty: 'turret',
+  nativeTurret: 'turret-m26',
 
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'hull-m26.glb', scene);
@@ -34,6 +35,6 @@ export default {
     for (const m of meshes) m.setParent(root);
 
     applyModelPaint(meshes, PAINT, scene);
-    return { root, meshes, mount };
+    return { root, meshes, mount, ringCenter: mount };
   },
 };
