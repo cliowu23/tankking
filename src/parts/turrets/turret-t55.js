@@ -1,5 +1,6 @@
 import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 import { applyModelPaint } from '../../utils/modelPaint.js';
+import { measureBase } from '../measureBase.js';
 
 // T-55 turret — extracted from t-55ak.glb (turret dome, hatch, cupola, coaxial MG;
 // hull meshes and main gun removed).  Body-midpoint centred, Rz(90) + scale 0.756.
@@ -23,6 +24,7 @@ export default {
   name: 'T-55 Turret',
   category: 'turret',
   stats: { traverseSpeed: 60 },
+  defaultCannon: 'cannon-100mm',
 
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-t55.glb', scene);
@@ -31,11 +33,15 @@ export default {
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
 
-    // Spin dome to face game-forward (mantlet → +Z). Set after parenting meshes; root
-    // has no parent yet so this local rotation survives assembleTank's parent assignment.
+    // Spin dome to face game-forward (mantlet → +Z) BEFORE measuring, so base is in the
+    // post-yaw frame that assembleTank scales/offsets against.
     root.rotation.y = YAW_FIX;
+    for (const m of meshes) m.computeWorldMatrix(true);
+
+    const base = measureBase(meshes);
+    console.log(`[turret-t55] base center=(${base.center.x.toFixed(2)},${base.center.y.toFixed(2)},${base.center.z.toFixed(2)}) diameter=${base.diameter.toFixed(2)}`);
 
     applyModelPaint(meshes, PAINT, scene);
-    return { root, meshes, mount: BARREL_MOUNT.clone() };
+    return { root, meshes, mount: BARREL_MOUNT.clone(), base };
   },
 };
