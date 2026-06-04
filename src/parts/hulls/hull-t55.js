@@ -5,6 +5,11 @@ import { applyModelPaint } from '../../utils/modelPaint.js';
 // turret and gun meshes removed).  Rz(90) rotation + scale 0.756 baked via PART_ROOT.
 // GLB is body-midpoint centred so hull appears symmetric around X=0, Z=0.
 
+// Turret-ring height. The source GLB 'turret' empty is misplaced, and the hull bbox
+// top (~1.48) catches antenna/gear spikes — too high, leaves the turret floating.
+// RING_HEIGHT is the actual deck level, dialled in live in the designer.
+const RING_HEIGHT = 1.0;
+
 const PAINT = {
   paintColor: [0.92, 0.12, 0.08],
   tintColor:  [0.28, 0.26, 0.24],
@@ -23,16 +28,7 @@ export default {
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
 
-    // Source GLB 'turret' empty is misplaced (not at hull deck level).
-    // Derive turret-ring mount from mesh bounding-box top instead.
-    let maxY = -Infinity;
-    for (const m of meshes) {
-      m.computeWorldMatrix(true);
-      const bb = m.getBoundingInfo().boundingBox;
-      if (bb.maximumWorld.y > maxY) maxY = bb.maximumWorld.y;
-    }
-
     applyModelPaint(meshes, PAINT, scene);
-    return { root, meshes, mount: new Vector3(0, maxY, 0) };
+    return { root, meshes, mount: new Vector3(0, RING_HEIGHT, 0) };
   },
 };
