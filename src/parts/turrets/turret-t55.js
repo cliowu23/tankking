@@ -2,15 +2,13 @@ import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 import { applyModelPaint } from '../../utils/modelPaint.js';
 
 // T-55 turret — extracted from t-55ak.glb (turret dome, hatch, cupola, coaxial MG;
-// hull meshes and main gun removed).  Ring at origin, scale + axis normalisation baked
-// in by extract-parts.py.
+// hull meshes and main gun removed).  Body-midpoint centred, Rz(90) + scale 0.756.
+// Dome spans Babylon Y 0→2.891 (above turret base), front face at Babylon Z≈1.176.
 //
-// BARREL_MOUNT is an explicit offset, NOT read from the GLB's `mount` empty: that empty
-// is an interior point in the source model (reads ~(-1.3, 0.95, -0.96)), which floats the
-// barrel off to the side and behind.  These values were dialed in live in the designer to
-// place the gun at the front-center of the dome.  x=0 (centered), y=mid-dome, z=front face.
+// BARREL_MOUNT is a hardcoded offset in turretPivot local space — dial in live in designer.
+// x=0 (centered), y=gun exit height above turret base, z=front-face offset.
 
-const BARREL_MOUNT = new Vector3(0, 0.45, 0.55);
+const BARREL_MOUNT = new Vector3(0, 0.3, 1.0);
 
 const PAINT = {
   paintColor: [0.92, 0.12, 0.08],
