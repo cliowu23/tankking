@@ -23,6 +23,7 @@ export default {
   stats: { traverseSpeed: 72 },
   mountEmpty: 'mount',
   defaultCannon: 'cannon-90mm',
+  paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-m26.glb', scene);
