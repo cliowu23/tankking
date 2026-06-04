@@ -99,7 +99,10 @@ turretBuilt.root.parent  = turretPivot
 turretBuilt.root.scaling = (scale, scale, scale)
 turretBuilt.root.position = base.center.scale(-scale)   // base-center → pivot, base-plane → deck
 
-barrelPivot.position = turretBuilt.mount.scale(scale)   // gun mount tracks the scaled turret
+// barrelPivot is a sibling of the turret root, so it does NOT inherit the turret's
+// -base.center recentering offset — apply it here: where the mount actually ended up is
+// scale × (mount - base.center) in turretPivot space.
+barrelPivot.position = turretBuilt.mount.subtract(turretBuilt.base.center).scale(scale)
 barrelPivot.parent   = turretPivot
 cannon.root.parent   = barrelPivot      // cannon keeps its own real-world size (not turret-scaled)
 ```
