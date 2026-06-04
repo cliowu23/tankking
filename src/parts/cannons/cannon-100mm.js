@@ -1,4 +1,4 @@
-import { TransformNode, SceneLoader } from '@babylonjs/core';
+import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 
 // 100mm D-10T — T-55 main gun, extracted from t-55ak.glb.
 // Base at origin, tip at +Z ≈ 2.78 game units.
@@ -33,6 +33,6 @@ export default {
     // a rotation set beforehand.
     root.rotation.x = Math.PI / 2;
 
-    return { root, meshes };
+    return { root, meshes, breech: new Vector3(0, 0, 0) };
   },
 };
