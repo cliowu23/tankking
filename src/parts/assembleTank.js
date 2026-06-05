@@ -1,5 +1,6 @@
 import { TransformNode, Vector3 } from '@babylonjs/core';
 import { PARTS_BY_ID } from './index.js';
+import { measureBasket } from './measureBasket.js';
 
 // Native ring diameter cache: a hull's ring is as big as its native turret's base.
 // Keyed by turret id; value is the measured base diameter.
@@ -69,36 +70,47 @@ export async function assembleTank(scene, loadout, materials = {}) {
   hullBuilt.root.parent = root;
   const ring = hullBuilt.ringCenter ?? hullBuilt.mount ?? new Vector3(0, 1, 0);
 
-  // 2. Turret pivot at the ring center.
-  const turretPivot = new TransformNode('turretPivot', scene);
-  turretPivot.position.copyFrom(ring);
-  turretPivot.parent = root;
-
+  // 2. Build the turret and detect its basket (ring) centre from the dome geometry — the point
+  //    it should rotate about. Done here (not per-part) so every turret pivots adaptively.
   const turretBuilt = await turretPart.build(scene);
+  const basket = measureBasket(turretBuilt.meshes);
+  console.log(`[assembleTank] ${loadout.turret} basket center=(${basket.center.x.toFixed(2)},${basket.center.z.toFixed(2)}) from ${basket.domeMeshes.length} dome meshes`);
 
-  // 3. Scale the turret so its base diameter matches the ring. The turret is already
-  //    centered on its ring at its origin (extraction contract), so we place the origin at
-  //    the ring and scale about it — the ring stays put, the dome scales around it. No
-  //    re-centering offset (a measured center would be skewed by the low-hanging mantlet).
+  // 3. Scale the turret so its base diameter matches the hull ring. The turret is centered on
+  //    its ring at its origin (extraction contract); we place the origin at the ring and scale
+  //    about it — the ring stays put, the dome scales around it.
   const ringDiameter = await nativeRingDiameter(scene, hullPart, loadout.turret, turretBuilt.base);
   let scale = ringDiameter / turretBuilt.base.diameter;
   if (!(scale > 0.3 && scale < 3.0)) {
     console.warn(`[assembleTank] scale ${scale.toFixed(3)} out of range for ${loadout.turret} on ${loadout.hull}; using 1`);
     scale = 1;
   }
-  turretBuilt.root.parent  = turretPivot;
-  turretBuilt.root.scaling = new Vector3(scale, scale, scale);
 
-  // 4. Barrel pivot at the scaled mount (mount scales about the turret origin too).
+  // 4. Turret pivot. It seats at the hull ring, then shifts to the turret's detected basket
+  //    centre (measureBasket) so the turret rotates about the middle of its dome, not the
+  //    geometry origin — which sits off-centre behind the basket. The basket offset is in
+  //    native turret units, so scale it into world units. The turret geometry is counter-
+  //    shifted by the same amount, so its static seating is unchanged: only the spin axis moves.
+  const basketOffset = basket.center.scale(scale);
+  const turretPivot = new TransformNode('turretPivot', scene);
+  turretPivot.position.copyFrom(ring).addInPlace(basketOffset);
+  turretPivot.parent = root;
+
+  turretBuilt.root.parent   = turretPivot;
+  turretBuilt.root.position = basketOffset.negate();        // counter-shift: seating unchanged
+  turretBuilt.root.scaling  = new Vector3(scale, scale, scale);
+
+  // 5. Barrel pivot at the scaled mount, carried by the same counter-shift so the gun stays
+  //    attached where it was — the mount rides with the turret geometry, not the shifted pivot.
   const mount = turretBuilt.mount ?? new Vector3(0, 0, 0.5);
   const barrelPivot = new TransformNode('barrelPivot', scene);
-  barrelPivot.position = mount.scale(scale);
+  barrelPivot.position = mount.scale(scale).add(turretBuilt.root.position);
   barrelPivot.parent = turretPivot;
 
   const cannonBuilt = await cannonPart.build(scene, materials.cannon);
   cannonBuilt.root.parent = barrelPivot;
 
-  // 5. Ground the tank — shift root so the lowest mesh point sits at y=0.
+  // 6. Ground the tank — shift root so the lowest mesh point sits at y=0.
   let minY = Infinity;
   const allMeshes = [...hullBuilt.meshes, ...turretBuilt.meshes, ...cannonBuilt.meshes];
   for (const m of allMeshes) {
