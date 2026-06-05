@@ -82,8 +82,14 @@ export function applyModelPaint(meshes, config, scene, colorOverride = null) {
         mesh.material = tintMaterial(mesh.material, tintColor, `tint_${tintColor.join('_')}`);
       continue;
     }
-    // Paint: flat matte color — bright and clean, like a properly painted toy tank
-    mesh.material = mat;
+    // Paint. Two modes:
+    //   default  → flat matte color (bright, clean toy-tank look; texture stripped)
+    //   detail   → tint the original surface with paintColor (keeps cast/weld/rivet detail)
+    if (config.detailPaint && mesh.material) {
+      mesh.material = tintMaterial(mesh.material, paintColor, `detail_${paintColor.join('_')}`);
+    } else {
+      mesh.material = mat;
+    }
     painted++;
   }
 
