@@ -35,10 +35,21 @@ without anyone eyeballing it.
 - A **barrel/cannon** has a *breech* — its attach point that seats at the turret's mount — and
   points its tube +Z (game-forward).
 
-### Link 1 — turret base → hull ring (three operations)
-1. **Center** — align the turret base-center to the hull ring-center (X/Z).
-2. **Seat** — drop the turret so its base-plane rests at the hull deck height (no float).
-3. **Scale** — uniformly scale the turret so its base diameter equals the ring diameter.
+### Link 1 — turret base → hull ring
+**Extraction contract:** a turret GLB is extracted *centered on its ring at the origin*
+(both current turrets satisfy this: M26 ≈(0,0), T-55 ≈(0,0)). So composition does NOT
+re-center the turret by a measured point — it trusts the origin and:
+1. **Place** the turret's origin at the hull ring-center (`turretPivot.position = ringCenter`,
+   turret root parented there with no offset).
+2. **Scale** — uniformly scale the turret about its origin so its base diameter equals the
+   ring diameter. Scaling about the origin keeps the ring at the origin (= at the ring-center).
+
+**Why measure only the diameter, not the center:** empirically (Blender vertex scan), a
+turret's lowest slice is dominated by its mantlet/gun-shield, which hangs down and forward —
+so the bottom-slice *center* is skewed (M26 reads Z≈+0.6 at every slice depth) and is NOT the
+ring center. The bottom-slice *extent* is still a fine proportional proxy for ring size. So
+`measureBase` is used for `diameter` only; centering is delegated to the extraction contract
+and the hull's `ringCenter` (the forward offset that fixes "too far back" lives on the hull).
 
 ### Link 2 — barrel breech → turret mount
 4. **Attach** — place the barrel pivot at the turret's `mount × scale` (mount tracks the scaled
@@ -95,14 +106,12 @@ ringDiameter   = nativeRingDiameter(hull)        // cached, see below
 scale          = ringDiameter / turretBuilt.base.diameter   // = 1 when turret IS the native
 
 turretPivot.position = hull.ringCenter           // ring center on the deck
-turretBuilt.root.parent  = turretPivot
-turretBuilt.root.scaling = (scale, scale, scale)
-turretBuilt.root.position = base.center.scale(-scale)   // base-center → pivot, base-plane → deck
+turretBuilt.root.parent   = turretPivot
+turretBuilt.root.scaling  = (scale, scale, scale)  // scale about origin; ring stays at origin
+// no position offset — the turret is already centered on its ring at the origin
 
-// barrelPivot is a sibling of the turret root, so it does NOT inherit the turret's
-// -base.center recentering offset — apply it here: where the mount actually ended up is
-// scale × (mount - base.center) in turretPivot space.
-barrelPivot.position = turretBuilt.mount.subtract(turretBuilt.base.center).scale(scale)
+// barrelPivot is a sibling of the turret root; the mount scales about the origin too.
+barrelPivot.position = turretBuilt.mount.scale(scale)
 barrelPivot.parent   = turretPivot
 cannon.root.parent   = barrelPivot      // cannon keeps its own real-world size (not turret-scaled)
 ```
@@ -153,29 +162,24 @@ invariants and `console.warn`s (with the loadout) on any violation. This is the 
 off-center, or mis-scaled turret without a human looking, so dropping in a **new** turret GLB
 is self-policing. Checks (each with a small tolerance):
 
-The checks mirror the alignment chain — one per link:
+The checks are the ones that are *reliable* given the mantlet skew — they police orientation,
+fit, and aim (the failure modes we actually hit), while X/Z/Y centering is guaranteed by the
+extraction contract + `ringCenter` rather than re-measured (a re-measured center would
+false-fail on the mantlet).
 
 **Link 1 — turret on hull:**
-1. **Centered.** Turret base-center world X/Z ≈ hull ringCenter X/Z (|Δ| < ~0.05 u).
-2. **Seated, not floating/sunk.** Turret base-plane world Y ≈ hull deck Y (|Δ| < ~0.05 u).
-3. **Fits.** `turret.base.diameter × scale` ≈ ringDiameter (asserts the scale math + guards bad data).
-4. **Turret orientation — gun on the front.** `turret.mount.z > 0` in the turret's post-yaw
-   frame (the barrel mount / mantlet is on the +Z side of the base center). A turret yawed the
-   wrong way puts the mount behind center and fails this.
+1. **Turret orientation — gun on the front.** `turret.mount.z > 0` (the barrel mount is forward
+   of the turret origin). A turret yawed 180° wrong puts the mount behind the origin and fails.
+2. **Fits / sane scale.** `0.3 < scale < 3.0`; outside that range warn (bad base measurement or
+   wrong-units GLB) and clamp/fall back to `scale = 1`.
 
 **Link 2 — barrel on turret:**
-5. **Barrel seated.** Cannon `breech` world position ≈ `barrelPivot` world position (the gun
-   attaches at the mount, |Δ| small).
-6. **Barrel aimed forward.** Assembled barrel tip world Z > breech world Z (the tube extends
-   game-forward, +Z), and the tip is forward of the turret pivot.
+3. **Barrel aimed forward.** The cannon's furthest world +Z point is ahead of the barrel pivot
+   (the tube extends game-forward), and the barrel pivot is forward of the turret pivot.
 
-**Whole composition:**
-7. **Sane scale.** `0.3 < scale < 3.0`; outside that range warn (likely a bad base measurement
-   or wrong-units GLB) and clamp/fall back to `scale = 1`.
-
-These are cheap (a few vector comparisons) and run only in dev; they don't gate production. Any
-failure `console.warn`s the loadout and which link failed, so a bad new part is named, not just
-suspected.
+These are cheap (a few comparisons) and run only in dev; they don't gate production. Any failure
+`console.warn`s the loadout and which link failed, so a bad new part is named, not just suspected.
+(Centering/seating remain on the visual-verification checklist below.)
 
 ## Visual verification
 

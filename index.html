@@ -663,6 +663,72 @@
       color: #00e5ff;
     }
     #hangar-panel-close:hover { background: rgba(0,229,255,0.08); }
+
+    /* Lounge customization panel — left-docked, scene stays visible */
+    #lounge-panel {
+      position: fixed;
+      top: 50%;
+      left: 28px;
+      transform: translateY(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 240px;
+      padding: 20px 22px;
+      background: rgba(0,8,20,0.93);
+      border: 1px solid #00e5ff;
+      box-shadow: 0 0 24px rgba(0,229,255,0.15);
+      font-family: 'Press Start 2P', monospace;
+    }
+    #lounge-panel .lng-head {
+      color: #00e5ff;
+      font-size: 12px;
+      letter-spacing: 3px;
+    }
+    #lounge-panel .lng-sub {
+      color: #2f6470;
+      font-size: 7px;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    #lounge-panel .lng-grp { display: flex; flex-direction: column; gap: 6px; }
+    #lounge-panel .lng-lbl {
+      color: #5fb8c4;
+      font-size: 8px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #lounge-panel .lng-btns { display: flex; flex-wrap: wrap; gap: 5px; }
+    #lounge-panel .lng-btns button {
+      background: #0a1824;
+      color: #7fc8d4;
+      border: 1px solid #1b4250;
+      padding: 7px 9px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      letter-spacing: 1px;
+      cursor: none;
+    }
+    #lounge-panel .lng-btns button:hover { border-color: #00e5ff66; color: #bdeef4; }
+    #lounge-panel .lng-btns button.on {
+      background: rgba(0,229,255,0.13);
+      border-color: #00e5ff;
+      color: #d8fbff;
+      box-shadow: 0 0 8px rgba(0,229,255,0.27);
+    }
+    #lounge-panel-close {
+      margin-top: 6px;
+      background: transparent;
+      border: 1px solid #00e5ff;
+      color: #00e5ff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      letter-spacing: 2px;
+      padding: 9px 12px;
+      cursor: none;
+    }
+    #lounge-panel-close:hover { background: rgba(0,229,255,0.08); }
   </style>
 </head>
 <body>
@@ -761,6 +827,42 @@
       <button id="hangar-panel-deploy" style="display:none">DEPLOY</button>
       <button id="hangar-panel-close">CLOSE [ESC]</button>
     </div>
+  </div>
+
+  <!-- Lounge customization — left-docked so the live lounge stays visible -->
+  <div id="lounge-panel" style="display:none">
+    <div class="lng-head">SW LOUNGE</div>
+    <div class="lng-sub">L-COUCH · CORNER REST AREA</div>
+
+    <div class="lng-grp">
+      <div class="lng-lbl">Upholstery</div>
+      <div class="lng-btns">
+        <button data-uph="oxblood">Oxblood</button>
+        <button data-uph="olive">Olive</button>
+        <button data-uph="gray">Gray wool</button>
+      </div>
+    </div>
+
+    <div class="lng-grp">
+      <div class="lng-lbl">Coffee table</div>
+      <div class="lng-btns">
+        <button data-table="crate">Ammo crate</button>
+        <button data-table="metal">Metal</button>
+        <button data-table="spool">Spool</button>
+      </div>
+    </div>
+
+    <div class="lng-grp">
+      <div class="lng-lbl">Extras (toggle)</div>
+      <div class="lng-btns">
+        <button data-extra="lamp">Lamp</button>
+        <button data-extra="rug">Rug</button>
+        <button data-extra="poster">Poster</button>
+        <button data-extra="scatter">Scatter</button>
+      </div>
+    </div>
+
+    <button id="lounge-panel-close">CLOSE [E / ESC]</button>
   </div>
 
   <div id="aim-indicator">

@@ -333,6 +333,9 @@ export default class TankDesignerScene {
             hb.classList.add('active');
             this._activeHullBtn = hb;
             this._equippedHull  = hull.id;
+            // Adopt the equipped turret's natural gun so the cannon matches the turret.
+            const turret = PARTS_BY_ID[this._equippedTurret];
+            if (turret?.defaultCannon) this._equippedCannon = turret.defaultCannon;
             this._rebuildComposed();
           });
           sidebar.appendChild(hb);
@@ -464,7 +467,7 @@ export default class TankDesignerScene {
     this._toDispose.push(modelRoot, turretPivot, barrelPivot, hullMat, turretMat, trackMat);
 
     // Barrel — async GLB load; fire-and-forget (appears shortly after tank loads)
-    this._activeModelConfig  = { cannonOffsets: { 'cannon-90mm': { z: -0.6 }, 'cannon-100mm': { z: -0.35 } } };
+    this._activeModelConfig  = { cannonOffsets: { 'cannon-90mm': { z: -0.6 }, 'cannon-t44-100mm': { z: -0.35 } } };
     this._buildCannon(this._equippedCannon, turretMat).catch(e =>
       console.error('[cannon] build failed:', e)
     );
@@ -499,11 +502,14 @@ export default class TankDesignerScene {
 
     this._clearCurrentModel();
 
-    // Hull + turret self-paint (textures tinted via applyModelPaint). Barrel = flat body color.
+    // Barrel is painted the body color of the equipped turret (red T-44, blue M26) so it
+    // reads as part of the tank, matching the hull/turret paint.
+    const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
     const cannonMat = new StandardMaterial('compCannon', this.scene);
-    cannonMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
+    cannonMat.diffuseColor  = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
     cannonMat.specularColor = new Color3(0.05, 0.06, 0.07);
     cannonMat.specularPower = 8;
+    cannonMat.backFaceCulling = false;  // barrel base faces don't cull -> no floating gap
     this._toDispose.push(cannonMat);
 
     assembleTank(this.scene, loadout, { cannon: cannonMat })
@@ -1002,6 +1008,7 @@ export default class TankDesignerScene {
       item.appendChild(stats);
       item.addEventListener('click', () => {
         this._equippedTurret = part.id;
+        if (part.defaultCannon) this._equippedCannon = part.defaultCannon;
         this._rebuildComposed();
         this._hideTurretDropdown();
       });

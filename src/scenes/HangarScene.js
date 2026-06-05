@@ -1,10 +1,14 @@
 import {
   Scene, HemisphericLight, DirectionalLight, PointLight,
-  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh,
+  MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh, SceneLoader,
+  DynamicTexture,
 } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf } from './HangarProps.js';
+import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
+import { applyModelPaint } from '../utils/modelPaint.js';
 
 const ROOM_W   = 24;    // width (X)
 const ROOM_D   = 32;    // depth (Z), north = positive Z
@@ -14,9 +18,10 @@ const TUNNEL_W = 5;     // tunnel opening width, centered on north wall
 const TUNNEL_LEN = 24;  // extended so fog fade reaches full black naturally
 
 export default class HangarScene {
-  constructor(engine, onDeploy) {
+  constructor(engine, onDeploy, onExit) {
     this.scene    = new Scene(engine);
     this.onDeploy = onDeploy;
+    this.onExit   = onExit;
 
     this.scene.clearColor        = new Color4(0.04, 0.04, 0.06, 1.0);
     this.scene.collisionsEnabled = true;
@@ -194,16 +199,32 @@ export default class HangarScene {
     mouth.intensity          = 1.3;
     mouth.range              = 18;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
+
+    // East-side fill — the QM corner at (11, 0) sits in the overhead light's shadow.
+    // A soft low-hanging bulb on the east wall lifts the rack out of darkness without
+    // creating a competing hotspot on the west side.
+    const eastFill = new PointLight('east-fill', new Vector3(10.5, 3.2, 0), this.scene);
+    eastFill.diffuse   = new Color3(1.0, 0.90, 0.75);
+    eastFill.intensity = 0.5;
+    eastFill.range     = 12;
+
+    // Tank bay spot — overhead light aimed at the parked M26 so it reads as the
+    // hero piece of the room. Kept warm to match the bulb palette.
+    const baySpot = new PointLight('bay-spot', new Vector3(0, 5, 10), this.scene);
+    baySpot.diffuse   = new Color3(1.0, 0.93, 0.80);
+    baySpot.intensity = 1.2;
+    baySpot.range     = 14;
   }
 
   _buildStations() {
     const s = this.scene;
 
     this._stationDefs = {
-      map:      { id: 'map',      label: 'INTERACT', title: 'TACTICAL MAP',  body: 'MISSION SELECT\nComing soon.',         showDeploy: true  },
-      radio:    { id: 'radio',    label: 'INTERACT', title: 'RADIO / INTEL', body: 'STAND BY FOR BRIEFING.\nComing soon.', showDeploy: false },
-      mechanic: { id: 'mechanic', label: 'INTERACT', title: 'MECHANIC',      body: 'UPGRADES & REPAIRS\nComing soon.',     showDeploy: false },
-      qm:       { id: 'qm',       label: 'INTERACT', title: 'QUARTERMASTER', body: 'AMMO & SUPPLIES\nComing soon.',        showDeploy: false },
+      map:      { id: 'map',      label: 'INTERACT',  title: 'TACTICAL MAP',  body: 'MISSION SELECT\nComing soon.',         showDeploy: true  },
+      radio:    { id: 'radio',    label: 'INTERACT',  title: 'RADIO / INTEL', body: 'STAND BY FOR BRIEFING.\nComing soon.', showDeploy: false },
+      mechanic: { id: 'mechanic', label: 'INTERACT',  title: 'MECHANIC',      body: 'UPGRADES & REPAIRS\nComing soon.',     showDeploy: false },
+      qm:       { id: 'qm',       label: 'INTERACT',  title: 'QUARTERMASTER', body: 'AMMO & SUPPLIES\nComing soon.',        showDeploy: false },
+      lounge:   { id: 'lounge',   label: 'CUSTOMIZE', title: 'LOUNGE' },
     };
 
     const propMats = makeMats(s);
@@ -214,24 +235,340 @@ export default class HangarScene {
       { mesh: buildQMCrates(s,    11,   0, propMats), data: this._stationDefs.qm       },
     ];
 
-    const tankMat = new StandardMaterial('tank-bay', s);
-    tankMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
-    tankMat.specularColor = new Color3(0.1,  0.1,  0.1);
-
-    // Tank bay placeholder — large enough to read as a real tank from above
-    const hull = MeshBuilder.CreateBox('tank-hull', { width: 5, height: 1.8, depth: 8 }, s);
-    hull.position = new Vector3(0, 0.9, 10);
-    hull.material = tankMat;
-
-    const turret = MeshBuilder.CreateBox('tank-turret', { width: 3.2, height: 1.2, depth: 3.5 }, s);
-    turret.position = new Vector3(0, 2.4, 9.5);
-    turret.material = tankMat;
-
-    const barrel = MeshBuilder.CreateBox('tank-barrel', { width: 0.45, height: 0.45, depth: 4 }, s);
-    barrel.position = new Vector3(0, 2.4, 12.5);
-    barrel.material = tankMat;
+    // SW-corner lounge — a stateful, customizable station (press E to open the
+    // customization panel; choices persist in localStorage).
+    this._loungeConfig = this._loadLoungeConfig();
+    this._lounge = buildLounge(s, propMats, this._loungeConfig);
+    this._stationMeshes.push({ mesh: this._lounge.collider, data: this._stationDefs.lounge });
 
     this._tankPosition = new Vector3(0, 0, 10);
+    this._buildBayGeometry();
+    this._buildBayProps(propMats);
+    this._loadTankDisplay();
+    this._buildExitDoor();
+    this._buildExitFloorMark();
+  }
+
+  async _loadTankDisplay() {
+    const s = this.scene;
+    const filename = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
+
+    let manifest;
+    try {
+      manifest = await fetch('/models/manifest.json').then(r => r.json());
+    } catch (e) {
+      console.warn('[Hangar] manifest fetch failed', e);
+      return;
+    }
+    const config = manifest[filename];
+    if (!config) return;
+
+    let result;
+    try {
+      result = await SceneLoader.ImportMeshAsync('', '/models/', filename, s);
+    } catch (e) {
+      console.warn('[Hangar] tank GLB failed to load:', e);
+      return;
+    }
+
+    const glbRoot = result.transformNodes.find(n => n.name === config.root);
+    if (!glbRoot) return;
+
+    // T-55 faces +X in its GLB — rotate so it faces north (+Z) like the M26
+    if (config.facingAxis === '+X') glbRoot.rotation.y = -Math.PI / 2;
+
+    // Compute scale from targetWidth; fall back for tanks that don't declare one
+    result.meshes.forEach(m => m.computeWorldMatrix(true));
+    const validMeshes = result.meshes.filter(m => m.getTotalVertices() > 0);
+    let scale = 0.8;
+    if (config.targetWidth && validMeshes.length) {
+      const xs = validMeshes.flatMap(m => [
+        m.getBoundingInfo().boundingBox.minimumWorld.x,
+        m.getBoundingInfo().boundingBox.maximumWorld.x,
+      ]);
+      const rawW = Math.max(...xs) - Math.min(...xs);
+      if (rawW > 0) scale = config.targetWidth / rawW;
+    }
+    glbRoot.scaling.setAll(scale);
+
+    // Re-compute after scale, then sit the tank on top of the plinth (y=0.25)
+    result.meshes.forEach(m => m.computeWorldMatrix(true));
+    const minY = Math.min(...validMeshes.map(m =>
+      m.getBoundingInfo().boundingBox.minimumWorld.y));
+    glbRoot.position.set(0, 0 - minY, 10);
+
+    applyModelPaint(result.meshes, config, s);
+  }
+
+  _buildBayGeometry() {
+    const s = this.scene;
+
+    // Concrete pad — lighter zone that marks the vehicle bay from the dark floor
+    const padMat = new StandardMaterial('bay-pad', s);
+    padMat.diffuseColor  = new Color3(0.22, 0.20, 0.18);
+    padMat.specularColor = new Color3(0.02, 0.02, 0.02);
+    const pad = MeshBuilder.CreateBox('bay-pad', { width: 12, height: 0.02, depth: 9 }, s);
+    pad.position = new Vector3(0, 0.01, 10);
+    pad.material = padMat;
+
+    // Yellow safety stripes around the pad perimeter
+    const stripeMat = new StandardMaterial('bay-stripe', s);
+    stripeMat.diffuseColor  = new Color3(0.78, 0.62, 0.04);
+    stripeMat.specularColor = new Color3(0.04, 0.04, 0.04);
+
+    // Stripes sit 0.5u inset from the new pad edge (pad: x ±6, z 5.5–14.5).
+    // E/W stripes anchor the box; N/S width fits between them minus corner overlap.
+    const ST = 0.12;
+    const stripeData = [
+      { name: 'stripe-n', w: 11 - ST * 2, h: 0.03, d: ST, x: 0,           z: 14.0          },
+      { name: 'stripe-s', w: 11 - ST * 2, h: 0.03, d: ST, x: 0,           z:  6.0          },
+      { name: 'stripe-e', w: ST,           h: 0.03, d: 8,  x:  5.5 - ST/2, z: 10            },
+      { name: 'stripe-w', w: ST,           h: 0.03, d: 8,  x: -5.5 + ST/2, z: 10            },
+    ];
+    for (const { name, w, h, d, x, z } of stripeData) {
+      const stripe = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, s);
+      stripe.position = new Vector3(x, 0.03, z);
+      stripe.material = stripeMat;
+    }
+
+  }
+
+  _buildBayProps(propMats) {
+    const s = this.scene;
+
+    // Drain tray — dark oil-stained rectangle under the tank
+    const trayMat = new StandardMaterial('drain-tray', s);
+    trayMat.diffuseColor  = new Color3(0.08, 0.07, 0.06);
+    trayMat.specularColor = new Color3(0.06, 0.06, 0.06);
+    const tray = MeshBuilder.CreateBox('drain-tray', { width: 4, height: 0.04, depth: 6.5 }, s);
+    tray.position = new Vector3(0, 0.03, 10);
+    tray.material = trayMat;
+
+    // Rolling mechanic cart — sits east of the tank on the pad, easy to read from above
+    const cartMat = new StandardMaterial('cart-body', s);
+    cartMat.diffuseColor  = new Color3(0.18, 0.26, 0.14); // olive-green like cabinet
+    cartMat.specularColor = new Color3(0.03, 0.03, 0.03);
+    const cartTopMat = new StandardMaterial('cart-top', s);
+    cartTopMat.diffuseColor  = new Color3(0.24, 0.22, 0.20); // worn metal work surface
+    cartTopMat.specularColor = new Color3(0.06, 0.06, 0.06);
+
+    const CART_X = 3.5;
+    const CART_Z = 6.8;
+    const cartBody = MeshBuilder.CreateBox('cart-body', { width: 1.4, height: 0.85, depth: 0.9 }, s);
+    cartBody.position = new Vector3(CART_X, 0.68, CART_Z);
+    cartBody.material = cartMat;
+    const cartSurface = MeshBuilder.CreateBox('cart-surface', { width: 1.3, height: 0.05, depth: 0.8 }, s);
+    cartSurface.position = new Vector3(CART_X, 1.125, CART_Z);
+    cartSurface.material = cartTopMat;
+    const cartDrawer = MeshBuilder.CreateBox('cart-drawer', { width: 1.2, height: 0.65, depth: 0.05 }, s);
+    cartDrawer.position = new Vector3(CART_X, 0.63, CART_Z - 0.45 - 0.025);
+    cartDrawer.material = propMats.darkMetal;
+    const cartHandle = MeshBuilder.CreateBox('cart-handle', { width: 0.35, height: 0.07, depth: 0.04 }, s);
+    cartHandle.position = new Vector3(CART_X, 0.63, CART_Z - 0.45 - 0.06);
+    cartHandle.material = cartTopMat;
+    const wheelMat = propMats.darkMetal;
+    const wheelPositions = [[-0.55, -0.38], [0.55, -0.38], [-0.55, 0.38], [0.55, 0.38]];
+    for (let i = 0; i < wheelPositions.length; i++) {
+      const [wx, wz] = wheelPositions[i];
+      const wheel = MeshBuilder.CreateCylinder(`cart-wheel-${i}`, { diameter: 0.18, height: 0.12, tessellation: 8 }, s);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position   = new Vector3(CART_X + wx, 0.25, CART_Z + wz);
+      wheel.material   = wheelMat;
+    }
+
+    // Tool cabinet — dark green body with drawer detail
+    const cabinetMat = new StandardMaterial('cabinet', s);
+    cabinetMat.diffuseColor  = new Color3(0.18, 0.26, 0.14);
+    cabinetMat.specularColor = new Color3(0.02, 0.02, 0.02);
+    // Cabinet — north wall
+    const CABINET_Z = 15.75;
+    const cabinet = MeshBuilder.CreateBox('cabinet', { width: 0.75, height: 1.8, depth: 1.5 }, s);
+    cabinet.position = new Vector3(-3.5, 0.9, CABINET_Z);
+    cabinet.material = cabinetMat;
+
+    const drawerMat = new StandardMaterial('cabinet-drawer', s);
+    drawerMat.diffuseColor  = new Color3(0.22, 0.30, 0.17);
+    drawerMat.specularColor = new Color3(0.02, 0.02, 0.02);
+    const handleMat = propMats.darkMetal;
+    // Drawers on south face (toward tank)
+    const DRAWER_Z = CABINET_Z - 0.75 - 0.01;
+    const drawerYs = [-0.5, 0, 0.5];
+    for (let i = 0; i < drawerYs.length; i++) {
+      const drawer = MeshBuilder.CreateBox(`drawer-${i}`, { width: 0.55, height: 0.22, depth: 0.06 }, s);
+      drawer.position = new Vector3(-3.5, 0.9 + drawerYs[i], DRAWER_Z);
+      drawer.material = drawerMat;
+      const handle = MeshBuilder.CreateBox(`handle-${i}`, { width: 0.15, height: 0.07, depth: 0.06 }, s);
+      handle.position = new Vector3(-3.5, 0.9 + drawerYs[i], DRAWER_Z - 0.05);
+      handle.material = handleMat;
+    }
+
+    // Parts crates — north wall
+    const CRATE_Z = 15.75;
+    const crateBot = MeshBuilder.CreateBox('crate-bot', { width: 1.2, height: 0.8, depth: 1.0 }, s);
+    crateBot.position = new Vector3(3.5, 0.4, CRATE_Z);
+    crateBot.material = propMats.crate;
+    const crateTop = MeshBuilder.CreateBox('crate-top', { width: 0.9, height: 0.6, depth: 0.75 }, s);
+    crateTop.position = new Vector3(3.5, 1.1, CRATE_Z);
+    crateTop.material = propMats.crateMed;
+
+    // Oil drums — two side-by-side west of the tank; instantly readable from above
+    const drumBodyMat = new StandardMaterial('drum-body', s);
+    drumBodyMat.diffuseColor  = new Color3(0.15, 0.14, 0.13); // dark steel
+    drumBodyMat.specularColor = new Color3(0.08, 0.08, 0.08);
+    const drumBandMat = new StandardMaterial('drum-band', s);
+    drumBandMat.diffuseColor  = new Color3(0.22, 0.20, 0.18); // slightly lighter ring
+    drumBandMat.specularColor = new Color3(0.04, 0.04, 0.04);
+    const drumLidMat = new StandardMaterial('drum-lid', s);
+    drumLidMat.diffuseColor  = new Color3(0.22, 0.28, 0.14); // olive-green top
+    drumLidMat.specularColor = new Color3(0.02, 0.02, 0.02);
+
+    // Drums at south edge of pad — form the left side of the prop wall facing the tank
+    const drumPositions = [{ x: -5.0, z: 6.4 }, { x: -4.2, z: 6.4 }];
+    for (let i = 0; i < drumPositions.length; i++) {
+      const { x: dx, z: dz } = drumPositions[i];
+      const body = MeshBuilder.CreateCylinder(`drum-body-${i}`, { diameter: 0.72, height: 1.0, tessellation: 12 }, s);
+      body.position = new Vector3(dx, 0.5, dz);
+      body.material = drumBodyMat;
+      const band = MeshBuilder.CreateCylinder(`drum-band-${i}`, { diameter: 0.78, height: 0.12, tessellation: 12 }, s);
+      band.position = new Vector3(dx, 0.5, dz);
+      band.material = drumBandMat;
+      const lid = MeshBuilder.CreateCylinder(`drum-lid-${i}`, { diameter: 0.68, height: 0.06, tessellation: 12 }, s);
+      lid.position = new Vector3(dx, 1.03, dz);
+      lid.material = drumLidMat;
+    }
+  }
+
+  _buildExitDoor() {
+    const s = this.scene;
+    const wallZ = -ROOM_D / 2; // = -16
+    // Door on the EXTERIOR face — camera swings south as player approaches,
+    // revealing the outside of the wall where the door sits.
+    const faceZ = wallZ - 0.5; // = -16.5, just outside the wall
+
+    // Frame — lighter concrete colour
+    const frameMat = new StandardMaterial('exit-frame', s);
+    frameMat.diffuseColor  = new Color3(0.50, 0.47, 0.43);
+    frameMat.specularColor = new Color3(0.03, 0.03, 0.03);
+    const jambL = MeshBuilder.CreateBox('exit-jamb-l', { width: 0.3, height: 3.6, depth: 0.3 }, s);
+    jambL.position = new Vector3(-1.25, 1.8, faceZ);
+    jambL.material = frameMat;
+    const jambR = MeshBuilder.CreateBox('exit-jamb-r', { width: 0.3, height: 3.6, depth: 0.3 }, s);
+    jambR.position = new Vector3(1.25, 1.8, faceZ);
+    jambR.material = frameMat;
+    const lintel = MeshBuilder.CreateBox('exit-lintel', { width: 2.8, height: 0.3, depth: 0.3 }, s);
+    lintel.position = new Vector3(0, 3.45, faceZ);
+    lintel.material = frameMat;
+
+    // Door panel — sits slightly south of the frame (exterior face visible)
+    const doorMat = new StandardMaterial('exit-door', s);
+    doorMat.diffuseColor  = new Color3(0.28, 0.27, 0.25);
+    doorMat.specularColor = new Color3(0.04, 0.04, 0.04);
+    const door = MeshBuilder.CreateBox('exit-door', { width: 2.2, height: 3.2, depth: 0.12 }, s);
+    door.position = new Vector3(0, 1.7, faceZ - 0.06);
+    door.material = doorMat;
+
+    // Hinges (3) — left side
+    const hingeMat = new StandardMaterial('exit-hinge', s);
+    hingeMat.diffuseColor  = new Color3(0.58, 0.54, 0.50);
+    hingeMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    for (let i = 0; i < 3; i++) {
+      const hinge = MeshBuilder.CreateBox(`exit-hinge-${i}`, { width: 0.08, height: 0.22, depth: 0.18 }, s);
+      hinge.position = new Vector3(-1.0, 0.55 + i * 1.0, faceZ - 0.05);
+      hinge.material = hingeMat;
+    }
+
+    // Handle — right side
+    const handleMat = new StandardMaterial('exit-handle', s);
+    handleMat.diffuseColor  = new Color3(0.70, 0.65, 0.58);
+    handleMat.specularColor = new Color3(0.15, 0.15, 0.15);
+    const handle = MeshBuilder.CreateBox('exit-handle', { width: 0.08, height: 0.5, depth: 0.14 }, s);
+    handle.position = new Vector3(0.85, 1.6, faceZ - 0.14);
+    handle.material = handleMat;
+
+    // Glowing EXIT sign plate — to the right of the frame on the exterior wall
+    const signMat = new StandardMaterial('exit-sign', s);
+    signMat.diffuseColor  = new Color3(0.02, 0.15, 0.15);
+    signMat.emissiveColor = new Color3(0.0, 0.7, 0.62);
+    const sign = MeshBuilder.CreateBox('exit-sign', { width: 1.2, height: 0.35, depth: 0.08 }, s);
+    sign.position = new Vector3(2.2, 2.8, faceZ);
+    sign.material = signMat;
+
+    // Exterior light above the door
+    const doorLight = new PointLight('door-light', new Vector3(0, 4.5, faceZ - 1.5), s);
+    doorLight.diffuse   = new Color3(0.9, 0.85, 0.78);
+    doorLight.intensity = 0.8;
+    doorLight.range     = 10;
+
+    // Proximity trigger — player walks up to south wall from inside
+    this._exitDoorPos = new Vector3(0, 0, wallZ + 2.0);
+  }
+
+  _buildExitFloorMark() {
+    const s = this.scene;
+    // Flush with south wall (z=-16), extending northward into the room
+    const W = 5.5, D = 5.5;
+    const CX = 0, CZ = -ROOM_D / 2 + D / 2; // south edge at z=-16
+    const Y = 0.015;
+    const BT = 0.13;
+
+    // Two-red diagonal fill — dark red base, brighter red 45° stripes, no black
+    const TEX = 512;
+    const dynTex = new DynamicTexture('exit-zone-tex', { width: TEX, height: TEX }, s, false);
+    const ctx = dynTex.getContext();
+    ctx.fillStyle = '#1e1e1e';      // dark gray base
+    ctx.fillRect(0, 0, TEX, TEX);
+    ctx.strokeStyle = '#3a3a3a';    // slightly lighter gray stripes
+    ctx.lineWidth = 44;
+    for (let i = -6; i <= 12; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 90, 0);
+      ctx.lineTo(i * 90 + TEX, TEX);
+      ctx.stroke();
+    }
+    dynTex.update();
+
+    const fillMat = new StandardMaterial('exit-zone-fill', s);
+    fillMat.diffuseTexture = dynTex;
+    fillMat.specularColor  = new Color3(0, 0, 0);
+    const inner = W - BT * 2;
+    const fill = MeshBuilder.CreatePlane('exit-zone-fill', { width: inner, height: inner }, s);
+    fill.rotation.x = Math.PI / 2;
+    fill.position   = new Vector3(CX, Y + 0.005, CZ);
+    fill.material   = fillMat;
+
+    // Border
+    const borderMat = new StandardMaterial('exit-zone-border', s);
+    borderMat.diffuseColor  = new Color3(0.28, 0.28, 0.28);
+    borderMat.specularColor = new Color3(0, 0, 0);
+    [
+      { w: W,  d: BT, x: CX,               z: CZ + D/2 - BT/2 }, // north
+      { w: W,  d: BT, x: CX,               z: CZ - D/2 + BT/2 }, // south
+      { w: BT, d: D,  x: CX - W/2 + BT/2,  z: CZ              }, // west
+      { w: BT, d: D,  x: CX + W/2 - BT/2,  z: CZ              }, // east
+    ].forEach((b, i) => {
+      const bar = MeshBuilder.CreateBox(`exit-bar-${i}`, { width: b.w, height: 0.025, depth: b.d }, s);
+      bar.position = new Vector3(b.x, Y, b.z);
+      bar.material = borderMat;
+    });
+
+    // Corner L-brackets
+    const cornerMat = new StandardMaterial('exit-zone-corner', s);
+    cornerMat.diffuseColor  = new Color3(0.40, 0.40, 0.40);
+    cornerMat.specularColor = new Color3(0, 0, 0);
+    const CL = 0.7;
+    [
+      { x: -W/2, z:  D/2, sx:  1, sz: -1 },
+      { x:  W/2, z:  D/2, sx: -1, sz: -1 },
+      { x: -W/2, z: -D/2, sx:  1, sz:  1 },
+      { x:  W/2, z: -D/2, sx: -1, sz:  1 },
+    ].forEach(({ x, z, sx, sz }, i) => {
+      const ha = MeshBuilder.CreateBox(`exit-ch-${i}`, { width: CL, height: 0.04, depth: 0.13 }, s);
+      ha.position = new Vector3(CX + x + sx * CL/2, Y + 0.01, CZ + z);
+      ha.material = cornerMat;
+      const va = MeshBuilder.CreateBox(`exit-cv-${i}`, { width: 0.13, height: 0.04, depth: CL }, s);
+      va.position = new Vector3(CX + x, Y + 0.01, CZ + z + sz * CL/2);
+      va.material = cornerMat;
+    });
   }
 
   _setupDriver() {
@@ -266,6 +603,14 @@ export default class HangarScene {
 
   _checkProximity(prompt, promptLabel) {
     const pos = this.driver.position;
+
+    // Exit door check
+    if (Vector3.Distance(pos, this._exitDoorPos) < 3.0) {
+      prompt.style.display    = 'flex';
+      promptLabel.textContent = 'EXIT';
+      this._nearStation       = { id: 'exit' };
+      return;
+    }
 
     // Tank check first — mount prompt, no panel
     if (Vector3.Distance(pos, this._tankPosition) < 3.5) {
@@ -307,9 +652,78 @@ export default class HangarScene {
   }
 
   closePanel() {
+    if (this._loungeOpen) { this._closeLounge(); return; }
     this._panelOpen   = false;
     this._nearStation = null;
     document.getElementById('hangar-panel').style.display = 'none';
+  }
+
+  // ── Lounge customization ────────────────────────────────────────────────────
+  _loadLoungeConfig() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('loungeConfig'));
+      if (saved && saved.uph && saved.table && saved.extras) return saved;
+    } catch (e) { /* fall through to default */ }
+    // Deep clone so we never mutate the shared default
+    return JSON.parse(JSON.stringify(LOUNGE_DEFAULT));
+  }
+
+  getLoungeConfig() { return this._loungeConfig; }
+
+  // Merge a partial change ({ uph } | { table } | { extras:{rug} }), live-rebuild
+  // the lounge, and persist. Returns the full updated config.
+  setLoungeConfig(partial) {
+    if (partial.extras) {
+      this._loungeConfig.extras = { ...this._loungeConfig.extras, ...partial.extras };
+    }
+    if (partial.uph)   this._loungeConfig.uph   = partial.uph;
+    if (partial.table) this._loungeConfig.table = partial.table;
+    this._lounge.update(this._loungeConfig);
+    try { localStorage.setItem('loungeConfig', JSON.stringify(this._loungeConfig)); } catch (e) { /* ignore */ }
+    return this._loungeConfig;
+  }
+
+  openLounge() {
+    this._panelOpen  = true;   // pause driver + freeze follow-cam target
+    this._loungeOpen = true;
+    document.getElementById('hangar-prompt').style.display = 'none';
+    document.getElementById('lounge-panel').style.display  = 'flex';
+
+    // Swing the camera to a 3/4 view of the corner so changes are easy to read
+    const c = this.driver.camera;
+    this._camSaved = {
+      alpha: c.alpha, beta: c.beta, radius: c.radius,
+      lower: c.lowerRadiusLimit, upper: c.upperRadiusLimit,
+      target: c.getTarget().clone(),
+    };
+    c.lowerRadiusLimit = 6;
+    c.upperRadiusLimit = 36;
+    c.alpha  = Math.PI * 0.28;
+    c.beta   = 0.95;
+    c.radius = 15;
+    c.setTarget(this._lounge.center.clone());
+  }
+
+  _closeLounge() {
+    this._loungeOpen  = false;
+    this._panelOpen   = false;
+    this._nearStation = null;
+    document.getElementById('lounge-panel').style.display = 'none';
+    const c = this.driver.camera, sv = this._camSaved;
+    if (sv) {
+      c.lowerRadiusLimit = sv.lower;
+      c.upperRadiusLimit = sv.upper;
+      c.alpha  = sv.alpha;
+      c.beta   = sv.beta;
+      c.radius = sv.radius;
+      c.setTarget(sv.target);
+    }
+  }
+
+  exitToMenu() {
+    document.getElementById('hangar-prompt').style.display = 'none';
+    this._nearStation = null;
+    if (this.onExit) this.onExit();
   }
 
   mountTank() {

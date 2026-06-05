@@ -146,7 +146,7 @@ function startHangar() {
     () => {
       canvas.style.display = 'block';
       window.__state = 'HANGAR';
-      hangarScene = new HangarScene(engine, deployToArena);
+      hangarScene = new HangarScene(engine, deployToArena, goToMenu);
       engine.runRenderLoop(() => hangarScene.scene.render());
     },
     'iris'
@@ -245,6 +245,8 @@ document.addEventListener('keydown', (e) => {
       const station = hangarScene._nearStation;
       if (!station) return;
       if (station.id === 'tank') { hangarScene.mountTank(); return; }
+      if (station.id === 'exit') { hangarScene.exitToMenu(); return; }
+      if (station.id === 'lounge') { hangarScene.openLounge(); syncLoungeButtons(hangarScene.getLoungeConfig()); return; }
       hangarScene.openPanel(station);
     }
     if (e.code === 'Escape' && hangarScene._panelOpen) {
@@ -309,6 +311,38 @@ setInterval(() => { if (!document.hidden && !document.hasFocus()) autoPause(); }
 
 document.getElementById('hangar-panel-deploy').addEventListener('click', deployToArena);
 document.getElementById('hangar-panel-close').addEventListener('click', () => {
+  if (hangarScene) hangarScene.closePanel();
+});
+
+// ── Lounge customization panel ────────────────────────────────────────────────
+// Reflect the active config on the panel buttons (`.on` class = selected).
+function syncLoungeButtons(cfg) {
+  document.querySelectorAll('#lounge-panel [data-uph]').forEach(b =>
+    b.classList.toggle('on', b.dataset.uph === cfg.uph));
+  document.querySelectorAll('#lounge-panel [data-table]').forEach(b =>
+    b.classList.toggle('on', b.dataset.table === cfg.table));
+  document.querySelectorAll('#lounge-panel [data-extra]').forEach(b =>
+    b.classList.toggle('on', !!cfg.extras[b.dataset.extra]));
+}
+
+document.querySelectorAll('#lounge-panel [data-uph]').forEach(b =>
+  b.addEventListener('click', () => {
+    if (!hangarScene) return;
+    syncLoungeButtons(hangarScene.setLoungeConfig({ uph: b.dataset.uph }));
+  }));
+document.querySelectorAll('#lounge-panel [data-table]').forEach(b =>
+  b.addEventListener('click', () => {
+    if (!hangarScene) return;
+    syncLoungeButtons(hangarScene.setLoungeConfig({ table: b.dataset.table }));
+  }));
+document.querySelectorAll('#lounge-panel [data-extra]').forEach(b =>
+  b.addEventListener('click', () => {
+    if (!hangarScene) return;
+    const k = b.dataset.extra;
+    const on = !hangarScene.getLoungeConfig().extras[k];
+    syncLoungeButtons(hangarScene.setLoungeConfig({ extras: { [k]: on } }));
+  }));
+document.getElementById('lounge-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
 });
 
