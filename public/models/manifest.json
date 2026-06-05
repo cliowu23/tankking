@@ -6,7 +6,7 @@
     "facingAxis": "+Z",
     "targetWidth": 3.2,
     "zCenterAdjust": 1.05,
-    "turretPivotZOffset": 0.78,
+    "turretPivotZOffset": 0,
     "barrelTipOffset": 3.8,
     "centerTurretX": true,
     "elevationDeg": 20,

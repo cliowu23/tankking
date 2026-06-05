@@ -7,6 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { PARTS, PARTS_BY_ID } from '../parts/index.js';
 import { assembleTank } from '../parts/assembleTank.js';
+import { measureBasket } from '../parts/measureBasket.js';
 
 const PAD_Y = 0.06;
 
@@ -686,14 +687,21 @@ export default class TankDesignerScene {
       const turretAbsPos = turretNode ? turretNode.absolutePosition.clone() : null;
       const mountAbsPos  = mountNode  ? mountNode.absolutePosition.clone()  : null;
 
-      // 7a. Turret pivot — same logic as arena loader
+      // 7a. Turret pivot — pivot about the turret's detected basket (ring) centre so it spins
+      //     in place, instead of the GLB's `turret` empty which sits behind the dome. The same
+      //     adaptive detection assembleTank uses: measureBasket finds the dome centre and strips
+      //     the forward-protruding gun (dome straddles the ring, the barrel/MG don't).
       if (turretNode) {
+        const turretMeshes = result.meshes.filter(m => m.isDescendantOf(turretNode));
+        const basket  = measureBasket(turretMeshes, turretAbsPos.z);   // basket centre, world XZ
         turretNode.setParent(turretPivot);
-        const rootInv = Matrix.Invert(modelRoot.getWorldMatrix());
-        const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
-        const pivotZShift = config.turretPivotZOffset ?? 0;
-        turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
-        turretPivot.position.z = localPos.z + pivotZShift;
+        const rootInv     = Matrix.Invert(modelRoot.getWorldMatrix());
+        const localPos    = Vector3.TransformCoordinates(turretAbsPos, rootInv);  // empty (height)
+        const basketLocal = Vector3.TransformCoordinates(basket.center, rootInv); // pivot XZ
+        const pivotZShift = config.turretPivotZOffset ?? 0;   // optional manual nudge (default 0)
+        turretPivot.position.x = config.centerTurretX ? 0 : basketLocal.x;
+        turretPivot.position.z = basketLocal.z + pivotZShift;
+        console.log(`[Inspector] ${filename} basket pivot z=${(basketLocal.z + pivotZShift).toFixed(3)} (empty z=${localPos.z.toFixed(3)}) from ${basket.domeMeshes.length} dome meshes`);
         if (localPos.y > 0.3) {
           turretPivot.position.y = localPos.y;
         } else {

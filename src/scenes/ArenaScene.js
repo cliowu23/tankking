@@ -6,6 +6,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
+import { measureBasket } from '../parts/measureBasket.js';
 import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
@@ -412,16 +413,22 @@ export default class ArenaScene {
       const turretAbsPos = turretNode ? turretNode.absolutePosition.clone() : null;
       const mountAbsPos  = mountNode  ? mountNode.absolutePosition.clone()  : null;
 
-      // --- 7a. Turret → turretPivot, then move pivot to actual turret ring ---
+      // --- 7a. Turret → turretPivot, then move pivot to the detected basket (ring) centre ---
       if (turretNode) {
+        // Pivot about the turret's basket centre so it spins in place, not the GLB `turret`
+        // empty (which sits behind the dome). Same adaptive detection as the designer +
+        // assembleTank: measureBasket finds the dome centre and strips the forward-jutting gun.
+        const turretMeshes = result.meshes.filter(m => m.isDescendantOf(turretNode));
+        const basket = measureBasket(turretMeshes, turretAbsPos.z);   // basket centre, world XZ
         turretNode.setParent(this.tank.turretPivot);
         // GLB node origins sit at the model's base plane (y≈0), so absolutePosition.y
         // is not useful for height. Only correct X and Z (the "too far forward" issue).
         const rootInv = Matrix.Invert(this.tank.root.getWorldMatrix());
-        const localPos = Vector3.TransformCoordinates(turretAbsPos, rootInv);
-        const pivotZShift = config.turretPivotZOffset ?? 0;
-        this.tank.turretPivot.position.x = config.centerTurretX ? 0 : localPos.x;
-        this.tank.turretPivot.position.z = localPos.z + pivotZShift;
+        const localPos    = Vector3.TransformCoordinates(turretAbsPos, rootInv);  // empty (height)
+        const basketLocal = Vector3.TransformCoordinates(basket.center, rootInv); // pivot XZ
+        const pivotZShift = config.turretPivotZOffset ?? 0;   // optional manual nudge (default 0)
+        this.tank.turretPivot.position.x = config.centerTurretX ? 0 : basketLocal.x;
+        this.tank.turretPivot.position.z = basketLocal.z + pivotZShift;
         // Use GLB turret node Y if it carries meaningful height (explicitly placed pivot),
         // otherwise fall back to Tank.js default (0.55) for models where node Y ≈ 0.
         if (localPos.y > 0.3) {
