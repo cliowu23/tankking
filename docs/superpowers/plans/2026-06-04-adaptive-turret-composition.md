@@ -318,7 +318,6 @@ Full file:
 ```javascript
 import { TransformNode, Vector3 } from '@babylonjs/core';
 import { PARTS_BY_ID } from './index.js';
-import { measureBase } from './measureBase.js';
 
 // Native ring diameter cache: a hull's ring is as big as its native turret's base.
 // Keyed by turret id; value is the measured base diameter.
@@ -340,39 +339,29 @@ async function nativeRingDiameter(scene, hullPart, equippedTurretId, equippedBas
   return d;
 }
 
-// Dev-only self-check: assert each alignment link and warn (naming the link + loadout)
-// on any violation. Re-measures the PLACED turret so center/seat/fit are verified from the
-// real assembled geometry (independent of the offset math), not just asserted by construction.
+// Dev-only self-check: warn (naming the link + loadout) on the reliable failure modes —
+// orientation, scale sanity, and barrel aim. Centering/seating are guaranteed by the
+// extraction contract (turret centered on its ring at origin) + the hull's ringCenter, NOT
+// re-measured: a turret's lowest slice is its mantlet, so a re-measured center would
+// false-fail (M26 bottom-slice center reads Z≈+0.6). Those stay on the visual checklist.
 function validateComposition(ctx) {
-  const { loadout, turretPivot, barrelPivot, ringDiameter, turretBuilt, cannonBuilt } = ctx;
-  const TOL = 0.08;
+  const { loadout, turretPivot, barrelPivot, scale, turretBuilt, cannonBuilt } = ctx;
   const tag = `${loadout.hull}+${loadout.turret}+${loadout.cannon}`;
   const warn = (link, msg) => console.warn(`[validateComposition] ${tag} — ${link}: ${msg}`);
 
-  // Re-measure the placed turret base in world space (independent of how we positioned it).
-  for (const m of turretBuilt.meshes) m.computeWorldMatrix(true);
-  const placed = measureBase(turretBuilt.meshes);
+  // Link 1: orientation — gun mount is forward of the turret origin (+Z). A 180°-wrong
+  // turret puts the mount behind the origin and fails this.
+  if (!(turretBuilt.mount && turretBuilt.mount.z > 0)) {
+    warn('orientation', `mount.z=${turretBuilt.mount?.z?.toFixed(2)} not > 0 (gun not on front)`);
+  }
+  // Link 1: scale sanity.
+  if (!(scale > 0.3 && scale < 3.0)) warn('scale', `scale ${scale.toFixed(2)} out of sane range`);
+
+  // Link 2: barrel aimed forward — cannon's furthest world +Z is ahead of the barrel pivot,
+  // and the barrel pivot is ahead of the turret pivot.
   turretPivot.computeWorldMatrix(true);
-  const ringW = turretPivot.getAbsolutePosition();
-
-  // Link 1: centered — placed base center over the ring (X/Z).
-  if (Math.abs(placed.center.x - ringW.x) > TOL || Math.abs(placed.center.z - ringW.z) > TOL) {
-    warn('centered', `base xz (${placed.center.x.toFixed(2)},${placed.center.z.toFixed(2)}) != ring (${ringW.x.toFixed(2)},${ringW.z.toFixed(2)})`);
-  }
-  // Link 1: seated — placed base plane at the deck (Y).
-  if (Math.abs(placed.y - ringW.y) > TOL) {
-    warn('seated', `base y ${placed.y.toFixed(2)} != deck ${ringW.y.toFixed(2)}`);
-  }
-  // Link 1: fits — placed base diameter matches the ring.
-  if (Math.abs(placed.diameter - ringDiameter) > TOL) {
-    warn('fits', `placed base diameter ${placed.diameter.toFixed(2)} != ring ${ringDiameter.toFixed(2)}`);
-  }
-  // Link 1: orientation — gun mount on the +Z (front) side of the base center.
-  const mZ = turretBuilt.mount ? turretBuilt.mount.z - turretBuilt.base.center.z : null;
-  if (!(mZ > 0)) warn('orientation', `mount not forward of base center (Δz=${mZ?.toFixed(2)})`);
-
-  // Link 2: barrel aimed forward — cannon's furthest world Z is ahead of the barrel pivot.
   barrelPivot.computeWorldMatrix(true);
+  const turretZ = turretPivot.getAbsolutePosition().z;
   const pivotZ = barrelPivot.getAbsolutePosition().z;
   let tipZ = -Infinity;
   for (const m of cannonBuilt.meshes) {
@@ -380,7 +369,8 @@ function validateComposition(ctx) {
     const z = m.getBoundingInfo().boundingBox.maximumWorld.z;
     if (z > tipZ) tipZ = z;
   }
-  if (!(tipZ > pivotZ)) warn('barrel-aim', `tip z=${tipZ.toFixed(2)} not forward of pivot z=${pivotZ.toFixed(2)}`);
+  if (!(tipZ > pivotZ)) warn('barrel-aim', `tip z=${tipZ.toFixed(2)} not forward of barrel pivot z=${pivotZ.toFixed(2)}`);
+  if (!(pivotZ >= turretZ - 0.01)) warn('barrel-attach', `barrel pivot z=${pivotZ.toFixed(2)} behind turret pivot z=${turretZ.toFixed(2)}`);
 }
 
 // Composes a {hull, turret, cannon} loadout into one tank via the alignment chain
@@ -404,25 +394,23 @@ export async function assembleTank(scene, loadout, materials = {}) {
 
   const turretBuilt = await turretPart.build(scene);
 
-  // 3. Scale turret so its base diameter matches the ring; center base on the pivot and
-  //    seat its base plane at the deck. base.center is in the turret's post-yaw frame; with
-  //    uniform scale s, a frame point Q maps to pivot-space P + s·Q, and P = -s·base.center
-  //    puts base.center at the pivot origin and base.y at the deck.
+  // 3. Scale the turret so its base diameter matches the ring. The turret is already
+  //    centered on its ring at its origin (extraction contract), so we place the origin at
+  //    the ring and scale about it — the ring stays put, the dome scales around it. No
+  //    re-centering offset (a measured center would be skewed by the low-hanging mantlet).
   const ringDiameter = await nativeRingDiameter(scene, hullPart, loadout.turret, turretBuilt.base);
   let scale = ringDiameter / turretBuilt.base.diameter;
   if (!(scale > 0.3 && scale < 3.0)) {
     console.warn(`[assembleTank] scale ${scale.toFixed(3)} out of range for ${loadout.turret} on ${loadout.hull}; using 1`);
     scale = 1;
   }
-  turretBuilt.root.parent   = turretPivot;
-  turretBuilt.root.scaling  = new Vector3(scale, scale, scale);
-  turretBuilt.root.position = turretBuilt.base.center.scale(-scale);
+  turretBuilt.root.parent  = turretPivot;
+  turretBuilt.root.scaling = new Vector3(scale, scale, scale);
 
-  // 4. Barrel pivot at the scaled, recentered mount. barrelPivot is a sibling of the turret
-  //    root, so apply the same -base.center recentering: mount lands at s·(mount - base.center).
+  // 4. Barrel pivot at the scaled mount (mount scales about the turret origin too).
   const mount = turretBuilt.mount ?? new Vector3(0, 0, 0.5);
   const barrelPivot = new TransformNode('barrelPivot', scene);
-  barrelPivot.position = mount.subtract(turretBuilt.base.center).scale(scale);
+  barrelPivot.position = mount.scale(scale);
   barrelPivot.parent = turretPivot;
 
   const cannonBuilt = await cannonPart.build(scene, materials.cannon);

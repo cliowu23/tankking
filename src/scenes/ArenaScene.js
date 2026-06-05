@@ -330,7 +330,7 @@ export default class ArenaScene {
       });
   }
 
-  _loadPlayerGLB(modelFile = 't-55ak.glb', config = {}) {
+  _loadPlayerGLB(modelFile = 'm26_pershing_war_thunder.glb', config = {}) {
     const rootName   = config.root        ?? 'Sketchfab_model';
     const turretName = config.turret      ?? 'turret';
     const mountName  = config.mount       ?? 'mount';

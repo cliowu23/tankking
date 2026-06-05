@@ -1,4 +1,4 @@
-import { TransformNode, SceneLoader } from '@babylonjs/core';
+import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 
 // 90mm T15E2M — M26 Pershing main gun, extracted from m26_pershing_war_thunder.glb.
 // Includes the real double-baffle muzzle brake at the tip.
@@ -31,6 +31,6 @@ export default {
     // Set rotation AFTER parenting — same reason as cannon-100mm.js.
     root.rotation.x = Math.PI / 2;
 
-    return { root, meshes };
+    return { root, meshes, breech: new Vector3(0, 0, 0) };
   },
 };
