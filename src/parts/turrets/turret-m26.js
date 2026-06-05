@@ -2,9 +2,10 @@ import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
 import { applyModelPaint } from '../../utils/modelPaint.js';
 import { measureBase } from '../measureBase.js';
 
-// The GLB's `mount` empty sits ~0.45 behind the mantlet front, so the gun's elevation pivot
-// ends up inside the turret. Nudge it forward to the trunnion (at the mantlet). Dial in designer.
-const MOUNT_FORWARD = 0.35;
+// turret-m26.glb is re-extracted (architecture/extract-m26-turret.py) to KEEP the mantlet
+// shield (bisected off the fused gun mesh Object_22) and to bake a `mount` empty at the
+// measured gun bore (the trunnion) — so the mantlet detail is back and the barrel mount is
+// correct without a hardcoded nudge.
 
 // M26 Pershing turret shell — extracted from m26_pershing_war_thunder.glb
 // (turret body, mantlet, cupola; barrel removed). Centered on its ring, materials kept.
@@ -13,7 +14,6 @@ const MOUNT_FORWARD = 0.35;
 const PAINT = {
   paintColor: [0.12, 0.42, 0.88],
   tintColor:  [0.28, 0.26, 0.24],
-  detailPaint: true,   // tint the cast turret (keep weld/rivet detail) instead of flat color
   paintSkipMeshes: [
     'Object_4', 'Object_6', 'Object_11', 'Object_14', 'Object_15', 'Object_16',
     'Object_8', 'Object_20', 'Object_5', 'Object_7', 'Object_19', 'Object_21',
@@ -33,8 +33,7 @@ export default {
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-m26.glb', scene);
     const mountNode = result.transformNodes.find(n => n.name === this.mountEmpty);
-    const mount = mountNode ? mountNode.getAbsolutePosition().clone() : new Vector3(0, 0.17, 1.13);
-    mount.z += MOUNT_FORWARD;   // shift the elevation pivot out to the mantlet trunnion
+    const mount = mountNode ? mountNode.getAbsolutePosition().clone() : new Vector3(0, 0.14, 1.83);
 
     const root = new TransformNode('turret_m26_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');
