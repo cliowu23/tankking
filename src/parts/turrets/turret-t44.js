@@ -15,8 +15,10 @@ const BARREL_MOUNT_FALLBACK = new Vector3(0, 0.78, 1.6);
 
 const PAINT = {
   paintColor: [0.92, 0.12, 0.08],   // red body
-  tintColor:  [0.28, 0.26, 0.24],
-  paintSkipMeshes: [],              // turret + mantlet are all body
+  tintColor:  [0.28, 0.26, 0.24],   // dark metal for fittings (same as running gear)
+  // Roof-mounted AA MG assembly + antenna stay metal, not painted red:
+  //   Object_20 = MG mount base, Object_3 = MG cradle, Object_9 = fitting, Object_2 = antenna.
+  paintSkipMeshes: ['Object_2', 'Object_3', 'Object_9', 'Object_20'],
 };
 
 export default {
