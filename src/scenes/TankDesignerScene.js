@@ -509,6 +509,7 @@ export default class TankDesignerScene {
     cannonMat.diffuseColor  = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
     cannonMat.specularColor = new Color3(0.05, 0.06, 0.07);
     cannonMat.specularPower = 8;
+    cannonMat.backFaceCulling = false;  // barrel base faces don't cull -> no floating gap
     this._toDispose.push(cannonMat);
 
     assembleTank(this.scene, loadout, { cannon: cannonMat })
