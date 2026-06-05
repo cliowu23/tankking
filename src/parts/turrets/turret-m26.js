@@ -14,10 +14,13 @@ import { measureBase } from '../measureBase.js';
 const PAINT = {
   paintColor: [0.12, 0.42, 0.88],
   tintColor:  [0.28, 0.26, 0.24],
+  // Turret fittings stay dark metal (not cobalt): Object_10 = cupola + hatches + periscopes
+  // + rear stowage rack (matches the original M26's manifest); Object_3/5/7/19/21 = small
+  // brackets/fittings. (Hull mesh names left in for parity; they simply don't match here.)
   paintSkipMeshes: [
+    'Object_3', 'Object_5', 'Object_7', 'Object_10', 'Object_19', 'Object_21',
     'Object_4', 'Object_6', 'Object_11', 'Object_14', 'Object_15', 'Object_16',
-    'Object_8', 'Object_20', 'Object_5', 'Object_7', 'Object_19', 'Object_21',
-    'Object_3', 'wheel_l5',
+    'Object_8', 'Object_20', 'wheel_l5',
   ],
 };
 
