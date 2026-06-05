@@ -467,7 +467,7 @@ export default class TankDesignerScene {
     this._toDispose.push(modelRoot, turretPivot, barrelPivot, hullMat, turretMat, trackMat);
 
     // Barrel — async GLB load; fire-and-forget (appears shortly after tank loads)
-    this._activeModelConfig  = { cannonOffsets: { 'cannon-90mm': { z: -0.6 }, 'cannon-100mm': { z: -0.35 } } };
+    this._activeModelConfig  = { cannonOffsets: { 'cannon-90mm': { z: -0.6 }, 'cannon-t44-100mm': { z: -0.35 } } };
     this._buildCannon(this._equippedCannon, turretMat).catch(e =>
       console.error('[cannon] build failed:', e)
     );

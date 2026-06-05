@@ -67,7 +67,9 @@ if PART == 'turret':
         bpy.ops.mesh.bisect(plane_co=(0,BREECH_CUT,0), plane_no=(0,1,0), use_fill=True, clear_outer=True),
         bpy.ops.mesh.select_all(action='SELECT'),
         bpy.ops.mesh.fill_holes(sides=0)))
-    bpy.ops.object.empty_add(type='PLAIN_AXES', location=(bore.x, bore.y, bore.z))
+    # Mount empty on the CUT PLANE (same reference the barrel breech uses), not the slice
+    # centroid — the centroid biases ~0.09 forward and floats the barrel. X/Z stay measured.
+    bpy.ops.object.empty_add(type='PLAIN_AXES', location=(bore.x, BARREL_CUT, bore.z))
     mnt = bpy.context.active_object; mnt.name='mount'
     mnt.parent = sk; mnt.matrix_parent_inverse = sk.matrix_world.inverted()
     keep = set(TURRET + ['Object_11'])
