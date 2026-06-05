@@ -8,9 +8,10 @@ import { measureBase } from '../measureBase.js';
 // the swappable cannon (defaultCannon below) which seats in the mantlet hole. Normals are
 // recalculated outward in extraction so the dome/mantlet don't render see-through. Scale 0.92.
 
-// Barrel pivot in the turret's local frame — the gun exits the mantlet hole. y = gun-axis
-// height above the turret base; z = mantlet front. Dialed live in the designer.
-const BARREL_MOUNT = new Vector3(0, 0.6, 1.0);
+// Barrel mount is MEASURED, not hardcoded: extract-t44.py bakes a `mount` empty at the gun-
+// bore centroid (the trunnion) into the GLB, and build() reads it — correct height + depth
+// for free. This fallback is only used if the empty is missing.
+const BARREL_MOUNT_FALLBACK = new Vector3(0, 0.78, 1.6);
 
 const PAINT = {
   paintColor: [0.92, 0.12, 0.08],   // red body
@@ -29,15 +30,19 @@ export default {
   async build(scene) {
     const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-t44.glb', scene);
 
+    // Read the measured trunnion baked into the GLB (see extract-t44.py).
+    const mountNode = result.transformNodes.find(n => n.name === 'mount');
+    const mount = mountNode ? mountNode.getAbsolutePosition().clone() : BARREL_MOUNT_FALLBACK.clone();
+
     const root = new TransformNode('turret_t44_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
     for (const m of meshes) m.computeWorldMatrix(true);
 
     const base = measureBase(meshes);
-    console.log(`[turret-t44] base center=(${base.center.x.toFixed(2)},${base.center.y.toFixed(2)},${base.center.z.toFixed(2)}) diameter=${base.diameter.toFixed(2)}`);
+    console.log(`[turret-t44] base diameter=${base.diameter.toFixed(2)} mount=(${mount.x.toFixed(2)},${mount.y.toFixed(2)},${mount.z.toFixed(2)})`);
 
     applyModelPaint(meshes, PAINT, scene);
-    return { root, meshes, mount: BARREL_MOUNT.clone(), base };
+    return { root, meshes, mount, base };
   },
 };
