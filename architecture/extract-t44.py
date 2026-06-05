@@ -81,10 +81,12 @@ for o in [o for o in all_meshes if o.name not in keep]:
 kept = [o for o in bpy.data.objects if o.type=='MESH']
 print(f"[t44] {PART}: kept {len(kept)} meshes: {sorted(o.name for o in kept)}")
 
-# recalc normals outward (repairs see-through meshes)
+# merge coincident verts (connects fill/cut caps to the shell) then recalc normals outward,
+# so the cut caps orient correctly instead of rendering dark/inward.
 for o in kept:
     bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); bpy.context.view_layer.objects.active=o
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.remove_doubles(threshold=0.0006)
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode='OBJECT')
 
