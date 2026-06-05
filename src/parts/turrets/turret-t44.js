@@ -24,7 +24,7 @@ export default {
   name: 'T-44 Turret',
   category: 'turret',
   stats: { traverseSpeed: 65 },
-  defaultCannon: 'cannon-100mm',
+  defaultCannon: 'cannon-t44-100mm',
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene) {
