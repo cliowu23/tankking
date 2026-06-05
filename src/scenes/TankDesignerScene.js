@@ -16,6 +16,7 @@ export default class TankDesignerScene {
     this._onExit = onExit;
     this.scene   = new Scene(engine);
     this.scene.clearColor = new Color4(0.84, 0.90, 0.96, 1.0);
+    if (import.meta.env?.DEV) window.__designer = this; // debug hook (matches __hangar/__arena)
 
     this._turretPivot      = null;
     this._barrelPivot      = null;
