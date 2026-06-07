@@ -11,6 +11,7 @@ import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { assembleTank } from '../parts/assembleTank.js';
+import { PARTS_BY_ID } from '../parts/index.js';
 
 const ROOM_W   = 24;    // width (X)
 const ROOM_D   = 32;    // depth (Z), north = positive Z
@@ -48,8 +49,8 @@ export default class HangarScene {
     floorMat.gridRatio           = 2.5;   // 2.5-unit slabs
     floorMat.majorUnitFrequency  = 1;     // bold line every slab
     floorMat.minorUnitVisibility = 0;     // no minor lines — clean grout only
-    floorMat.mainColor           = new Color3(0.13, 0.12, 0.11);
-    floorMat.lineColor           = new Color3(0.09, 0.08, 0.07);
+    floorMat.mainColor           = new Color3(0.20, 0.18, 0.16);  // lighter slab so blob shadows read
+    floorMat.lineColor           = new Color3(0.13, 0.12, 0.10);
     floorMat.opacity             = 1.0;
     floorMat.backFaceCulling     = false;
     floorMat.maxSimultaneousLights = 8;  // so accent-light pools land on the floor
@@ -170,9 +171,9 @@ export default class HangarScene {
     // fill, lounge lamp, kitchen bar + caged light) read as pools against a dark
     // bunker rather than being washed out by even illumination.
     const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
-    ambient.intensity   = 0.30;
+    ambient.intensity   = 0.45;   // lifted so the floor reads enough for blob shadows to show
     ambient.diffuse     = new Color3(0.82, 0.78, 0.68);
-    ambient.groundColor = new Color3(0.10, 0.09, 0.08);
+    ambient.groundColor = new Color3(0.14, 0.13, 0.11);
 
     const overhead = new DirectionalLight('overhead', new Vector3(-0.3, -1, 0.5), this.scene);
     overhead.intensity = 0.20;
@@ -311,8 +312,9 @@ export default class HangarScene {
     if (filename === 'composed') {
       const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
         ?? { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' };
+      const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
       const cannonMat = new StandardMaterial('hangarComposedCannon', s);
-      cannonMat.diffuseColor    = new Color3(0.12, 0.42, 0.88);
+      cannonMat.diffuseColor    = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
       cannonMat.specularColor   = new Color3(0.05, 0.06, 0.07);
       cannonMat.backFaceCulling = false;
       let assembled;
