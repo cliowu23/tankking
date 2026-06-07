@@ -6,13 +6,13 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
-import { measureBasket } from '../parts/measureBasket.js';
-import { assembleTank } from '../parts/assembleTank.js';
-import { PARTS_BY_ID } from '../parts/index.js';
-import Tank from '../entities/Tank.js';
-import Enemy from '../entities/Enemy.js';
-import AIEnemy from '../entities/AIEnemy.js';
-import Shell from '../entities/Shell.js';
+import { measureBasket } from '../tank/parts/measureBasket.js';
+import { assembleTank } from '../tank/parts/assembleTank.js';
+import { PARTS_BY_ID } from '../tank/parts/index.js';
+import Tank from '../tank/Tank.js';
+import Enemy from './Enemy.js';
+import AIEnemy from './AIEnemy.js';
+import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 
 const NORMAL_SPARK_VELS = [
@@ -319,7 +319,7 @@ export default class ArenaScene {
     });
 
     // Fetch model manifest then load — manifest provides node name overrides per model
-    fetch('/models/manifest.json')
+    fetch('/assets/models/manifest.json')
       .then(r => r.json())
       .catch(() => ({}))
       .then(manifest => {
@@ -355,7 +355,7 @@ export default class ArenaScene {
     startBtn.style.pointerEvents = 'none';
     startBtn.style.opacity = '0.4';
 
-    SceneLoader.ImportMeshAsync('', '/models/', modelFile, this.scene).then(result => {
+    SceneLoader.ImportMeshAsync('', '/assets/models/tanks/', modelFile, this.scene).then(result => {
       // Exact name match first, then fuzzy fallback so any well-named GLB works
       const glbRoot    = result.transformNodes.find(n => n.name === rootName)
         ?? result.transformNodes.find(n => n.name !== '__root__' && n.parent == null);

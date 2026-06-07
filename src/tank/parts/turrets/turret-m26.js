@@ -1,5 +1,5 @@
 import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
-import { applyModelPaint } from '../../utils/modelPaint.js';
+import { applyModelPaint } from '../../../utils/modelPaint.js';
 import { measureBase } from '../measureBase.js';
 
 // turret-m26.glb is re-extracted (architecture/extract-m26-turret.py) to KEEP the mantlet
@@ -34,7 +34,7 @@ export default {
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene) {
-    const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-m26.glb', scene);
+    const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'turret-m26.glb', scene);
     const mountNode = result.transformNodes.find(n => n.name === this.mountEmpty);
     const mount = mountNode ? mountNode.getAbsolutePosition().clone() : new Vector3(0, 0.14, 1.83);
 

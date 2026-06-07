@@ -1,5 +1,5 @@
 import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
-import { applyModelPaint } from '../../utils/modelPaint.js';
+import { applyModelPaint } from '../../../utils/modelPaint.js';
 import { measureBase } from '../measureBase.js';
 
 // T-44-100 turret — extracted by mesh list (no rig empties) via architecture/extract-t44.py.
@@ -31,7 +31,7 @@ export default {
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene) {
-    const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'turret-t44.glb', scene);
+    const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'turret-t44.glb', scene);
 
     // Read the measured trunnion baked into the GLB (see extract-t44.py).
     const mountNode = result.transformNodes.find(n => n.name === 'mount');

@@ -5,13 +5,13 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
-import DriverCharacter from '../entities/DriverCharacter.js';
+import DriverCharacter from './DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf, addBlob } from './HangarProps.js';
 import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
 import { applyModelPaint } from '../utils/modelPaint.js';
-import { assembleTank } from '../parts/assembleTank.js';
-import { PARTS_BY_ID } from '../parts/index.js';
+import { assembleTank } from '../tank/parts/assembleTank.js';
+import { PARTS_BY_ID } from '../tank/parts/index.js';
 
 const ROOM_W   = 24;    // width (X)
 const ROOM_D   = 32;    // depth (Z), north = positive Z
@@ -302,7 +302,7 @@ export default class HangarScene {
 
     let manifest;
     try {
-      manifest = await fetch('/models/manifest.json').then(r => r.json());
+      manifest = await fetch('/assets/models/manifest.json').then(r => r.json());
     } catch (e) {
       console.warn('[Hangar] manifest fetch failed', e);
       return;
@@ -351,7 +351,7 @@ export default class HangarScene {
 
     let result;
     try {
-      result = await SceneLoader.ImportMeshAsync('', '/models/', filename, s);
+      result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/', filename, s);
     } catch (e) {
       console.warn('[Hangar] tank GLB failed to load:', e);
       return;

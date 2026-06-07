@@ -1,11 +1,11 @@
 import { TransformNode, SceneLoader } from '@babylonjs/core';
-import { applyModelPaint } from '../../utils/modelPaint.js';
+import { applyModelPaint } from '../../../utils/modelPaint.js';
 
 // M26 Pershing hull — extracted from m26_pershing_war_thunder.glb (hull + tracks + wheels;
 // turret + barrel removed). Centered at origin, scale baked in, materials + Sketchfab
 // orientation preserved. The GLB keeps the original `turret` empty → turretRing mount.
 
-// Paint config (matches the M26 entry in models/manifest.json): body painted flat cobalt,
+// Paint config (matches the M26 entry in assets/models/manifest.json): body painted flat cobalt,
 // running gear keeps its War Thunder textures tinted dark gunmetal.
 const PAINT = {
   paintColor: [0.12, 0.42, 0.88],
@@ -26,7 +26,7 @@ export default {
   nativeTurret: 'turret-m26',
 
   async build(scene) {
-    const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'hull-m26.glb', scene);
+    const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'hull-m26.glb', scene);
     const mountNode = result.transformNodes.find(n => n.name === this.mountEmpty);
     const mount = mountNode ? mountNode.getAbsolutePosition().clone() : null;
 

@@ -1,7 +1,7 @@
 import { Engine } from '@babylonjs/core';
-import ArenaScene        from './scenes/ArenaScene.js';
-import TankDesignerScene from './scenes/TankDesignerScene.js';
-import HangarScene       from './scenes/HangarScene.js';
+import ArenaScene        from '../world/ArenaScene.js';
+import TankDesignerScene from '../hub/TankDesignerScene.js';
+import HangarScene       from '../hub/HangarScene.js';
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });

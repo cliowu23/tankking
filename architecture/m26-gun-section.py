@@ -4,7 +4,7 @@ import bpy
 from mathutils import Vector
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
-bpy.ops.import_scene.gltf(filepath='/Users/cliowu/claude-workspace/game/public/models/m26_pershing_war_thunder.glb')
+bpy.ops.import_scene.gltf(filepath='/Users/cliowu/claude-workspace/game/public/assets/models/tanks/m26_pershing_war_thunder.glb')
 o = bpy.data.objects['Object_22']
 buckets = {}
 for v in o.data.vertices:

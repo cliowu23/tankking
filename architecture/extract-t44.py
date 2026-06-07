@@ -15,9 +15,9 @@ All parts: merge coincident verts + recalc normals outward (no see-through / dar
 scale 0.92, no mesh rotation (standard orientation).
 
 Usage:
-  blender --background --python architecture/extract-t44.py -- turret public/models/parts/turret-t44.glb
-  blender --background --python architecture/extract-t44.py -- barrel public/models/parts/barrel-t44-100mm.glb
-  blender --background --python architecture/extract-t44.py -- hull   public/models/parts/hull-t44.glb
+  blender --background --python architecture/extract-t44.py -- turret public/assets/models/tanks/parts/turret-t44.glb
+  blender --background --python architecture/extract-t44.py -- barrel public/assets/models/tanks/parts/barrel-t44-100mm.glb
+  blender --background --python architecture/extract-t44.py -- hull   public/assets/models/tanks/parts/hull-t44.glb
 """
 import bpy, sys, os
 from mathutils import Vector
@@ -25,7 +25,7 @@ from mathutils import Vector
 argv = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else sys.argv[1:]
 PART, OUT = argv[0], os.path.abspath(argv[1])
 
-SRC   = os.path.abspath('public/models/t-44-100_war_thunder.glb')
+SRC   = os.path.abspath('public/assets/models/tanks/t-44-100_war_thunder.glb')
 SCALE = 0.92
 BARREL_CUT = -1.6     # mantlet front / barrel breech
 BREECH_CUT = -1.05    # mantlet back

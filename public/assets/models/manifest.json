@@ -1,0 +1,32 @@
+{
+  "m26_pershing_war_thunder.glb": {
+    "root": "Sketchfab_model",
+    "turret": "turret",
+    "mount": "mount",
+    "facingAxis": "+Z",
+    "targetWidth": 3.2,
+    "zCenterAdjust": 1.05,
+    "turretPivotZOffset": 0,
+    "barrelTipOffset": 3.8,
+    "centerTurretX": true,
+    "elevationDeg": 20,
+    "depressionDeg": 10,
+    "paintColor": [0.12, 0.42, 0.88],
+    "tintColor":  [0.28, 0.26, 0.24],
+    "barrelMeshNames": ["Object_22"],
+    "nativeCannon": "cannon-90mm",
+    "cannonOffsets": {
+      "cannon-90mm":  { "z": -0.8           },
+      "cannon-100mm": { "z": -0.35, "scale": 1.22 }
+    },
+    "paintSkipMeshes": [
+      "Object_4",  "Object_6",
+      "Object_11", "Object_14", "Object_15", "Object_16",
+      "Object_8",  "Object_20",
+      "Object_5",  "Object_7",
+      "Object_19", "Object_21", "Object_3",
+      "Object_10",
+      "wheel_l5"
+    ]
+  }
+}

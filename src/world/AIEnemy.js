@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode } from '@babylonjs/core';
-import Shell from './Shell.js';
+import Shell from '../combat/Shell.js';
 
 function shortAngle(from, to) {
   let d = ((to - from) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
