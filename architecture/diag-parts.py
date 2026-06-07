@@ -37,7 +37,7 @@ def check_glb(path, label):
             s = e.scale
             print(f"  {e.name}: pos=({p.x:.3f},{p.y:.3f},{p.z:.3f})  rot=({math.degrees(r.x):.1f},{math.degrees(r.y):.1f},{math.degrees(r.z):.1f})  scale=({s.x:.4f},{s.y:.4f},{s.z:.4f})")
 
-base = '/Users/cliowu/claude-workspace/game/public/models/parts/'
+base = '/Users/cliowu/claude-workspace/game/public/assets/models/tanks/parts/'
 check_glb(base + 'hull-t55.glb', 'hull-t55')
 check_glb(base + 'turret-t55.glb', 'turret-t55')
 check_glb(base + 'hull-m26.glb', 'hull-m26')

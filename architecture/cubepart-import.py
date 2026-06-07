@@ -175,6 +175,6 @@ bpy.ops.export_scene.gltf(
 print(f"[CubePart] Exported → {OUT_PATH}")
 print("[CubePart] Checklist:")
 print("  [ ] Open GLB in Blender — verify turret/mount empty positions visually")
-print("  [ ] Copy to game/public/models/<name>.glb")
+print("  [ ] Copy to game/public/assets/models/tanks/<name>.glb")
 print("  [ ] Add manifest entry (architecture/MODEL_IMPORT.md Step 7)")
 print("  [ ] T key in game inspector — confirm turretPivot.y > 0.3 in console")

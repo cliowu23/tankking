@@ -74,7 +74,7 @@ The model's Blender Z-minimum is [MIN_Z]. Use this as the floor reference for al
 3. Create an EMPTY named "mount" at the barrel trunnion (where the barrel pivots for elevation).
    Re-parent the barrel mesh under it using keep_world=True.
 4. Do NOT rotate the root.
-5. Export as GLB to: /Users/cliowu/claude-workspace/game/public/models/MODELNAME.glb
+5. Export as GLB to: /Users/cliowu/claude-workspace/game/public/assets/models/tanks/MODELNAME.glb
 
 Report:
 - World position of the "turret" empty (X, Y, Z)
@@ -90,7 +90,7 @@ Claude will use `execute_blender_code` (bpy) to inspect, rig, and export.
 
 ### Step 5 — Add to manifest
 
-Open `public/models/manifest.json` and add an entry:
+Open `public/assets/models/manifest.json` and add an entry:
 
 ```json
 {

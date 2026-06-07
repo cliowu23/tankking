@@ -6,7 +6,7 @@ def test_rotation(rot_euler, label):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
-    bpy.ops.import_scene.gltf(filepath='/Users/cliowu/claude-workspace/game/public/models/t-55ak.glb')
+    bpy.ops.import_scene.gltf(filepath='/Users/cliowu/claude-workspace/game/public/assets/models/tanks/t-55ak.glb')
 
     turret_empty = bpy.data.objects.get('turret')
     sketchfab_root = bpy.data.objects.get('Sketchfab_model')

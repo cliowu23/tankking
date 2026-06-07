@@ -1,5 +1,5 @@
 import { TransformNode, SceneLoader, Vector3 } from '@babylonjs/core';
-import { applyModelPaint } from '../../utils/modelPaint.js';
+import { applyModelPaint } from '../../../utils/modelPaint.js';
 
 // T-44-100 hull — extracted by explicit mesh list (the GLB had no rig empties) via
 // architecture/extract-bymesh.py. The model is in standard Blender Z-up orientation, so no
@@ -26,7 +26,7 @@ export default {
   nativeTurret: 'turret-t44',
 
   async build(scene) {
-    const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'hull-t44.glb', scene);
+    const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'hull-t44.glb', scene);
 
     const root = new TransformNode('hull_t44_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');

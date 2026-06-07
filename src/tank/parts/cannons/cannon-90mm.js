@@ -17,7 +17,7 @@ export default {
 
   async build(scene, material) {
     const result = await SceneLoader.ImportMeshAsync(
-      '', '/models/parts/', 'barrel-m26-90mm.glb', scene
+      '', '/assets/models/tanks/parts/', 'barrel-m26-90mm.glb', scene
     );
 
     const root = new TransformNode('cannon90mm_root', scene);

@@ -3,16 +3,16 @@ extract-parts.py — split a whole-tank Sketchfab GLB into hull or turret part G
 
 Usage (Blender headless):
   blender --background --python architecture/extract-parts.py -- \\
-    --src   public/models/t-55ak.glb \\
+    --src   public/assets/models/tanks/t-55ak.glb \\
     --part  hull \\
     --scale 0.7064 \\
-    --out   public/models/parts/hull-t55.glb
+    --out   public/assets/models/tanks/parts/hull-t55.glb
 
   blender --background --python architecture/extract-parts.py -- \\
-    --src   public/models/t-55ak.glb \\
+    --src   public/assets/models/tanks/t-55ak.glb \\
     --part  turret \\
     --scale 0.7064 \\
-    --out   public/models/parts/turret-t55.glb
+    --out   public/assets/models/tanks/parts/turret-t55.glb
 
 Pipeline (hard-won rules — do NOT change without understanding why):
 

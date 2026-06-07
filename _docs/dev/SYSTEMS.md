@@ -1,76 +1,108 @@
 # Systems Map
 
-What exists, what each system owns, and what's next.
+What exists in the code today, what each system owns, and what's next.
+Reconciled against the real `src/` tree (domain layout) and the v2 design
+(`_docs/dev/TANKING_RESTRUCTURE2.md`): extraction roguelite, classless tank.
 
 ---
 
-## Entities
+## Source layout (domain-based)
+
+```
+src/core/    engine setup, scene orchestration, menu/death DOM glue   (main.js)
+src/tank/    player vehicle + modular GLB parts pipeline
+src/combat/  projectiles
+src/world/   arena/battlefield, enemies, terrain
+src/hub/     bunker/hangar, NPCs (driver), garage/designer, props
+src/ui/      HUD/menus — currently inline in index.html (folder empty)
+src/utils/   shared helpers (modelPaint.js)
+```
+
+---
+
+## Entities & tank
 
 | System | File | Owns | Status |
 |--------|------|------|--------|
-| Player Tank | `src/entities/Tank.js` | Hull + turret mesh, movement, boost, barrel elevation, fire, death state | ✅ Complete |
-| Static Enemy | `src/entities/Enemy.js` | Hull + turret mesh, health bar, death state, reset | ✅ Complete |
-| AI Enemy | `src/entities/AIEnemy.js` | Enemy.js base + patrol, chase, fire AI behavior | ✅ Complete |
-| Shell | `src/entities/Shell.js` | Projectile pool (10 shells), physics arc, hit radius, lifetime | ✅ Complete |
-| Pershing Tank (model) | `src/entities/PershingTank.js` | Visual-only reference model, egg turret, 90mm barrel | ✅ Complete |
-| T-80 Tank (model) | `src/entities/T80Tank.js` | File on disk, removed from scene — needs redesign before use | ⏸️ Dormant |
-| Terrain Piece | `src/entities/TerrainPiece.js` | Placeholder for cover/obstacle objects in the arena | ⬜ Shell only |
+| Player tank | `src/tank/Tank.js` | Primitive fallback vehicle — movement, boost/dash, turret aim, fire, death | ✅ In use |
+| Modular parts pipeline | `src/tank/parts/` | GLB hull/turret/cannon composition; `assembleTank.js` recombines; `PARTS_BY_ID` registry in `index.js` | ✅ Built |
+| → Hulls | `parts/hulls/{hull-m26,hull-t44}.js` | Load + paint hull GLBs | ✅ Built |
+| → Turrets | `parts/turrets/{turret-m26,turret-t44}.js` | Load + paint + base-measure turret GLBs | ✅ Built |
+| → Cannons | `parts/cannons/{cannon-90mm,cannon-t44-100mm}.js` | Load barrel GLBs, adaptive offsets | ✅ Built |
+| → Measurement | `parts/measureBase.js`, `parts/measureBasket.js` | Trunnion / basket measurement for adaptive composition | ✅ Built |
+| Static enemy | `src/world/Enemy.js` | Hull + turret mesh, health bar, death/reset | ✅ Built |
+| AI enemy | `src/world/AIEnemy.js` | `Enemy` base + patrol/chase/fire AI, flat-shot aiming | ✅ Built |
+| Shell | `src/combat/Shell.js` | Projectile pool, **flat-shot** (no gravity), hit radius, lifetime | ✅ Built |
+| Terrain piece | `src/world/TerrainPiece.js` | Cover/obstacle objects (arena collisions hook in) | ⬜ Hook only |
+| Driver character | `src/hub/DriverCharacter.js` | Walking driver in the hub (cosmetic), WASD + follow cam | ✅ Built |
+
+> The old primitive `PershingTank.js` / `T80Tank.js` classes were **removed** —
+> superseded by the GLB modular-parts pipeline (M26 Pershing, T-44).
 
 ---
 
-## Scenes
+## Scenes (actual)
+
+There is no separate `BootScene` / `MenuScene` / `GameOverScene` file. The menu,
+pause, and death screens are DOM overlays in `index.html`, driven by `main.js`.
 
 | Scene | File | Owns | Status |
 |-------|------|------|--------|
-| Boot | `src/scenes/BootScene.js` | Initial load | ✅ Complete |
-| Menu | `src/scenes/MenuScene.js` | Title screen, monochrome intentional | ✅ Complete |
-| Arena | `src/scenes/ArenaScene.js` | Camera, lighting, ground, environment, hazards, entities, lock-on, firing, game loop | ✅ Complete |
-| Hangar | `src/scenes/HangarScene.js` | Hub — tank builder, research terminal, arena gate | ⬜ Stub |
-| Game Over | `src/scenes/GameOverScene.js` | Death / results / return to hangar | ✅ Complete |
+| Orchestrator | `src/core/main.js` | Engine, scene lifecycle, menu/death DOM transitions, deploy flow | ✅ Built |
+| Hangar (hub) | `src/hub/HangarScene.js` | Bunker bay: geometry, lighting, stations, lounge, kitchen, driver, tank display, exit door, proximity | ✅ Built |
+| Tank designer (garage) | `src/hub/TankDesignerScene.js` | Modular part swapping + adaptive composition preview | ✅ Built |
+| Arena (battlefield) | `src/world/ArenaScene.js` | Camera, lighting, ground, environment, sky, hazards, entities, lock-on, flat firing, VFX, game loop | ✅ Built |
 
 ---
 
-## Arena Sub-Systems (all inside ArenaScene.js)
+## Arena sub-systems (inside ArenaScene.js)
 
-| Sub-system | Method | Status |
-|------------|--------|--------|
-| Camera | `_setupCamera` + soft follow in game loop | ✅ Complete |
-| Lighting | `_setupLighting` | ✅ Complete |
-| Ground | `_setupGround` | ✅ Complete |
-| Environment / walls | `_setupEnvironment` | ✅ Complete |
-| Sky + clouds | `_setupSky` | ✅ Complete |
-| Hazards (lava pool) | `_setupHazards` + `_updateLavaTex` | ✅ Complete |
-| Entity spawn | `_setupEntities` | ✅ Complete |
-| Lock-on targeting | `_setupLockOn` | ✅ Complete |
-| Charge-to-fire | `_setupFiring` | ✅ Complete |
-| Game loop | `_setupGameLoop` | ✅ Complete |
-| Collision (AABB) | Inside game loop | ✅ Complete |
-| Shell arc preview | Inside firing setup | ✅ Complete |
-| Screen shake | `_triggerShake` | ✅ Complete |
-| HUD (boost + HP bars) | JS in game loop + CSS in index.html | ✅ Complete |
-| Pause / death overlays | JS events + CSS in index.html | ✅ Complete |
-| CRT transition | CSS animation in index.html | ✅ Complete |
+| Sub-system | Method(s) | Status |
+|------------|-----------|--------|
+| Camera (soft follow) | `_setupCamera`, `_updateCamera` | ✅ |
+| Lighting / ground / environment / sky | `_setupLighting`, `_setupGround`, `_setupEnvironment`, `_setupSky` | ✅ |
+| Hazards (lava pool) | `_setupHazards`, `_checkHazards`, `_updateLavaTex` | ✅ |
+| Entity spawn | `_setupEntities` | ✅ |
+| Player load (primitive / GLB / composed) | `_loadPlayerGLB`, `_loadPlayerComposed` | ✅ |
+| Lock-on targeting | `_setupLockOn`, `_lockOnNearestToCursor`, `_updateLockRing` | ✅ |
+| Firing — **flat shot** | `_setupFiring`, `_shoot`, `_barrelTip` | ✅ |
+| VFX | `_setupVFX`, `_spawnMuzzleFlash`, `_spawnNormalImpact`, `_spawnTankImpact`, `_updateVFX` | ✅ |
+| Collisions (AABB + separation) | `_checkCollisions`, `_checkObstacleCollisions`, `_separate` | ✅ |
+| Aim indicator | `_updateAimIndicator` | ✅ |
+| Screen shake | `_triggerShake` | ✅ |
+| HUD (boost + HP) | `_updateHUD` + CSS in index.html | ✅ |
+| Pause / death overlays | `_showDeath` + DOM events + CSS | ✅ |
 
 ---
 
-## Empty Folders (no files yet)
+## Hub sub-systems (inside HangarScene.js + helpers)
 
-| Folder | Intended use |
-|--------|-------------|
-| `src/systems/` | Cross-cutting concerns — input manager, save state, audio manager |
-| `src/utils/` | Shared helpers — math, pooling, etc. |
-
-These are empty because the vertical slice didn't need them. They become relevant when building the Hangar, research tree, and save system.
+| Sub-system | Method / module | Status |
+|------------|-----------------|--------|
+| Bay geometry / room | `_buildRoom`, `_buildBayGeometry` | ✅ |
+| Lighting | `_buildLighting` | ✅ |
+| Stations + props | `_buildStations`, `_buildBayProps`, `HangarProps.js` (workbench, QM crates, map table, radio shelf) | ✅ |
+| Lounge | `buildLounge` (`HangarLounge.js`) | ✅ |
+| Kitchen | `buildKitchen` (`HangarKitchen.js`) | ✅ |
+| Driver | `_setupDriver` (`DriverCharacter.js`) | ✅ |
+| Tank display | `_loadTankDisplay` | ✅ |
+| Exit door / floor mark | `_buildExitDoor`, `_buildExitFloorMark` | ✅ |
+| Blob shadows | `_setupBlobShadows`, `_blobDrop` | ✅ |
+| Proximity interaction | `_checkProximity` | ✅ |
 
 ---
 
-## What's Next (Design Phase)
+## What's next (v2 extraction-roguelite roadmap)
+
+Per `_docs/dev/TANKING_RESTRUCTURE2.md` dev priorities. None of these exist yet.
 
 | System | Priority | Notes |
 |--------|----------|-------|
-| Arena content — terrain / cover | High | TerrainPiece.js is the hook, needs populating |
-| Explosion effects | High | New `src/effects/Explosion.js` — ParticleSystem burst on kill |
-| Hangar scene | Medium | Build station UI + research terminal |
-| Audio manager | Medium | `src/systems/AudioManager.js` — wraps BABYLON.Sound |
-| Save system | Low | localStorage, simple key-value |
-| Boss entity | Low | Unique enemy, needs design first |
+| Zone structure | High | Starter zone, depth-scaled difficulty, largely fixed enemy positions |
+| Loot table | High | Common consumables (ammo/fuel/repair/smoke) + rare parts |
+| Extraction mechanic | High | Success (keep gains) vs death (lose run gains, keep tank, pay repair) |
+| Classless equip system | High | One tank equips parts from any doctrine; parts found in the world |
+| Hub NPC system | Medium | 5 rescuable slots: Mechanic, Merchant, Researcher, Combat Ally, Healer |
+| Research tree (stats only) | Medium | Mobility / Health / Armor / Fuel; earned with Research Points |
+| Boss (found, not triggered) | Low | Encountered by pushing deep; needs design first |
+| Audio | Medium | `src/core/AudioManager.js` (to create) wrapping `BABYLON.Sound` |

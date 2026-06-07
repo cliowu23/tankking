@@ -5,9 +5,9 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
-import { PARTS, PARTS_BY_ID } from '../parts/index.js';
-import { assembleTank } from '../parts/assembleTank.js';
-import { measureBasket } from '../parts/measureBasket.js';
+import { PARTS, PARTS_BY_ID } from '../tank/parts/index.js';
+import { assembleTank } from '../tank/parts/assembleTank.js';
+import { measureBasket } from '../tank/parts/measureBasket.js';
 
 const PAD_Y = 0.06;
 
@@ -293,7 +293,7 @@ export default class TankDesignerScene {
   }
 
   _populateSidebar() {
-    fetch('/models/manifest.json')
+    fetch('/assets/models/manifest.json')
       .then(r => r.json())
       .catch(() => ({}))
       .then(manifest => {
@@ -625,7 +625,7 @@ export default class TankDesignerScene {
     btn.textContent = 'LOADING…';
     btn.style.opacity = '0.5';
 
-    SceneLoader.ImportMeshAsync('', '/models/', filename, this.scene).then(result => {
+    SceneLoader.ImportMeshAsync('', '/assets/models/tanks/', filename, this.scene).then(result => {
       const glbRoot    = result.transformNodes.find(n => n.name === rootName)
         ?? result.transformNodes.find(n => n.name !== '__root__' && !n.parent);
       const turretNode = result.transformNodes.find(n => n.name === turretName)

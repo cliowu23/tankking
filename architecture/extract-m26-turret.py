@@ -11,7 +11,7 @@ M26 is standard orientation (Sketchfab rot 0, gun along -Y), scale 0.8715, and H
 empties — we center on the turret-ring empty (XY) + ground (Z) to match the existing part.
 
 Usage:
-  blender --background --python architecture/extract-m26-turret.py -- public/models/parts/turret-m26.glb
+  blender --background --python architecture/extract-m26-turret.py -- public/assets/models/tanks/parts/turret-m26.glb
 """
 import bpy, sys, os
 from mathutils import Vector
@@ -19,7 +19,7 @@ from mathutils import Vector
 argv = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else sys.argv[1:]
 OUT = os.path.abspath(argv[0])
 
-SRC   = os.path.abspath('public/models/m26_pershing_war_thunder.glb')
+SRC   = os.path.abspath('public/assets/models/tanks/m26_pershing_war_thunder.glb')
 SCALE = 0.8715
 BARREL_CUT = -2.1     # mantlet front / barrel breech
 BREECH_CUT = -1.1     # mantlet back

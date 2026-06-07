@@ -8,10 +8,10 @@ extract-parts.py instead.
 
 Usage (Blender headless):
   blender --background --python architecture/extract-bymesh.py -- \\
-    --src public/models/t-44-100_war_thunder.glb --part turret --scale 0.92 \\
+    --src public/assets/models/tanks/t-44-100_war_thunder.glb --part turret --scale 0.92 \\
     --turret Object_2,Object_3,Object_9,Object_12,Object_13,Object_20,Object_21 \\
     --gun Object_5,Object_11 \\
-    --out public/models/parts/turret-t44.glb
+    --out public/assets/models/tanks/parts/turret-t44.glb
 
 Rules (mirrors the M26 'HARD-WON RULES'):
   * NO mesh rotation / transform_apply — the model is already in standard Blender Z-up

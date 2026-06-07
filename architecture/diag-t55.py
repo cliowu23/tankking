@@ -6,7 +6,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete()
 
-src = '/Users/cliowu/claude-workspace/game/public/models/t-55ak.glb'
+src = '/Users/cliowu/claude-workspace/game/public/assets/models/tanks/t-55ak.glb'
 bpy.ops.import_scene.gltf(filepath=src)
 
 sketchfab_root = bpy.data.objects.get('Sketchfab_model')

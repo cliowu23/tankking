@@ -42,7 +42,7 @@ def analyze(path, label, yaw=0.0):
               f"X bboxMid={(xmin+xmax)/2:+.2f} mean={xmean:+.2f} med={xmed:+.2f} ext={xmax-xmin:.2f} | "
               f"Z bboxMid={(zmin+zmax)/2:+.2f} mean={zmean:+.2f} med={zmed:+.2f} ext={zmax-zmin:.2f}")
 
-base = '/Users/cliowu/claude-workspace/game/public/models/parts/'
+base = '/Users/cliowu/claude-workspace/game/public/assets/models/tanks/parts/'
 analyze(base+'turret-m26.glb', 'turret-m26 (no yaw)', yaw=0.0)
 analyze(base+'turret-t55.glb', 'turret-t55 (yaw 180)', yaw=math.pi)
 print()

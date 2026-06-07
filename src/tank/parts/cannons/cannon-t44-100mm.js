@@ -12,7 +12,7 @@ export default {
   stats: { caliber: 100, barrelLength: 3.5, elevation: 18, depression: 5 },
 
   async build(scene, material) {
-    const result = await SceneLoader.ImportMeshAsync('', '/models/parts/', 'barrel-t44-100mm.glb', scene);
+    const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'barrel-t44-100mm.glb', scene);
 
     const root = new TransformNode('cannonT44_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');
