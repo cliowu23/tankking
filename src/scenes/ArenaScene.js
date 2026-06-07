@@ -8,6 +8,7 @@ import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { measureBasket } from '../parts/measureBasket.js';
 import { assembleTank } from '../parts/assembleTank.js';
+import { PARTS_BY_ID } from '../parts/index.js';
 import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
@@ -514,9 +515,11 @@ export default class ArenaScene {
       .filter(m => m.isDescendantOf(this.tank.root))
       .forEach(m => { m.isVisible = false; });
 
-    // Barrel painted the player blue so it reads as one tank with the hull/turret.
+    // Barrel painted to match the turret body (blue M26, red T-44) so the gun reads as part of
+    // the same tank — same rule the designer uses, not a hardcoded colour.
+    const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
     const cannonMat = new StandardMaterial('playerComposedCannon', this.scene);
-    cannonMat.diffuseColor   = new Color3(0.12, 0.42, 0.88);
+    cannonMat.diffuseColor   = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
     cannonMat.specularColor  = new Color3(0.05, 0.06, 0.07);
     cannonMat.specularPower   = 8;
     cannonMat.backFaceCulling = false;
