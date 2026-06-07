@@ -66,6 +66,7 @@ export function buildLounge(s, M, config) {
     const m = new StandardMaterial(name, s);
     m.diffuseColor  = new Color3(r, g, b);
     m.specularColor = new Color3(spec, spec, spec);
+    m.maxSimultaneousLights = 8;  // so the lounge lamp isn't culled by the 4-light cap
     return m;
   };
 
@@ -172,8 +173,8 @@ export function buildLounge(s, M, config) {
   const lampLight = new PointLight('lng-lamp-light', new Vector3(LX + OX - CAX, 1.7, LZ + OZ - CAZ), s);
   lampLight.parent    = root;
   lampLight.diffuse   = new Color3(1.0, 0.82, 0.45);
-  lampLight.intensity = 0.6;
-  lampLight.range     = 8;
+  lampLight.intensity = 2.8;
+  lampLight.range     = 11;
 
   const posterNode = new TransformNode('lng-poster', s); posterNode.parent = root;
   box(posterNode, 'poster-board', 0.10, 1.5, 1.2, -3.46, 1.7, -1.3, posterMat);
