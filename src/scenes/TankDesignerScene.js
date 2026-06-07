@@ -278,6 +278,14 @@ export default class TankDesignerScene {
     if (!this._previewFilename) return;
     localStorage.setItem('selectedTank', this._previewFilename);
     this._selectedFilename = this._previewFilename;
+    // Composed mode ('composed') needs the actual parts saved so the arena/hangar can rebuild it.
+    if (this._isComposedMode) {
+      localStorage.setItem('selectedLoadout', JSON.stringify({
+        hull:   this._equippedHull,
+        turret: this._equippedTurret,
+        cannon: this._equippedCannon || 'cannon-90mm',
+      }));
+    }
     if (this._selectedBtn) this._selectedBtn.classList.remove('selected');
     if (this._activeBtn)  { this._activeBtn.classList.add('selected'); this._selectedBtn = this._activeBtn; }
     const hint = document.getElementById('designer-bottom-hint');

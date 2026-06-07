@@ -7,6 +7,7 @@ import {
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { measureBasket } from '../parts/measureBasket.js';
+import { assembleTank } from '../parts/assembleTank.js';
 import Tank from '../entities/Tank.js';
 import Enemy from '../entities/Enemy.js';
 import AIEnemy from '../entities/AIEnemy.js';
@@ -321,10 +322,17 @@ export default class ArenaScene {
       .then(r => r.json())
       .catch(() => ({}))
       .then(manifest => {
-        const modelFile = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
+        const modelFile = localStorage.getItem('selectedTank') || 'composed';
         if (modelFile === 'primitive') {
           // Primitive Tank.js entity already has turretPivot/barrelPivot — nothing to load
           document.getElementById('controls-start').textContent = 'PRESS ENTER TO BATTLE';
+          return;
+        }
+        if (modelFile === 'composed') {
+          // Modular tank built from the designer's saved hull + turret + cannon loadout.
+          const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
+            ?? { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' };
+          this._loadPlayerComposed(loadout);
           return;
         }
         this._loadPlayerGLB(modelFile, manifest[modelFile] ?? {});
@@ -490,6 +498,69 @@ export default class ArenaScene {
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
     });
+  }
+
+  // Build the modular tank (hull + turret + cannon) straight onto the Tank entity's pivots, so
+  // all existing gameplay — hull movement, turret aim, elevation, recoil, lock-on — drives it
+  // unchanged. assembleTank handles the adaptive ring pivot, scaling and grounding.
+  _loadPlayerComposed(loadout) {
+    const startBtn = document.getElementById('controls-start');
+    startBtn.textContent = 'LOADING…';
+    startBtn.style.pointerEvents = 'none';
+    startBtn.style.opacity = '0.4';
+
+    // Hide the primitive placeholder meshes before the composed parts attach to tank.root.
+    this.scene.meshes
+      .filter(m => m.isDescendantOf(this.tank.root))
+      .forEach(m => { m.isVisible = false; });
+
+    // Barrel painted the player blue so it reads as one tank with the hull/turret.
+    const cannonMat = new StandardMaterial('playerComposedCannon', this.scene);
+    cannonMat.diffuseColor   = new Color3(0.12, 0.42, 0.88);
+    cannonMat.specularColor  = new Color3(0.05, 0.06, 0.07);
+    cannonMat.specularPower   = 8;
+    cannonMat.backFaceCulling = false;
+
+    assembleTank(this.scene, loadout, { cannon: cannonMat }, {
+      target: { root: this.tank.root, turretPivot: this.tank.turretPivot, barrelPivot: this.tank.barrelPivot },
+    }).then(assembled => {
+      const { hullBuilt, turretBuilt, cannonBuilt } = assembled.parts;
+      const allMeshes = [...hullBuilt.meshes, ...turretBuilt.meshes, ...cannonBuilt.meshes];
+
+      // Recoil baseline + muzzle tip (derived from the cannon geometry — no hardcoded offset).
+      this._barrelPivotBaseZ = this.tank.barrelPivot.position.z;
+      this._barrelTipOffset  = this._measureBarrelTip(cannonBuilt.meshes);
+
+      for (const m of allMeshes) {
+        this.shadowGen.addShadowCaster(m);
+        m.receiveShadows = true;
+      }
+
+      console.log(`[Composed] ${loadout.hull}+${loadout.turret}+${loadout.cannon} loaded: scale=${assembled.scale.toFixed(3)}, barrelTip=${this._barrelTipOffset.toFixed(2)}`);
+      startBtn.textContent = 'PRESS ENTER TO BATTLE';
+      startBtn.style.pointerEvents = '';
+      startBtn.style.opacity = '';
+    }).catch(e => {
+      console.error('[Composed] assembly failed for', loadout, e);
+      startBtn.textContent = 'PRESS ENTER TO BATTLE';
+      startBtn.style.pointerEvents = '';
+      startBtn.style.opacity = '';
+    });
+  }
+
+  // Muzzle tip = furthest +Z of the cannon, in barrelPivot-local space (what _barrelTip expects).
+  _measureBarrelTip(cannonMeshes) {
+    this.tank.barrelPivot.computeWorldMatrix(true);
+    const inv = Matrix.Invert(this.tank.barrelPivot.getWorldMatrix());
+    let maxZ = 0;
+    for (const m of cannonMeshes) {
+      m.computeWorldMatrix(true);
+      for (const corner of m.getBoundingInfo().boundingBox.vectorsWorld) {
+        const local = Vector3.TransformCoordinates(corner, inv);
+        if (local.z > maxZ) maxZ = local.z;
+      }
+    }
+    return maxZ || 1.8;
   }
 
   _setupLockOn() {
