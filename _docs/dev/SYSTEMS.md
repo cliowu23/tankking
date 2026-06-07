@@ -2,7 +2,7 @@
 
 What exists in the code today, what each system owns, and what's next.
 Reconciled against the real `src/` tree (domain layout) and the v2 design
-(`_docs/dev/TANKING_RESTRUCTURE2.md`): extraction roguelite, classless tank.
+(see `CLAUDE.md`): extraction roguelite, classless tank.
 
 ---
 
@@ -94,7 +94,7 @@ pause, and death screens are DOM overlays in `index.html`, driven by `main.js`.
 
 ## What's next (v2 extraction-roguelite roadmap)
 
-Per `_docs/dev/TANKING_RESTRUCTURE2.md` dev priorities. None of these exist yet.
+Per the dev priorities in `CLAUDE.md`. None of these exist yet.
 
 | System | Priority | Notes |
 |--------|----------|-------|

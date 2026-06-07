@@ -2,7 +2,7 @@
 
 Tracks what's been sourced, approved, and built for each design domain.
 Update this as assets come in and get integrated.
-Aligned to the v2 vision (`_docs/dev/TANKING_RESTRUCTURE2.md`): extraction
+Aligned to the v2 vision (see `CLAUDE.md`): extraction
 roguelite, classless modular tank, bunker hub + deployable zones.
 
 ---

@@ -1,170 +1,233 @@
-# CLAUDE.md — TanKING Project Context
-
-## What This Project Is
-
-**TanKING** — a top-down 3D tank **extraction-shooter roguelite** built in Babylon.js. From a mountain **bunker hub** the player builds a **classless modular tank**, deploys to open-world zones, scavenges consumables and parts, and either **extracts alive** (keeping everything) or **dies** (losing run gains but keeping the tank). Permanent upgrades and a **stats-only research tree** carry between runs; rescued NPCs bring the bunker to life. Escape from Duckov × Deep Rock Galactic × War Thunder DNA, **cozy-apocalypse** tone. Aesthetic north star: *"Beautiful in a bright way — a battlefield that feels like a game, not a war."* Bright, cheerful, saturated — the world is broken but the vibe is warm.
-
-The **authoritative design vision** is `_docs/dev/TANKING_RESTRUCTURE2.md` (v2: extraction roguelite, classless tank). Broader detail lives in `_docs/design/DESIGN_DOC.md`, and `_docs/dev/SYSTEMS.md` is the live systems map. Reference these for feature decisions; update them when design changes.
+# TanKING — Claude Code Session Context
+> Read this entire file at the start of every session before touching any code. This is the authoritative context for the project. Reference _docs/ for deeper detail on any topic.
 
 ---
 
-## Tech Stack
+## WHAT THIS GAME IS
 
-- **Engine**: Babylon.js 7.54.3 (3D, browser-based)
-- **Bundler**: Vite
-- **Language**: Plain JavaScript (not TypeScript)
-- **Version control**: Git, hosted on GitHub
-- **Editor**: VS Code with Claude Code extension
+**TanKING** is a 3D top-down extraction shooter roguelite built in Babylon.js.
 
----
+The player is a modern tank driver who crashed into a medieval fantasy world called Tankford — a kingdom where tanks and tank drivers are the dominant civilization. The goal: dethrone the TanKING and claim the throne.
 
-## Developer Context
+**Tone:** Cozy-apocalypse. Bright, vibrant, toylike and charming. Escape from Duckov is the primary aesthetic reference. The world is broken but the vibe is warm.
 
-The developer is learning as they build. They have no digital art or 3D modeling background. When working on this project:
-
-- **Explain decisions as you go.** Narrate what you're doing and why — the developer should understand the code, not just have it.
-- **Prefer simple, readable code over clever code.** Verbosity that aids comprehension beats brevity that obscures.
-- **Stop and ask before assumptions.** If something is ambiguous, ask rather than choose for them.
-- **Suggest small, testable increments.** Break big requests into chunks they can verify one at a time.
-- **For 3D visuals, use a tight feedback loop.** The developer knows when something looks wrong and roughly where — they don't need to know how to fix it. Adjust numbers and reload; reference images (Wikipedia, YouTube walkarounds) work better than descriptions.
-- **Don't pretend to know Babylon.js quirks.** When unsure about specific API behavior, say so.
+**Platform target:** PC via Steam. Name is confirmed available.
 
 ---
 
-## Coding Conventions
+## TECH STACK
 
-- 2-space indentation
-- camelCase for variables and functions
-- PascalCase for classes
-- Files use kebab-case (e.g., `tank-controller.js`)
-- One class per file when possible
-- Domain-based folder structure under `src/`: `core/` (engine setup, scene management, game loop), `tank/` (player vehicle + modular parts), `combat/` (shells, targeting, hit detection), `world/` (arena, enemies, terrain, spawning), `hub/` (hangar/bunker, NPCs, garage, tank designer), `ui/` (HUD/menus — currently inline in `index.html`), `utils/` (shared helpers)
+| Tool | Purpose | Status |
+|---|---|---|
+| Babylon.js | 3D game engine | Active |
+| Blender + BlenderMCP | 3D asset creation | Active |
+| Obsidian MCP | World bible and design docs | Active |
+| GitHub MCP | Version control | Active |
+| PolyHaven | PBR textures | Active |
+| Claude Code | Primary development agent | Active |
 
----
-
-## Architecture (Babylon.js Conventions)
-
-**Scene-per-major-state pattern.** Major scenes are each their own class with a Babylon.js `Engine`/`Scene`, orchestrated by `src/core/main.js`:
-
-- `HangarScene` (`src/hub/`) — the bunker hub (build/equip the tank, NPCs, deploy)
-- `TankDesignerScene` (`src/hub/`) — garage / modular part swapping
-- `ArenaScene` (`src/world/`) — the gameplay battlefield (primary scene)
-
-The menu, pause, and death screens are DOM overlays in `index.html` driven by `main.js` (the menu's monochrome look is intentional — do not change). There are no separate `BootScene` / `MenuScene` / `GameOverScene` files.
-
-Entities are their own classes managing Babylon.js meshes, organized by domain: `src/tank/Tank.js` is the player's vehicle; `src/world/AIEnemy.js` handles enemy AI logic, `src/world/Enemy.js` / `src/world/TerrainPiece.js` the static enemies and terrain; `src/combat/Shell.js` manages projectile physics. Scenes live with their domain too: `src/world/ArenaScene.js` (battlefield), `src/hub/HangarScene.js` + `src/hub/TankDesignerScene.js` (hub/garage), `src/core/main.js` (entry + scene orchestration).
+**Environment:** Mac, bash shell (not zsh). PATH configured with `$HOME/.local/bin` in `~/.bash_profile`.
 
 ---
 
-## Controls (Current)
+## PROJECT STRUCTURE
 
-| Key | Action |
-|-----|--------|
-| W / S | Forward / Reverse |
-| A / D | Rotate tank hull |
-| Shift (tap) | Tap boost / dash |
-| Shift (tap + W + A or D) | Spin boost |
-| Shift (hold) | Sustained boost |
-| Mouse (move) | Free-aim turret |
-| Mouse (click) | Fire — **flat shot** (no charge mechanic in V1; 0.3s cooldown) |
-| F (hold 0.7s) | Lock on to nearest enemy |
-| F (tap while locked) | Cycle targets |
-
----
-
-## Art Direction — DECIDED
-
-**Two separate aesthetic systems that intentionally contrast:**
-
-### Gameplay World — Bright & Cheerful
-**North star: "Beautiful in a bright way — a battlefield that feels like a game, not a war."**
-
-Aesthetic references: **Super Mario World × Escape from Duckov × toy soldier.** Bright, casual, cheerful. Grass fields, sunshine, saturated primary colors. Still a battlefield, but inviting rather than oppressive.
-
-- Saturated, confident primary colors — toy soldier plastic, not military drab
-- Shapes slightly chunkier/more exaggerated than real proportions
-- Bright green grass ground, clear blue sky, warm sunshine lighting
-- Tank colors pop hard against the green (blue player, red enemy, orange AI)
-
-### UI / HUD — Retro-Futurist (Tron)
-The overlay layer (menus, HUD, overlays) lives in a different register: dark, geometric, neon-lit.
-Like looking through a targeting computer at a toy battlefield.
-
-- Primary neon: `#00e5ff` (electric cyan), danger: `#ff2060`, hull: `#00ff88`
-- Panel background: `rgba(0, 8, 20, 0.93)`, body: `#000810`
-- 1px neon borders with glow, dark navy panels — no chrome or decoration
-- Thin (5px) glowing bar for HUD meters
-- Monospace, uppercase, wide letter-spacing throughout
-- Subtle CRT scanlines overlay on full screen (very low opacity)
-- One accent color only — cyan. Everything else is dark or glowing text.
-
-**Approved color palette:**
-| Element | Color |
-|---------|-------|
-| Player tank hull | Cobalt blue `(0.12, 0.42, 0.88)` |
-| Player tank turret | Deep cobalt `(0.08, 0.32, 0.75)` |
-| Static enemy | Signal red `(0.92, 0.12, 0.08)` |
-| AI enemy | Orange `(0.95, 0.42, 0.04)` |
-| Shell | Yellow `(1.0, 0.82, 0.0)` with orange emissive |
-| Tracks | Near-black `(0.12, 0.12, 0.12)` |
-| Ground | Two-tone bright grass `#4db33d` / `#43a035` |
-| Walls | Golden yellow `(0.95, 0.82, 0.30)` — Mario block feel |
-| Sky | Bright Mario blue `(0.48, 0.78, 1.0)` |
+```
+TanKING/
+├── _docs/
+│   ├── design/        # Game design documents
+│   ├── world/         # Lore, locations, NPCs (see TANKING_WORLD.md)
+│   ├── art/           # Visual direction, Blender modeling guide
+│   └── dev/           # CLAUDE.md, TOOLKIT.md, CHANGELOG.md
+├── src/
+│   ├── core/          # Engine, scene, game loop
+│   ├── tank/          # Tank construction, parts, physics
+│   ├── combat/        # Shooting, targeting, hit detection
+│   ├── world/         # Zones, enemies, map logic
+│   ├── hub/           # Bunker, NPCs, garage
+│   ├── ui/            # HUD, menus, research tree
+│   └── utils/         # Shared helpers
+├── assets/
+│   ├── models/        # .glb / .obj from Blender
+│   ├── textures/      # PBR textures
+│   ├── audio/
+│   └── ui/
+└── CLAUDE.md          # This file
+```
 
 ---
 
-## Tank Models — Current State
+## CORE GAME LOOP
 
-The tank is rendered two ways:
-
-- **`src/tank/Tank.js`** — a vehicle built from Babylon.js primitives (fallback when no GLB is selected).
-- **Modular GLB parts system** (`src/tank/parts/`) — the current direction. Real `.glb` assets in `public/assets/models/tanks/` (M26 Pershing, T-44) are split into hull / turret / cannon parts (`parts/hulls/`, `parts/turrets/`, `parts/cannons/`), described by `public/assets/models/manifest.json`, and recombined by `assembleTank.js`. `PARTS_BY_ID` in `parts/index.js` is the registry.
-
-> The older primitive-only `PershingTank.js` / `T80Tank.js` classes no longer exist — they were superseded by the GLB parts pipeline.
-
----
-
-## Current Status
-
-*(Update this as systems land. Live systems map: `_docs/dev/SYSTEMS.md`.)*
-
-**Foundation (vertical slice) shipped:** momentum movement + boost/dash, static + AI enemies with collision, lock-on targeting, **flat-shot** combat, hit detection / damage / death, menu + death overlays + auto-pause, a built-out **bunker hub** (lounge, kitchen, props, walking driver), a **modular GLB tank-parts pipeline** (M26 + T-44; hull/turret/cannon swap with adaptive composition), and the tank designer/garage.
-
-**Now building toward the v2 extraction roguelite** (roadmap in `_docs/dev/SYSTEMS.md`):
-1. ⬜ Zone structure — starter zone, depth-scaled difficulty
-2. ⬜ Loot table — common consumables + rare parts
-3. ⬜ Extraction mechanic — extract-alive vs death split
-4. ⬜ Classless equip system — parts from any doctrine
-5. ⬜ Hub NPC system — 5 rescuable slots
-6. ⬜ Research tree (stats only) — Mobility / Health / Armor / Fuel
+```
+Bunker hub
+  → Equip tank from available parts
+  → Deploy to zone
+  → Explore battlefield — scavenge consumables and parts
+  → Push deeper for better loot and harder enemies
+  → Extract alive → keep all gains
+  → Die → lose all run gains, keep tank, pay repair cost
+  → Upgrade tank, research base stats
+  → Go back out stronger
+```
 
 ---
 
-## Scope Discipline
+## DESIGN RULES — NEVER VIOLATE THESE
 
-This is the developer's first shipped game. Scope discipline matters more than feature ambition.
-
-- **Build the extraction loop incrementally.** Hub → deploy → scavenge → extract/die → upgrade. Get one zone working end-to-end before adding more zones, NPCs, or systems.
-- **Don't pre-build speculative systems.** Build for the current roadmap step (see `_docs/dev/SYSTEMS.md`), refactor when the next step actually arrives.
-- **Bumper-car collision feel is intentional.** The user noticed it and wants to keep it — it may become a "ram build" chassis type in V1.1. Don't tune it away unless it's a bug, not flavor.
-- **If a request feels too big for one session, flag it.** Suggest splitting.
-
----
-
-## Things to Avoid
-
-- Code with patterns and abstractions the developer can't maintain
-- Adding libraries beyond Babylon.js and Vite unless necessary
-- TypeScript
-- ESLint, Prettier, or other dev tooling complexity
-- Test frameworks
-- Premature optimization
-- Skipping ahead to features in later milestones
-- Long monologue responses — keep explanations focused, let the developer ask follow-ups
-- Changing the menu's monochrome look (it's intentional)
+- Default loadout is always winnable — parts raise the power ceiling not the floor
+- Death stings but never destroys — player keeps their tank, loses run gains, pays repair cost
+- Enemy positions are largely fixed per zone — map mastery is a skill
+- The world is discovered not constructed — parts, NPCs, bosses found in the wild
+- The bunker is home — warm and lived-in, not clinical
+- Player tank is classless — can equip parts from any doctrine
+- No cross-doctrine restrictions — the whole point is the hybrid build
+- Parts come from the world only — research tree handles base stats only
 
 ---
 
-## When in Doubt
+## LOOT & ECONOMY
 
-Ask the developer. Most ambiguities resolve with one clarifying question, not a guess.
+**Common drops:** Ammo, fuel canisters, repair kits, smoke grenades
+**Rare drops:** Upgrade components, new tank parts, class hull wrecks
+**On death:** Lose everything from the run. Keep tank and permanent upgrades. Pay repair cost.
+**On extraction:** Keep everything found. Bank parts, install upgrades.
+**No research-gated parts** — all parts come from the world.
+
+---
+
+## TANK SYSTEM
+
+**The player tank is classless** — unique in Tankford. Can equip parts from any doctrine.
+
+Four doctrines exist in the world:
+- **Light** — fast, fragile, evasive (World 1 enemies)
+- **Medium** — balanced, adaptable (World 2 enemies)
+- **Heavy** — slow, tanky, devastating (World 3 enemies)
+- **Tank Destroyer** — long range, glass cannon (Tea Dee faction)
+
+By late game the player has a frankentank hybrid of all doctrines. This is the intended fantasy.
+
+**Research tree** — base stats only per doctrine: Mobility, Health, Armor, Fuel. Spent at the bunker between runs.
+
+---
+
+## COMBAT SYSTEM
+
+**Firing:**
+- Flat shooting on click
+- Lock-on targeting available — but alerts the enemy
+- Manual aim keeps stealth — skill expression in choosing when to use each
+- Arc cannons planned as future weapon type
+
+**Movement:**
+- Momentum-based physics
+- High speed → wider turning radius + reduced accuracy
+- Jet boost with fuel meter as primary evasion
+
+---
+
+## WORLD ZONES
+
+| Zone | Biome | Lighting | Fortress | Enemies |
+|---|---|---|---|---|
+| World 1 | Green fields | Bright midday | The Iron Keep | Light tanks |
+| World 2 | Desert | Orange sunset | Ashrock | Medium tanks |
+| World 3 | Frozen tundra | Overcast/blizzard | Frostholm | Heavy tanks |
+| World 4 | European capital | Sunny day | The Cathedral | TanKING |
+
+**Zone structure:** Duckov-style continuous open world per zone. Enemy positions largely fixed. Difficulty and loot scale with depth. No wave defense, no artificial triggers. Push deep enough to permanently unlock the next zone. Fast travel to unlocked zones from hub.
+
+**Full zone visual details:** See `_docs/world/TANKING_WORLD.md`
+
+---
+
+## THE BUNKER
+
+Mountain bunker. Fully built from day one — not constructed over time. Starts empty, fills with life as crew is recruited.
+
+**Key features:**
+- **Sean's workbench** — mechanical bench with a terminal. Player's mission log and records.
+- **The radio** — intercepts Tankford transmissions. Source of side quests, world building, and one recurring mysterious signal (main story).
+
+---
+
+## BUNKER CREW
+
+**Sean — Mechanic**
+Childhood best friend. Already in bunker at start. Keeps the tank running. Also secretly the recurring voice on the radio — transmitting without the player knowing. How he knew the player was coming and why he prepared everything in advance is the core mystery of the game. *Full backstory: TBD*
+
+**Clint — Merchant**
+Player's brother. Found in World 1 — his store was destroyed, player helps him, he joins. Buys and sells parts and consumables. Materialistic and entrepreneurial.
+
+**Caylie — Healer & Stat Upgrades**
+Player's girlfriend. Found and rescued via quest in the wild. After recruitment: manages all base stat upgrades (the Melina role) AND appears in the field when player is critically low to save them. The only NPC with both a bunker role and a field presence.
+
+---
+
+## WILD NPCs
+*Exist only in the world. Never move to bunker. Reappear across zones like Blaidd/Alexander in Elden Ring. All are Tankford locals who want the TanKING gone.*
+
+- **The Fighter** — rebel warrior, summonable at boss fights, own arc across worlds. *Identity: TBD*
+- **The Quest Giver** — underground intel operative, wild missions only. *Identity: TBD*
+- **The Black Market Trader** — sells rare parts, moves around each zone, hard to find. *Identity: TBD*
+
+---
+
+## THE KINGDOMS
+
+**Tankford** — main kingdom ruled by the TanKING. Built unknowingly on the history of crashed outsiders. Different tank doctrines across territories are fragments of absorbed outsider cultures.
+
+**Tea Dee** — neutral sovereign faction. Holds Long Boi — a legendary 183mm FV4005-inspired cannon, the only weapon capable of defeating the TanKING. Must be earned through their questline. *Full details: TBD*
+
+---
+
+## THE TANKKING
+
+The most powerful, most advanced tank in Tankford. Rules from The Cathedral in Tankford Capital. Final boss. Not ancient, not a god — just the strongest. Rose to power by force.
+
+*Name and full backstory: TBD*
+
+---
+
+## LONG BOI
+
+The legendary 183mm cannon from Tea Dee. Based on the FV4005 Stage II — comically oversized, absurdly powerful, one shot potential. The weapon that ends the TanKING. Earned by proving yourself to Tea Dee.
+
+---
+
+## THE CORE MYSTERY
+
+Tankford was built on the wreckage of crashed outsiders. Every traveler who arrived and never went home became part of its history. The player is the latest outsider — not the first. Sean knows this. How much he knows and why he prepared the bunker before the player arrived is the narrative spine of the game.
+
+*This is environmental storytelling — crashed machines, buried ruins, fragments of forgotten history. Never fully explained.*
+
+---
+
+## CURRENT DEVELOPMENT PRIORITIES
+
+1. ✅ Project restructured
+2. ✅ Obsidian MCP connected
+3. ✅ GitHub MCP connected
+4. ⬜ Implement zone structure — starter zone with depth-scaled difficulty
+5. ⬜ Implement loot table — common consumables + rare parts
+6. ⬜ Implement extraction mechanic — success vs death outcome split
+7. ⬜ Hub NPC placeholder system — empty bunker, slots for crew
+8. ⬜ Research tree UI per doctrine
+9. ⬜ Art direction document — visual targets per zone
+
+---
+
+## KEY REFERENCE FILES
+
+- `_docs/world/TANKING_WORLD.md` — full world bible, lore, zone details, characters
+- `_docs/art/ART_DIRECTION.md` — decided visual spec: gameplay palette + Tron UI, exact colors
+- `_docs/art/BLENDER_MODELING_GUIDE.md` — asset creation instructions
+- `_docs/dev/ENGINEERING.md` — code conventions, architecture, controls, scope discipline
+- `_docs/dev/SYSTEMS.md` — live systems map / roadmap
+- `_docs/dev/TOOLKIT.md` — full developer toolkit reference
+- `_docs/dev/CHANGELOG.md` — log major decisions and changes here
+
+---
+
+*Last updated: June 2026*
