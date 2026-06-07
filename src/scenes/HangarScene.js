@@ -6,9 +6,11 @@ import {
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter from '../entities/DriverCharacter.js';
-import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf } from './HangarProps.js';
+import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf, addBlob } from './HangarProps.js';
 import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
+import { buildKitchen } from './HangarKitchen.js';
 import { applyModelPaint } from '../utils/modelPaint.js';
+import { assembleTank } from '../parts/assembleTank.js';
 
 const ROOM_W   = 24;    // width (X)
 const ROOM_D   = 32;    // depth (Z), north = positive Z
@@ -29,6 +31,7 @@ export default class HangarScene {
     this._buildRoom();
     this._buildLighting();
     this._buildStations();
+    this._setupBlobShadows();   // fake grounding shadows (work on any GPU)
 
     this._setupDriver();
     this._setupGameLoop();
@@ -49,6 +52,7 @@ export default class HangarScene {
     floorMat.lineColor           = new Color3(0.09, 0.08, 0.07);
     floorMat.opacity             = 1.0;
     floorMat.backFaceCulling     = false;
+    floorMat.maxSimultaneousLights = 8;  // so accent-light pools land on the floor
 
     // Tunnel material — lit concrete. The shaft is lit ONLY by a dedicated
     // mouth light (set up in _buildLighting) that falls off into blackness,
@@ -162,23 +166,26 @@ export default class HangarScene {
   }
 
   _buildLighting() {
+    // Flat fill kept deliberately low so the warm accent lights (bay spot, east
+    // fill, lounge lamp, kitchen bar + caged light) read as pools against a dark
+    // bunker rather than being washed out by even illumination.
     const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
-    ambient.intensity   = 0.55;
-    ambient.diffuse     = new Color3(0.85, 0.80, 0.70);
-    ambient.groundColor = new Color3(0.15, 0.14, 0.12);
+    ambient.intensity   = 0.30;
+    ambient.diffuse     = new Color3(0.82, 0.78, 0.68);
+    ambient.groundColor = new Color3(0.10, 0.09, 0.08);
 
     const overhead = new DirectionalLight('overhead', new Vector3(-0.3, -1, 0.5), this.scene);
-    overhead.intensity = 0.4;
+    overhead.intensity = 0.20;
     overhead.position  = new Vector3(5, 15, 0);
 
     const bulb1 = new PointLight('bulb1', new Vector3(0, 4.5, 5), this.scene);
     bulb1.diffuse   = new Color3(1.0, 0.92, 0.78);
-    bulb1.intensity = 0.8;
+    bulb1.intensity = 0.80;
     bulb1.range     = 18;
 
     const bulb2 = new PointLight('bulb2', new Vector3(0, 4.5, -5), this.scene);
     bulb2.diffuse   = new Color3(1.0, 0.92, 0.78);
-    bulb2.intensity = 0.6;
+    bulb2.intensity = 0.65;
     bulb2.range     = 14;
 
     // Keep only the strong directional + bulbs off the tunnel so the deep end
@@ -196,7 +203,7 @@ export default class HangarScene {
     // rather than pooling a hotspot on the floor.
     const mouth = new PointLight('tunnel-mouth', new Vector3(0, 2.4, ROOM_D / 2 + 3), this.scene);
     mouth.diffuse            = new Color3(1.0, 0.94, 0.82); // warm, matches room bulbs
-    mouth.intensity          = 1.3;
+    mouth.intensity          = 1.8;
     mouth.range              = 18;
     mouth.includedOnlyMeshes = this._tunnelMeshes;
 
@@ -205,15 +212,47 @@ export default class HangarScene {
     // creating a competing hotspot on the west side.
     const eastFill = new PointLight('east-fill', new Vector3(10.5, 3.2, 0), this.scene);
     eastFill.diffuse   = new Color3(1.0, 0.90, 0.75);
-    eastFill.intensity = 0.5;
+    eastFill.intensity = 0.9;
     eastFill.range     = 12;
 
     // Tank bay spot — overhead light aimed at the parked M26 so it reads as the
     // hero piece of the room. Kept warm to match the bulb palette.
     const baySpot = new PointLight('bay-spot', new Vector3(0, 5, 10), this.scene);
     baySpot.diffuse   = new Color3(1.0, 0.93, 0.80);
-    baySpot.intensity = 1.2;
+    baySpot.intensity = 1.9;
     baySpot.range     = 14;
+  }
+
+  // Fake "blob" grounding shadows — soft dark ovals on the floor under each prop.
+  // Real-time shadow maps don't render on some GPUs (including the dev machine),
+  // so blobs guarantee a grounded look everywhere and suit the bright art style.
+  // Each blob is sized to the prop's world X/Z footprint.
+  _setupBlobShadows() {
+    const drop = (root, opts = {}) => {
+      const meshes = root.getChildMeshes(false).filter((m) => m.getTotalVertices() > 0 && m.isVisible);
+      if (!meshes.length) return;
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      meshes.forEach((m) => {
+        m.computeWorldMatrix(true);
+        const bb = m.getBoundingInfo().boundingBox;
+        minX = Math.min(minX, bb.minimumWorld.x); maxX = Math.max(maxX, bb.maximumWorld.x);
+        minZ = Math.min(minZ, bb.minimumWorld.z); maxZ = Math.max(maxZ, bb.maximumWorld.z);
+      });
+      const pad = opts.pad ?? 0.15;
+      addBlob(this.scene, this._blobMat,
+        (minX + maxX) / 2, (minZ + maxZ) / 2,
+        (maxX - minX) / 2 + pad, (maxZ - minZ) / 2 + pad,
+        { y: opts.y ?? 0.03 });
+    };
+
+    // Compact stations get one blob each. The kitchen places its own per-item
+    // blobs (table/stools/etc. are spread out, so one big blob would look wrong),
+    // and the lounge already sits on a rug, so neither is dropped here.
+    ['wb-root', 'qm-root', 'mt-root', 'rs-root'].forEach((n) => {
+      const r = this.scene.getTransformNodeByName(n);
+      if (r) drop(r);
+    });
+    this._blobDrop = drop; // reused for the async tank
   }
 
   _buildStations() {
@@ -225,9 +264,11 @@ export default class HangarScene {
       mechanic: { id: 'mechanic', label: 'INTERACT',  title: 'MECHANIC',      body: 'UPGRADES & REPAIRS\nComing soon.',     showDeploy: false },
       qm:       { id: 'qm',       label: 'INTERACT',  title: 'QUARTERMASTER', body: 'AMMO & SUPPLIES\nComing soon.',        showDeploy: false },
       lounge:   { id: 'lounge',   label: 'CUSTOMIZE', title: 'LOUNGE' },
+      kitchen:  { id: 'kitchen',  label: 'INTERACT',  title: 'GALLEY',        body: 'MESS & RATIONS\nComing soon.',        showDeploy: false },
     };
 
     const propMats = makeMats(s);
+    this._blobMat = propMats.blob;
     this._stationMeshes = [
       { mesh: buildMapTable(s,    -8,  14, propMats), data: this._stationDefs.map      },
       { mesh: buildRadioShelf(s,    7,  15, propMats), data: this._stationDefs.radio    },
@@ -240,6 +281,11 @@ export default class HangarScene {
     this._loungeConfig = this._loadLoungeConfig();
     this._lounge = buildLounge(s, propMats, this._loungeConfig);
     this._stationMeshes.push({ mesh: this._lounge.collider, data: this._stationDefs.lounge });
+
+    // SE-corner kitchen — static INTERACT station (galley/mess), scaled into the
+    // corner the same way as the lounge.
+    this._kitchen = buildKitchen(s, propMats);
+    this._stationMeshes.push({ mesh: this._kitchen.collider, data: this._stationDefs.kitchen });
 
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
@@ -260,6 +306,44 @@ export default class HangarScene {
       console.warn('[Hangar] manifest fetch failed', e);
       return;
     }
+    // Composed (modular) tank — rebuild the saved hull+turret+cannon loadout, scaled onto the
+    // plinth like the single-GLB display. Mirrors how the arena rebuilds the player tank.
+    if (filename === 'composed') {
+      const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
+        ?? { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' };
+      const cannonMat = new StandardMaterial('hangarComposedCannon', s);
+      cannonMat.diffuseColor    = new Color3(0.12, 0.42, 0.88);
+      cannonMat.specularColor   = new Color3(0.05, 0.06, 0.07);
+      cannonMat.backFaceCulling = false;
+      let assembled;
+      try {
+        assembled = await assembleTank(s, loadout, { cannon: cannonMat });
+      } catch (e) { console.warn('[Hangar] composed assembly failed', e); return; }
+
+      const meshes = [
+        ...assembled.parts.hullBuilt.meshes,
+        ...assembled.parts.turretBuilt.meshes,
+        ...assembled.parts.cannonBuilt.meshes,
+      ].filter(m => m.getTotalVertices() > 0);
+
+      // Scale to the same display width GLBs use (~3.2), then sit it on the plinth at z=10.
+      assembled.root.position.set(0, 0, 0);
+      meshes.forEach(m => m.computeWorldMatrix(true));
+      const xs = meshes.flatMap(m => [
+        m.getBoundingInfo().boundingBox.minimumWorld.x,
+        m.getBoundingInfo().boundingBox.maximumWorld.x,
+      ]);
+      const rawW = Math.max(...xs) - Math.min(...xs);
+      if (rawW > 0) assembled.root.scaling.setAll(3.2 / rawW);
+      assembled.root.computeWorldMatrix(true);
+      meshes.forEach(m => m.computeWorldMatrix(true));
+      const minY = Math.min(...meshes.map(m => m.getBoundingInfo().boundingBox.minimumWorld.y));
+      assembled.root.position.set(0, -minY, 10);
+
+      if (this._blobDrop) this._blobDrop(assembled.root, { y: 0.035 });
+      return;
+    }
+
     const config = manifest[filename];
     if (!config) return;
 
@@ -298,6 +382,9 @@ export default class HangarScene {
     glbRoot.position.set(0, 0 - minY, 10);
 
     applyModelPaint(result.meshes, config, s);
+
+    // The tank loads after _setupBlobShadows ran, so drop its blob now.
+    if (this._blobDrop) this._blobDrop(glbRoot, { y: 0.035 });
   }
 
   _buildBayGeometry() {
@@ -484,14 +571,6 @@ export default class HangarScene {
     const handle = MeshBuilder.CreateBox('exit-handle', { width: 0.08, height: 0.5, depth: 0.14 }, s);
     handle.position = new Vector3(0.85, 1.6, faceZ - 0.14);
     handle.material = handleMat;
-
-    // Glowing EXIT sign plate — to the right of the frame on the exterior wall
-    const signMat = new StandardMaterial('exit-sign', s);
-    signMat.diffuseColor  = new Color3(0.02, 0.15, 0.15);
-    signMat.emissiveColor = new Color3(0.0, 0.7, 0.62);
-    const sign = MeshBuilder.CreateBox('exit-sign', { width: 1.2, height: 0.35, depth: 0.08 }, s);
-    sign.position = new Vector3(2.2, 2.8, faceZ);
-    sign.material = signMat;
 
     // Exterior light above the door
     const doorLight = new PointLight('door-light', new Vector3(0, 4.5, faceZ - 1.5), s);
