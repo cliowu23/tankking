@@ -147,6 +147,7 @@ function startHangar() {
       canvas.style.display = 'block';
       window.__state = 'HANGAR';
       hangarScene = new HangarScene(engine, deployToArena, goToMenu);
+      window.__hangar = hangarScene; // debug hook
       engine.runRenderLoop(() => hangarScene.scene.render());
     },
     'iris'
