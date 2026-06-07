@@ -58,8 +58,14 @@ function validateComposition(ctx) {
 
 // Composes a {hull, turret, cannon} loadout into one tank via the alignment chain
 // hull → turret → barrel. Returns the same handles the game expects.
-export async function assembleTank(scene, loadout, materials = {}) {
-  const root = new TransformNode('tankRoot', scene);
+//
+// By default it creates its own root/turretPivot/barrelPivot (the designer preview). Pass
+// `options.target = { root, turretPivot, barrelPivot }` to build onto an existing rig — e.g. the
+// arena's Tank entity, whose gameplay already drives those pivots. In that mode the tank's root
+// is gameplay-controlled, so grounding is applied to the parts (hull + turret) instead of root.
+export async function assembleTank(scene, loadout, materials = {}, options = {}) {
+  const target = options.target ?? null;
+  const root = target?.root ?? new TransformNode('tankRoot', scene);
 
   const hullPart   = PARTS_BY_ID[loadout.hull];
   const turretPart = PARTS_BY_ID[loadout.turret];
@@ -92,7 +98,7 @@ export async function assembleTank(scene, loadout, materials = {}) {
   //    native turret units, so scale it into world units. The turret geometry is counter-
   //    shifted by the same amount, so its static seating is unchanged: only the spin axis moves.
   const basketOffset = basket.center.scale(scale);
-  const turretPivot = new TransformNode('turretPivot', scene);
+  const turretPivot = target?.turretPivot ?? new TransformNode('turretPivot', scene);
   turretPivot.position.copyFrom(ring).addInPlace(basketOffset);
   turretPivot.parent = root;
 
@@ -103,14 +109,17 @@ export async function assembleTank(scene, loadout, materials = {}) {
   // 5. Barrel pivot at the scaled mount, carried by the same counter-shift so the gun stays
   //    attached where it was — the mount rides with the turret geometry, not the shifted pivot.
   const mount = turretBuilt.mount ?? new Vector3(0, 0, 0.5);
-  const barrelPivot = new TransformNode('barrelPivot', scene);
+  const barrelPivot = target?.barrelPivot ?? new TransformNode('barrelPivot', scene);
   barrelPivot.position = mount.scale(scale).add(turretBuilt.root.position);
   barrelPivot.parent = turretPivot;
+  barrelPivot.rotation.x = 0;   // start level (gameplay drives elevation)
 
   const cannonBuilt = await cannonPart.build(scene, materials.cannon);
   cannonBuilt.root.parent = barrelPivot;
 
-  // 6. Ground the tank — shift root so the lowest mesh point sits at y=0.
+  // 6. Ground the tank — shift the lowest mesh point to y=0. With our own root we just move the
+  //    root; on a target rig the root is gameplay-controlled, so we shift the parts (hull +
+  //    turret pivot carry everything below them) by the same amount instead.
   let minY = Infinity;
   const allMeshes = [...hullBuilt.meshes, ...turretBuilt.meshes, ...cannonBuilt.meshes];
   for (const m of allMeshes) {
@@ -118,14 +127,21 @@ export async function assembleTank(scene, loadout, materials = {}) {
     const bb = m.getBoundingInfo().boundingBox;
     if (bb.minimumWorld.y < minY) minY = bb.minimumWorld.y;
   }
-  if (isFinite(minY)) root.position.y = -minY;
+  if (isFinite(minY)) {
+    if (target) {
+      hullBuilt.root.position.y -= minY;
+      turretPivot.position.y    -= minY;
+    } else {
+      root.position.y = -minY;
+    }
+  }
 
   if (import.meta.env?.DEV) {
     validateComposition({ loadout, turretPivot, barrelPivot, ringDiameter, scale, turretBuilt, cannonBuilt });
   }
 
   return {
-    root, turretPivot, barrelPivot,
+    root, turretPivot, barrelPivot, scale, minY,
     parts: { hullBuilt, turretBuilt, cannonBuilt },
   };
 }
