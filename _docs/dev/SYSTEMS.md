@@ -15,7 +15,8 @@ src/combat/  projectiles
 src/world/   arena/battlefield, enemies, terrain
 src/hub/     bunker/hangar, NPCs (driver), garage/designer, props
 src/ui/      HUD/menus — currently inline in index.html (folder empty)
-src/utils/   shared helpers (modelPaint.js)
+src/utils/   shared helpers (modelPaint, mathUtils, meshBounds)
+src/world/arenaLoot.js — extraction-loop layout + tuning config (the one place to edit/scale)
 ```
 
 ---
@@ -99,8 +100,8 @@ Per the dev priorities in `CLAUDE.md`. None of these exist yet.
 | System | Priority | Notes |
 |--------|----------|-------|
 | Zone structure | High | Starter zone, depth-scaled difficulty, largely fixed enemy positions |
-| Loot table | High | Common consumables (ammo/fuel/repair/smoke) + rare parts |
-| Extraction mechanic | High | Success (keep gains) vs death (lose run gains, keep tank, pay repair) |
+| Loot table | High | Slice 1 done — salvage crates (abstract currency). Next: consumables + rare parts |
+| Extraction mechanic | ✅ Slice 1 | Done — timed channel, extract banks / die loses (tank kept). Repair cost still TODO |
 | Classless equip system | High | One tank equips parts from any doctrine; parts found in the world |
 | Hub NPC system | Medium | 5 rescuable slots: Mechanic, Merchant, Researcher, Combat Ally, Healer |
 | Research tree (stats only) | Medium | Mobility / Health / Armor / Fuel; earned with Research Points |
