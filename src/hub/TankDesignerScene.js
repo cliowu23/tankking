@@ -30,7 +30,7 @@ export default class TankDesignerScene {
     this._barrelUp         = -0.349;
     this._barrelDown       =  0.175;
     this._previewFilename  = null; // what's currently showing in the 3D view
-    this._selectedFilename = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
+    this._selectedFilename = localStorage.getItem('selectedTank') || 'composed';
 
     // Cannon parts state
     this._equippedCannon          = 'cannon-90mm';

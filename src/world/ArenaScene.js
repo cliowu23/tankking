@@ -326,8 +326,9 @@ export default class ArenaScene {
           document.getElementById('controls-start').textContent = 'PRESS ENTER TO BATTLE';
           return;
         }
-        if (modelFile === 'composed') {
-          // Modular tank built from the designer's saved hull + turret + cannon loadout.
+        // Composed modular tank — also the fallback for any selectedTank no longer in the
+        // manifest (e.g. the removed whole-GLB M26), so a stale save can't 404.
+        if (modelFile === 'composed' || !manifest[modelFile]) {
           const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
             ?? { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' };
           this._loadPlayerComposed(loadout);

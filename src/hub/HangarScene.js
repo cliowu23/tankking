@@ -314,7 +314,7 @@ export default class HangarScene {
 
   async _loadTankDisplay() {
     const s = this.scene;
-    const filename = localStorage.getItem('selectedTank') || 'm26_pershing_war_thunder.glb';
+    let filename = localStorage.getItem('selectedTank') || 'composed';
 
     let manifest;
     try {
@@ -323,6 +323,9 @@ export default class HangarScene {
       console.warn('[Hangar] manifest fetch failed', e);
       return;
     }
+    // Stale selectedTank no longer in the manifest (e.g. the removed whole-GLB M26) → composed.
+    if (filename !== 'composed' && !manifest[filename]) filename = 'composed';
+
     // Composed (modular) tank — rebuild the saved hull+turret+cannon loadout, scaled onto the
     // plinth like the single-GLB display. Mirrors how the arena rebuilds the player tank.
     if (filename === 'composed') {
