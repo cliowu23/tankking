@@ -1,10 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicTexture } from '@babylonjs/core';
-
-// Shortest signed angle between two angles (radians)
-function shortAngle(from, to) {
-  let d = ((to - from) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-  return d;
-}
+import { shortAngle } from '../utils/mathUtils.js';
 
 export default class Tank {
   constructor(scene, x, z) {
