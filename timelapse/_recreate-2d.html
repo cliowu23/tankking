@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;background:#000;overflow:hidden}
+  canvas{display:block;width:1280px;height:800px;image-rendering:auto}
+</style></head>
+<body>
+<canvas id="c" width="2560" height="1600"></canvas>
+<script>
+const cv = document.getElementById('c');
+const x = cv.getContext('2d');
+x.scale(2,2);                 // draw in 1280x800 logical space, 2x backing
+const W=1280, H=800;
+
+/* ---------- dystopian arena ground ---------- */
+function ground(){
+  // base: grim charcoal-brown wasteland
+  const g = x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#23211d'); g.addColorStop(1,'#1a1815');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+
+  // cracked-tile grid, very dim
+  x.strokeStyle='rgba(120,110,90,0.06)'; x.lineWidth=1;
+  for(let i=0;i<=W;i+=64){x.beginPath();x.moveTo(i,0);x.lineTo(i,H);x.stroke();}
+  for(let j=0;j<=H;j+=64){x.beginPath();x.moveTo(0,j);x.lineTo(W,j);x.stroke();}
+
+  // scattered rubble / scorch (deterministic)
+  let s=1337; const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  for(let i=0;i<70;i++){
+    const px=rnd()*W, py=rnd()*H, r=2+rnd()*5;
+    x.fillStyle=`rgba(${30+rnd()*30|0},${28+rnd()*20|0},${22+rnd()*14|0},0.7)`;
+    x.beginPath();x.arc(px,py,r,0,7);x.fill();
+  }
+  // a few scorch craters
+  for(const [cx,cy,cr] of [[300,560,46],[940,250,38],[640,440,30]]){
+    const cg=x.createRadialGradient(cx,cy,2,cx,cy,cr);
+    cg.addColorStop(0,'rgba(10,8,6,0.85)');cg.addColorStop(1,'rgba(10,8,6,0)');
+    x.fillStyle=cg;x.beginPath();x.arc(cx,cy,cr,0,7);x.fill();
+  }
+}
+
+/* ---------- top-down 2D tank sprite (Phaser style) ---------- */
+function tank(cx,cy,deg,hull,track,turret,barrel,sc=1){
+  x.save(); x.translate(cx,cy); x.rotate(deg*Math.PI/180); x.scale(sc,sc);
+  // drop shadow
+  x.fillStyle='rgba(0,0,0,0.45)';
+  roundRect(-30,-36,60,76,8); x.fill();
+  x.translate(-2,-3);
+  // tracks
+  x.fillStyle=track;
+  roundRect(-30,-34,14,70,4); x.fill();
+  roundRect( 16,-34,14,70,4); x.fill();
+  // track treads
+  x.fillStyle='rgba(0,0,0,0.35)';
+  for(let ty=-30;ty<34;ty+=8){x.fillRect(-30,ty,14,2);x.fillRect(16,ty,14,2);}
+  // hull
+  x.fillStyle=hull; roundRect(-20,-32,40,66,6); x.fill();
+  x.fillStyle='rgba(255,255,255,0.06)'; roundRect(-20,-32,40,20,6); x.fill();
+  // turret
+  x.fillStyle=turret; x.beginPath(); x.arc(0,-2,17,0,7); x.fill();
+  x.fillStyle='rgba(0,0,0,0.25)'; x.beginPath(); x.arc(0,-2,17,0.6,2.2); x.fill();
+  // barrel
+  x.fillStyle=barrel; roundRect(-3.5,-44,7,40,2); x.fill();
+  x.fillStyle='rgba(0,0,0,0.3)'; x.fillRect(-3.5,-44,7,3);
+  // hatch
+  x.fillStyle='rgba(0,0,0,0.3)'; x.beginPath(); x.arc(0,-2,6,0,7); x.fill();
+  x.restore();
+}
+function roundRect(rx,ry,w,h,r){
+  x.beginPath();
+  x.moveTo(rx+r,ry); x.arcTo(rx+w,ry,rx+w,ry+h,r);
+  x.arcTo(rx+w,ry+h,rx,ry+h,r); x.arcTo(rx,ry+h,rx,ry,r);
+  x.arcTo(rx,ry,rx+w,ry,r); x.closePath();
+}
+function healthbar(cx,cy,frac){
+  const w=44,h=6;
+  x.fillStyle='rgba(0,0,0,0.7)'; x.fillRect(cx-w/2-1,cy-1,w+2,h+2);
+  x.fillStyle='#3a2530'; x.fillRect(cx-w/2,cy,w,h);
+  x.fillStyle='#5cff8f'; x.fillRect(cx-w/2,cy,w*frac,h);
+}
+
+/* ---------- scene ---------- */
+ground();
+
+// enemies (red) — layout echoes the surviving Frame 1
+const enemies=[[300,150,200],[980,170,165],[150,640,20],[1120,650,-25]];
+for(const [ex,ey,ed] of enemies){
+  tank(ex,ey,ed,'#a8302f','#241412','#7e2422','#5a1a18',0.92);
+  healthbar(ex,ey-44,0.7+0.25*Math.sin(ex));
+}
+
+// lock-on reticle on one enemy (day-1 mechanic)
+(function reticle(cx,cy){
+  x.strokeStyle='#ff9f1c'; x.lineWidth=2;
+  x.beginPath(); x.arc(cx,cy,34,0,7); x.stroke();
+  for(let a=0;a<4;a++){
+    const an=a*Math.PI/2+Math.PI/4;
+    x.beginPath();
+    x.moveTo(cx+Math.cos(an)*28,cy+Math.sin(an)*28);
+    x.lineTo(cx+Math.cos(an)*40,cy+Math.sin(an)*40);
+    x.stroke();
+  }
+})(300,150);
+
+// player shell tracer
+x.strokeStyle='#ffd24a'; x.lineWidth=3; x.lineCap='round';
+x.beginPath(); x.moveTo(640,360); x.lineTo(420,210); x.stroke();
+x.fillStyle='#fff6c2'; x.beginPath(); x.arc(420,210,4,0,7); x.fill();
+
+// player tank (olive-drab, centered) — the lineage that becomes the M26
+tank(640,420,-34,'#6b6a3a','#1f1d15','#5a5930','#3f3e22',1.05);
+// muzzle flash
+x.fillStyle='rgba(255,210,80,0.9)';
+x.save();x.translate(640,420);x.rotate(-34*Math.PI/180);
+x.beginPath();x.arc(0,-48,7,0,7);x.fill();x.restore();
+
+/* ---------- HUD (carried into Frame 1) ---------- */
+(function hud(){
+  const px=24,py=H-118,pw=250,ph=94;
+  x.fillStyle='rgba(10,16,34,0.92)'; roundRect(px,py,pw,ph,6); x.fill();
+  x.strokeStyle='#c84b6a'; x.lineWidth=2; roundRect(px,py,pw,ph,6); x.stroke();
+  // BOOST
+  x.fillStyle='#46e0ff'; x.font='bold 15px monospace';
+  x.fillText('▸ BOOST', px+16, py+26);
+  segbar(px+16, py+34, 218, '#2b6cff', 0.82);
+  // HULL
+  x.fillStyle='#5cff8f'; x.fillText('◆ HULL', px+16, py+66);
+  segbar(px+16, py+74, 218, '#36d96a', 0.9);
+})();
+function segbar(bx,by,bw,col,frac){
+  const n=18, gap=2, sw=(bw-(n-1)*gap)/n;
+  for(let i=0;i<n;i++){
+    x.fillStyle = (i/n < frac) ? col : 'rgba(255,255,255,0.08)';
+    x.fillRect(bx+i*(sw+gap), by, sw, 11);
+  }
+}
+
+/* ---------- bleak vignette + grain ---------- */
+const vg=x.createRadialGradient(W/2,H/2,200,W/2,H/2,760);
+vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.6)');
+x.fillStyle=vg; x.fillRect(0,0,W,H);
+
+// recreation watermark
+x.fillStyle='rgba(180,180,180,0.5)'; x.font='11px monospace'; x.textAlign='right';
+x.fillText('RECONSTRUCTION • PHASER 2D ERA • NO ORIGINAL SURVIVES', W-18, H-16);
+x.textAlign='left';
+
+window.__drawn = true;
+</script>
+</body></html>
