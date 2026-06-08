@@ -21,7 +21,7 @@ The player is a modern tank driver who crashed into a medieval fantasy world cal
 |---|---|---|
 | Babylon.js | 3D game engine | Active |
 | Blender + BlenderMCP | 3D asset creation | Active |
-| Obsidian MCP | World bible and design docs | Active |
+| `_docs/` markdown | World bible and design docs | Active (plain files — edit directly) |
 | GitHub MCP | Version control | Active |
 | PolyHaven | PBR textures | Active |
 | Claude Code | Primary development agent | Active |
@@ -207,7 +207,7 @@ Tankford was built on the wreckage of crashed outsiders. Every traveler who arri
 ## CURRENT DEVELOPMENT PRIORITIES
 
 1. ✅ Project restructured
-2. ✅ Obsidian MCP connected
+2. ✅ Docs live as plain `_docs/` markdown (Obsidian retired — edit files directly)
 3. ✅ GitHub MCP connected
 4. ⬜ Implement zone structure — starter zone with depth-scaled difficulty
 5. ⬜ Implement loot table — common consumables + rare parts

@@ -6,6 +6,10 @@ For the *reasoning* behind architectural choices, see `DECISIONS.md`. This file 
 
 > Entries before 2026-06-07 were reconstructed from dated plans/specs (`_docs/misc/superpowers/`), file timestamps, and `DECISIONS.md`. Dates are approximate where noted. Keep this updated going forward — add an entry whenever something meaningful ships or a major decision lands.
 
+> 📸 **When a milestone is visual, also record a timelapse frame** (the living visual record in `timelapse/`). After committing, run:
+> `timelapse/tools/record-frame.sh HEAD <arena|hangar|designer|raw> <name.png> "<date>" "<title>" "<desc>" [base]`
+> then refresh `timelapse/index.html`. See `timelapse/README.md`. Commit first — captures use committed state.
+
 ---
 
 ## 2026-06-08 — Extraction loop Slice 1
