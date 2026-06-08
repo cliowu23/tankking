@@ -8,6 +8,13 @@ For the *reasoning* behind architectural choices, see `DECISIONS.md`. This file 
 
 ---
 
+## 2026-06-08 — Extraction loop Slice 1
+- Salvage crates (drive-over) + extraction pad with a 3s timed channel
+- Extract banks run salvage (persisted via `runState.js`); death loses it (tank kept)
+- Banked total shown in the bunker; EXTRACTED summary → return to bunker
+- Config-driven + scalable: all layout/tuning in `world/arenaLoot.js`; generic `SalvageCrate` / `ExtractionZone` entities
+- New files: `core/runState.js`, `world/arenaLoot.js`, `world/SalvageCrate.js`, `world/ExtractionZone.js`
+
 ## 2026-06-07 — Docs restructure
 
 - Replaced `CLAUDE.md` with the v2 extraction-roguelite vision (Steam/PC target, 4 doctrines incl. Tank Destroyer, 8 design rules, loot/economy, lock-on stealth tradeoff).
