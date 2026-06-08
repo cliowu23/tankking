@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;background:#fff;overflow:hidden}
+  canvas{display:block;width:1280px;height:800px}
+</style></head>
+<body>
+<canvas id="c" width="2560" height="1600"></canvas>
+<script>
+const cv=document.getElementById('c'), x=cv.getContext('2d');
+x.scale(2,2); const W=1280,H=800;
+const RED='#e23b3b', BLUE='#2f6bff';
+
+// crude near-white background, like the migrated vertical slice
+x.fillStyle='#f2f2f5'; x.fillRect(0,0,W,H);
+
+// barest possible tank: solid rectangle + stick barrel + crude turret square. no shadows/gradients.
+function tank(cx,cy,deg,fill){
+  x.save(); x.translate(cx,cy); x.rotate(deg*Math.PI/180);
+  x.fillStyle='#555'; x.fillRect(-3,-34,6,38);              // barrel
+  x.fillStyle=fill; x.strokeStyle='#222'; x.lineWidth=3;
+  x.fillRect(-26,-30,52,60); x.strokeRect(-26,-30,52,60);   // body
+  x.strokeRect(-13,-15,26,26);                              // turret outline
+  x.restore();
+  x.fillStyle='#000'; x.fillRect(cx-22,cy-46,44,6);         // crude green health bar
+  x.fillStyle='#23c552'; x.fillRect(cx-21,cy-45,42*0.8,4);
+}
+
+tank(300,150,205,RED);
+tank(980,170,160,RED);
+tank(160,640,20,RED);
+tank(1110,650,-22,RED);
+tank(640,420,-30,BLUE);                                     // player
+
+x.fillStyle='#111'; x.fillRect(470,250,8,8);               // a shell, mid-flight
+
+// barebones HUD: plain text + flat outlined bars, no panel
+x.font='bold 16px monospace'; x.fillStyle='#111';
+x.fillText('BOOST', 28, H-78);
+x.fillStyle=BLUE; x.fillRect(28,H-70,180*0.8,14);
+x.strokeStyle='#111'; x.lineWidth=2; x.strokeRect(28,H-70,180,14);
+x.fillStyle='#111'; x.fillText('HULL', 28, H-44);
+x.fillStyle='#23c552'; x.fillRect(28,H-36,180*0.9,14);
+x.strokeRect(28,H-36,180,14);
+
+x.fillStyle='rgba(0,0,0,0.45)'; x.font='11px monospace'; x.textAlign='right';
+x.fillText('RECONSTRUCTION • EARLIEST PHASER PROTOTYPE • NO ORIGINAL SURVIVES', W-18, H-16);
+x.textAlign='left';
+window.__drawn=true;
+</script>
+</body></html>

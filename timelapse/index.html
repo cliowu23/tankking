@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>TanKING — Development Timelapse</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#0e1426; --line:#1d2740;
+    --ink:#cdd6f4; --dim:#6c7aa0;
+    --red:#ff4d5e; --orange:#ff9f1c; --cyan:#46e0ff; --green:#5cff8f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #131c33 0%, var(--bg) 60%);
+    color:var(--ink);
+    font-family:"SF Mono",ui-monospace,"Menlo",monospace;
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100vh;padding:28px 20px 40px;gap:18px;
+  }
+  header{text-align:center}
+  h1{
+    font-size:26px;letter-spacing:.18em;font-weight:800;
+    display:flex;gap:.05em;justify-content:center;align-items:baseline;
+  }
+  h1 .k{color:var(--orange)}
+  .sub{margin-top:7px;color:#7c8bb5;font-size:12.5px;letter-spacing:.22em;text-transform:uppercase}
+
+  .stage{
+    position:relative;width:min(960px,94vw);aspect-ratio:16/10;
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    background:#05070f;
+    box-shadow:0 0 0 1px #000, 0 30px 80px -30px #000, inset 0 0 120px -40px #000;
+  }
+  .stage img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    opacity:0;transition:opacity .55s ease;
+  }
+  .stage img.on{opacity:1}
+  /* corner ticks, Tron flavor */
+  .corner{position:absolute;width:14px;height:14px;border:2px solid var(--red);opacity:.85;z-index:5}
+  .corner.tl{top:8px;left:8px;border-right:0;border-bottom:0}
+  .corner.tr{top:8px;right:8px;border-left:0;border-bottom:0}
+  .corner.bl{bottom:8px;left:8px;border-right:0;border-top:0}
+  .corner.br{bottom:8px;right:8px;border-left:0;border-top:0}
+
+  .badge{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:6;
+    background:rgba(8,12,24,.78);border:1px solid var(--line);
+    padding:6px 16px;border-radius:999px;font-size:12px;letter-spacing:.12em;
+    color:#9fb0d8;backdrop-filter:blur(6px);white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;
+  }
+  .badge b{color:#eaf0ff;font-weight:700}
+  .badge .bnum{color:#5d6b94;margin-right:6px}
+  .badge .recon{color:var(--orange);border-left:1px solid var(--line);margin-left:9px;padding-left:9px;letter-spacing:.14em}
+  .badge .sect{color:var(--cyan);border-left:1px solid var(--line);margin-left:9px;padding-left:9px;letter-spacing:.14em}
+  .cap-date.sect{border-color:var(--cyan)}
+  .dot.base{border-color:var(--cyan)}
+  .dot.base.active{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 0 4px rgba(70,224,255,.18)}
+  .cap-date.recon{border-color:var(--orange)}
+  .cap-date.recon .d{font-size:15px}
+
+  .caption{width:min(960px,94vw);min-height:74px;display:flex;gap:16px;align-items:flex-start}
+  .cap-date{
+    flex:0 0 auto;text-align:center;border:1px solid var(--line);border-radius:10px;
+    padding:10px 14px;background:var(--panel);min-width:104px;
+  }
+  .cap-date .d{font-size:20px;font-weight:800;color:var(--orange);letter-spacing:.04em}
+  .cap-date .c{font-size:10px;color:#5d6b94;margin-top:3px;letter-spacing:.1em}
+  .cap-body{flex:1}
+  .cap-title{font-size:16px;font-weight:700;letter-spacing:.04em;color:#eaf0ff}
+  .cap-title .n{color:#46506e;font-weight:600;margin-right:8px}
+  .cap-desc{margin-top:6px;font-size:13px;line-height:1.55;color:#9aa8cf;max-width:62ch}
+
+  /* timeline / scrubber */
+  .timeline{width:min(960px,94vw);margin-top:2px}
+  .track{
+    position:relative;height:5px;background:var(--line);border-radius:99px;cursor:pointer;
+  }
+  .fill{position:absolute;left:0;top:0;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,var(--red),var(--orange));width:0;transition:width .25s linear}
+  .dots{position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center}
+  .dot{
+    width:13px;height:13px;border-radius:50%;background:#1b2440;border:2px solid #38456b;
+    cursor:pointer;transition:.2s;position:relative;transform:translateY(0)
+  }
+  .dot:hover{border-color:var(--cyan)}
+  .dot.active{background:var(--orange);border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,159,28,.18)}
+  .dot.past{border-color:var(--red)}
+  .ticklabels{display:flex;justify-content:space-between;margin-top:10px}
+  .ticklabels span{font-size:10.5px;color:#5d6b94;letter-spacing:.08em;flex:1;text-align:center}
+  .ticklabels span:first-child{text-align:left}
+  .ticklabels span:last-child{text-align:right}
+  .ticklabels span.active{color:var(--orange)}
+
+  .controls{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:6px}
+  button.ctl{
+    background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    padding:9px 18px;border-radius:9px;font-family:inherit;font-size:12px;letter-spacing:.12em;
+    cursor:pointer;transition:.15s;text-transform:uppercase
+  }
+  button.ctl:hover{border-color:var(--cyan);color:#fff}
+  button.ctl.play{background:var(--red);border-color:var(--red);color:#fff;min-width:120px;font-weight:700}
+  button.ctl.play:hover{background:#ff6271}
+  .hint{color:#46506e;font-size:11px;letter-spacing:.1em;margin-top:2px}
+  .speed{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .speed button{background:var(--panel);color:#8493bd;border:0;padding:9px 12px;font-family:inherit;font-size:11px;cursor:pointer}
+  .speed button.on{background:#1b2440;color:var(--cyan)}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Tan<span class="k">KING</span></h1>
+    <div class="sub">Phaser 2D → Babylon 3D · The Whole Journey</div>
+  </header>
+
+  <div class="stage" id="stage">
+    <span class="corner tl"></span><span class="corner tr"></span>
+    <span class="corner bl"></span><span class="corner br"></span>
+    <div class="badge" id="badge"></div>
+    <!-- images injected -->
+  </div>
+
+  <div class="timeline">
+    <div class="track" id="track">
+      <div class="fill" id="fill"></div>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="ticklabels" id="ticks"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctl" id="prev">◀ Prev</button>
+    <button class="ctl play" id="play">▶ Replay</button>
+    <button class="ctl" id="next">Next ▶</button>
+    <div class="speed" id="speed">
+      <button data-s="2200">0.5×</button>
+      <button data-s="1400" class="on">1×</button>
+      <button data-s="800">2×</button>
+    </div>
+  </div>
+  <div class="hint">← → to scrub · Space to play/pause · click the timeline</div>
+
+<script src="frames.js"></script>
+<script>
+// Frames load from frames.js (window.TIMELAPSE_FRAMES) — the living manifest.
+// Add new ones with tools/record-frame.sh. Do not hardcode frames here.
+const FRAMES = window.TIMELAPSE_FRAMES;
+
+const stage = document.getElementById('stage');
+const imgs = FRAMES.map((f,i)=>{
+  const el = document.createElement('img');
+  el.src = f.file; el.alt = f.title; el.dataset.i = i;
+  stage.appendChild(el); return el;
+});
+const dotsWrap = document.getElementById('dots');
+const ticksWrap = document.getElementById('ticks');
+FRAMES.forEach((f,i)=>{
+  const d=document.createElement('div'); d.className='dot'; d.dataset.i=i;
+  d.onclick=(e)=>{e.stopPropagation();go(i,false)}; dotsWrap.appendChild(d);
+  const t=document.createElement('span'); t.textContent=f.date; ticksWrap.appendChild(t);
+});
+
+let cur=0, playing=false, timer=null, dur=1400;
+
+function render(){
+  imgs.forEach((el,i)=>el.classList.toggle('on',i===cur));
+  [...dotsWrap.children].forEach((d,i)=>{
+    d.classList.toggle('active',i===cur);
+    d.classList.toggle('past',i<cur);
+    d.classList.toggle('base',FRAMES[i].section==='base');
+  });
+  [...ticksWrap.children].forEach((t,i)=>t.classList.toggle('active',i===cur));
+  const f=FRAMES[cur];
+  document.getElementById('badge').innerHTML =
+    `<span class="bnum">${String(cur+1).padStart(2,'0')}/${FRAMES.length}</span> <b>${f.title}</b> · ${f.date}`
+    + (f.recreation ? `<span class="recon">⟲ RECONSTRUCTION</span>` : '')
+    + (f.section==='base' ? `<span class="sect">⌂ BASE EVOLUTION</span>` : '');
+  document.getElementById('fill').style.width = (FRAMES.length===1?100:(cur/(FRAMES.length-1))*100)+'%';
+}
+function go(i,fromPlay){
+  cur=(i+FRAMES.length)%FRAMES.length; render();
+  if(!fromPlay) stop();
+}
+function step(){
+  if(cur>=FRAMES.length-1){ stop(); return; }
+  go(cur+1,true);
+}
+function play(){
+  if(cur>=FRAMES.length-1) cur=-1; // restart from beginning
+  playing=true; document.getElementById('play').textContent='❚❚ Pause';
+  clearInterval(timer); step(); timer=setInterval(step,dur);
+}
+function stop(){
+  playing=false; clearInterval(timer);
+  document.getElementById('play').textContent='▶ Replay';
+}
+document.getElementById('play').onclick=()=>playing?stop():play();
+document.getElementById('next').onclick=()=>go(cur+1,false);
+document.getElementById('prev').onclick=()=>go(cur-1,false);
+document.getElementById('track').onclick=(e)=>{
+  const r=e.currentTarget.getBoundingClientRect();
+  const p=(e.clientX-r.left)/r.width;
+  go(Math.round(p*(FRAMES.length-1)),false);
+};
+document.getElementById('speed').onclick=(e)=>{
+  if(e.target.tagName!=='BUTTON')return;
+  dur=Number(e.target.dataset.s);
+  [...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));
+  if(playing) play();
+};
+window.addEventListener('keydown',e=>{
+  if(e.code==='ArrowRight'){go(cur+1,false);e.preventDefault();}
+  if(e.code==='ArrowLeft'){go(cur-1,false);e.preventDefault();}
+  if(e.code==='Space'){playing?stop():play();e.preventDefault();}
+});
+render();
+</script>
+</body>
+</html>

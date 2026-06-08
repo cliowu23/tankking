@@ -1,0 +1,9 @@
+{
+  "name": "tanking-timelapse-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Capture tooling for the TanKING development timelapse.",
+  "dependencies": {
+    "playwright-core": "^1.40.0"
+  }
+}
