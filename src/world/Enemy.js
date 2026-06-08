@@ -1,4 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, TransformNode } from '@babylonjs/core';
+import { hpColor } from '../utils/mathUtils.js';
 
 export default class Enemy {
   constructor(scene, x, z) {
@@ -115,8 +116,7 @@ export default class Enemy {
     this.hpBarFill.position.x = (r - 1) * 1.0; // 1.0 = half of bar width (2.0)
 
     // Green → yellow → red
-    const red   = r < 0.5 ? 1.0 : 2 * (1 - r);
-    const green = r > 0.5 ? 1.0 : 2 * r;
+    const { red, green } = hpColor(r);
     this.hpFillMat.diffuseColor  = new Color3(red * 0.8, green * 0.8, 0);
     this.hpFillMat.emissiveColor = new Color3(red * 0.3, green * 0.3, 0);
   }

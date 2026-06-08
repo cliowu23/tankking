@@ -6,5 +6,6 @@ dist/
 architecture/verify-screenshots/
 .superpowers/
 .claude/
+.playwright-mcp/
 /*.png
 .obsidian/

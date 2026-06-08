@@ -1,10 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode } from '@babylonjs/core';
 import Shell from '../combat/Shell.js';
-
-function shortAngle(from, to) {
-  let d = ((to - from) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-  return d;
-}
+import { shortAngle, hpColor } from '../utils/mathUtils.js';
 
 const HSPEED = 35;
 
@@ -313,8 +309,7 @@ export default class AIEnemy {
     const r = this.hp / this.maxHp;
     this.hpBarFill.scaling.x  = r;
     this.hpBarFill.position.x = (r - 1) * 1.0;
-    const red   = r < 0.5 ? 1.0 : 2 * (1 - r);
-    const green = r > 0.5 ? 1.0 : 2 * r;
+    const { red, green } = hpColor(r);
     this.hpFillMat.diffuseColor  = new Color3(red * 0.8, green * 0.8, 0);
     this.hpFillMat.emissiveColor = new Color3(red * 0.3, green * 0.3, 0);
   }

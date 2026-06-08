@@ -6,6 +6,8 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
+import { hpColor, yRotForFacing } from '../utils/mathUtils.js';
+import { worldBounds } from '../utils/meshBounds.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID } from '../tank/parts/index.js';
@@ -347,8 +349,7 @@ export default class ArenaScene {
     const facingAxis = config.facingAxis  ?? '+X';
 
     // Map facing axis → Y rotation that aligns model toward game +Z forward
-    const yRotMap = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
-    const yRot = yRotMap[facingAxis] ?? -Math.PI / 2;
+    const yRot = yRotForFacing(facingAxis);
 
     const startBtn = document.getElementById('controls-start');
     startBtn.textContent = 'LOADING…';
@@ -379,18 +380,8 @@ export default class ArenaScene {
       result.meshes.forEach(m => m.computeWorldMatrix(true));
 
       // --- 3. Bounding box in world space (model still at origin) ---
-      let minX = Infinity, minY = Infinity, minZ = Infinity;
-      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-      for (const m of result.meshes) {
-        if (m.name === '__root__') continue;
-        const w = m.getBoundingInfo().boundingBox;
-        if (w.minimumWorld.x < minX) minX = w.minimumWorld.x;
-        if (w.minimumWorld.y < minY) minY = w.minimumWorld.y;
-        if (w.minimumWorld.z < minZ) minZ = w.minimumWorld.z;
-        if (w.maximumWorld.x > maxX) maxX = w.maximumWorld.x;
-        if (w.maximumWorld.y > maxY) maxY = w.maximumWorld.y;
-        if (w.maximumWorld.z > maxZ) maxZ = w.maximumWorld.z;
-      }
+      const { minX, minY, minZ, maxX, maxY, maxZ } =
+        worldBounds(result.meshes, m => m.name !== '__root__');
 
       // Scale to targetWidth (default 2.4) — barrel overhang is intentional
       const modelW      = maxX - minX;
@@ -1028,9 +1019,8 @@ export default class ArenaScene {
     const hpFill  = document.getElementById('hud-hp-fill');
     if (hpFill) {
       hpFill.style.width      = `${Math.max(1, hpRatio * 100)}%`;
-      const r = hpRatio < 0.5 ? 1.0 : 2 * (1 - hpRatio);
-      const g = hpRatio > 0.5 ? 1.0 : 2 * hpRatio;
-      hpFill.style.background = `rgb(${Math.round(r*220)},${Math.round(g*220)},40)`;
+      const { red, green } = hpColor(hpRatio);
+      hpFill.style.background = `rgb(${Math.round(red*220)},${Math.round(green*220)},40)`;
     }
   }
 

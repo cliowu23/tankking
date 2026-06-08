@@ -10,6 +10,7 @@ import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf
 import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
 import { applyModelPaint } from '../utils/modelPaint.js';
+import { worldBounds } from '../utils/meshBounds.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID } from '../tank/parts/index.js';
 
@@ -330,16 +331,11 @@ export default class HangarScene {
 
       // Scale to the same display width GLBs use (~3.2), then sit it on the plinth at z=10.
       assembled.root.position.set(0, 0, 0);
-      meshes.forEach(m => m.computeWorldMatrix(true));
-      const xs = meshes.flatMap(m => [
-        m.getBoundingInfo().boundingBox.minimumWorld.x,
-        m.getBoundingInfo().boundingBox.maximumWorld.x,
-      ]);
-      const rawW = Math.max(...xs) - Math.min(...xs);
+      const { minX, maxX } = worldBounds(meshes);
+      const rawW = maxX - minX;
       if (rawW > 0) assembled.root.scaling.setAll(3.2 / rawW);
       assembled.root.computeWorldMatrix(true);
-      meshes.forEach(m => m.computeWorldMatrix(true));
-      const minY = Math.min(...meshes.map(m => m.getBoundingInfo().boundingBox.minimumWorld.y));
+      const { minY } = worldBounds(meshes);
       assembled.root.position.set(0, -minY, 10);
 
       if (this._blobDrop) this._blobDrop(assembled.root, { y: 0.035 });
@@ -364,23 +360,17 @@ export default class HangarScene {
     if (config.facingAxis === '+X') glbRoot.rotation.y = -Math.PI / 2;
 
     // Compute scale from targetWidth; fall back for tanks that don't declare one
-    result.meshes.forEach(m => m.computeWorldMatrix(true));
     const validMeshes = result.meshes.filter(m => m.getTotalVertices() > 0);
     let scale = 0.8;
     if (config.targetWidth && validMeshes.length) {
-      const xs = validMeshes.flatMap(m => [
-        m.getBoundingInfo().boundingBox.minimumWorld.x,
-        m.getBoundingInfo().boundingBox.maximumWorld.x,
-      ]);
-      const rawW = Math.max(...xs) - Math.min(...xs);
+      const { minX, maxX } = worldBounds(validMeshes);
+      const rawW = maxX - minX;
       if (rawW > 0) scale = config.targetWidth / rawW;
     }
     glbRoot.scaling.setAll(scale);
 
     // Re-compute after scale, then sit the tank on top of the plinth (y=0.25)
-    result.meshes.forEach(m => m.computeWorldMatrix(true));
-    const minY = Math.min(...validMeshes.map(m =>
-      m.getBoundingInfo().boundingBox.minimumWorld.y));
+    const { minY } = worldBounds(validMeshes);
     glbRoot.position.set(0, 0 - minY, 10);
 
     applyModelPaint(result.meshes, config, s);

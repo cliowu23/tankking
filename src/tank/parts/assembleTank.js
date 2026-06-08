@@ -1,6 +1,7 @@
 import { TransformNode, Vector3 } from '@babylonjs/core';
 import { PARTS_BY_ID } from './index.js';
 import { measureBasket } from './measureBasket.js';
+import { worldBounds } from '../../utils/meshBounds.js';
 
 // Native ring diameter cache: a hull's ring is as big as its native turret's base.
 // Keyed by turret id; value is the measured base diameter.
@@ -120,13 +121,8 @@ export async function assembleTank(scene, loadout, materials = {}, options = {})
   // 6. Ground the tank — shift the lowest mesh point to y=0. With our own root we just move the
   //    root; on a target rig the root is gameplay-controlled, so we shift the parts (hull +
   //    turret pivot carry everything below them) by the same amount instead.
-  let minY = Infinity;
   const allMeshes = [...hullBuilt.meshes, ...turretBuilt.meshes, ...cannonBuilt.meshes];
-  for (const m of allMeshes) {
-    m.computeWorldMatrix(true);
-    const bb = m.getBoundingInfo().boundingBox;
-    if (bb.minimumWorld.y < minY) minY = bb.minimumWorld.y;
-  }
+  const { minY } = worldBounds(allMeshes);
   if (isFinite(minY)) {
     if (target) {
       hullBuilt.root.position.y -= minY;

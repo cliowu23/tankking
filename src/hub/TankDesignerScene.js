@@ -5,6 +5,8 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
+import { yRotForFacing } from '../utils/mathUtils.js';
+import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
@@ -619,8 +621,7 @@ export default class TankDesignerScene {
     const turretName = config.turret     ?? 'turret';
     const mountName  = config.mount      ?? 'mount';
     const facingAxis = config.facingAxis ?? '+X';
-    const yRotMap    = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
-    const yRot       = yRotMap[facingAxis] ?? -Math.PI / 2;
+    const yRot       = yRotForFacing(facingAxis);
 
     btn.textContent = 'LOADING…';
     btn.style.opacity = '0.5';
@@ -651,18 +652,8 @@ export default class TankDesignerScene {
       result.meshes.forEach(m => m.computeWorldMatrix(true));
 
       // 3. Bounding box
-      let minX=Infinity, minY=Infinity, minZ=Infinity;
-      let maxX=-Infinity, maxY=-Infinity, maxZ=-Infinity;
-      for (const m of result.meshes) {
-        if (m.name === '__root__') continue;
-        const w = m.getBoundingInfo().boundingBox;
-        if (w.minimumWorld.x < minX) minX = w.minimumWorld.x;
-        if (w.minimumWorld.y < minY) minY = w.minimumWorld.y;
-        if (w.minimumWorld.z < minZ) minZ = w.minimumWorld.z;
-        if (w.maximumWorld.x > maxX) maxX = w.maximumWorld.x;
-        if (w.maximumWorld.y > maxY) maxY = w.maximumWorld.y;
-        if (w.maximumWorld.z > maxZ) maxZ = w.maximumWorld.z;
-      }
+      const { minX, minY, minZ, maxX, maxY, maxZ } =
+        worldBounds(result.meshes, m => m.name !== '__root__');
 
       // 4. Scale — same formula as arena for 1:1 comparison
       const targetWidth = config.targetWidth ?? 2.4;
