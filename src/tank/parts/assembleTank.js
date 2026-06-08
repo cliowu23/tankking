@@ -67,19 +67,20 @@ function validateComposition(ctx) {
 export async function assembleTank(scene, loadout, materials = {}, options = {}) {
   const target = options.target ?? null;
   const root = target?.root ?? new TransformNode('tankRoot', scene);
+  const paint = options.paint ?? null;   // [r,g,b] player paint, or null = each part's own colour
 
   const hullPart   = PARTS_BY_ID[loadout.hull];
   const turretPart = PARTS_BY_ID[loadout.turret];
   const cannonPart = PARTS_BY_ID[loadout.cannon];
 
-  // 1. Hull at origin (self-paints). ringCenter = where the turret seats.
-  const hullBuilt = await hullPart.build(scene);
+  // 1. Hull at origin (self-paints, or the player paint override). ringCenter = turret seat.
+  const hullBuilt = await hullPart.build(scene, paint);
   hullBuilt.root.parent = root;
   const ring = hullBuilt.ringCenter ?? hullBuilt.mount ?? new Vector3(0, 1, 0);
 
   // 2. Build the turret and detect its basket (ring) centre from the dome geometry — the point
   //    it should rotate about. Done here (not per-part) so every turret pivots adaptively.
-  const turretBuilt = await turretPart.build(scene);
+  const turretBuilt = await turretPart.build(scene, paint);
   const basket = measureBasket(turretBuilt.meshes);
   console.log(`[assembleTank] ${loadout.turret} basket center=(${basket.center.x.toFixed(2)},${basket.center.z.toFixed(2)}) from ${basket.domeMeshes.length} dome meshes`);
 

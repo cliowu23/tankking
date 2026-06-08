@@ -47,6 +47,7 @@ export default class TankDesignerScene {
     // Modular parts state
     this._equippedHull            = 'hull-m26';
     this._equippedTurret          = 'turret-m26';
+    this._selectedPaint           = JSON.parse(localStorage.getItem('selectedPaint') || 'null'); // [r,g,b] or null
     this._isComposedMode          = false;
     this._turretMeshesComposed    = [];
     this._turretDropdown          = null;
@@ -353,6 +354,49 @@ export default class TankDesignerScene {
           sidebar.appendChild(hb);
         }
 
+        // PAINT selector — recolours the whole composed tank; persists to selectedPaint.
+        const paintTitle = document.createElement('div');
+        paintTitle.className = 'ds-title';
+        paintTitle.textContent = 'PAINT';
+        sidebar.appendChild(paintTitle);
+
+        const paintRow = document.createElement('div');
+        paintRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:6px 4px;';
+        const PAINT_PRESETS = [
+          ['Cobalt',   [0.12, 0.42, 0.88]],
+          ['Crimson',  [0.80, 0.12, 0.10]],
+          ['Forest',   [0.18, 0.45, 0.22]],
+          ['Sand',     [0.78, 0.66, 0.40]],
+          ['Charcoal', [0.16, 0.17, 0.20]],
+          ['Plum',     [0.46, 0.20, 0.56]],
+          ['Default',  null],
+        ];
+        const applyPaint = (rgb) => {
+          this._selectedPaint = rgb;
+          try { localStorage.setItem('selectedPaint', JSON.stringify(rgb)); } catch (e) { /* ignore */ }
+          this._rebuildComposed();
+        };
+        for (const [pname, rgb] of PAINT_PRESETS) {
+          const sw = document.createElement('button');
+          sw.title = pname;
+          sw.style.cssText = 'width:24px;height:24px;border:1px solid #00e5ff55;border-radius:3px;cursor:pointer;' +
+            (rgb ? `background:rgb(${rgb.map(c => Math.round(c * 255)).join(',')});`
+                 : 'background:repeating-linear-gradient(45deg,#555,#555 4px,#333 4px,#333 8px);');
+          sw.addEventListener('click', () => applyPaint(rgb));
+          paintRow.appendChild(sw);
+        }
+        const customPaint = document.createElement('input');
+        customPaint.type = 'color';
+        customPaint.value = '#3a6bdf';
+        customPaint.title = 'Custom colour';
+        customPaint.style.cssText = 'width:30px;height:24px;padding:0;border:1px solid #00e5ff55;border-radius:3px;cursor:pointer;background:none;';
+        customPaint.addEventListener('input', () => {
+          const h = customPaint.value;
+          applyPaint([parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]);
+        });
+        paintRow.appendChild(customPaint);
+        sidebar.appendChild(paintRow);
+
         const div2 = document.createElement('div');
         div2.className = 'ds-divider';
         sidebar.appendChild(div2);
@@ -516,7 +560,8 @@ export default class TankDesignerScene {
 
     // Barrel is painted the body color of the equipped turret (red T-44, blue M26) so it
     // reads as part of the tank, matching the hull/turret paint.
-    const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
+    const paint = this._selectedPaint ?? null;   // player paint, or null = each part's own colour
+    const bodyCol = paint ?? PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
     const cannonMat = new StandardMaterial('compCannon', this.scene);
     cannonMat.diffuseColor  = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
     cannonMat.specularColor = new Color3(0.05, 0.06, 0.07);
@@ -524,7 +569,7 @@ export default class TankDesignerScene {
     cannonMat.backFaceCulling = false;  // barrel base faces don't cull -> no floating gap
     this._toDispose.push(cannonMat);
 
-    assembleTank(this.scene, loadout, { cannon: cannonMat })
+    assembleTank(this.scene, loadout, { cannon: cannonMat }, { paint })
       .then(tank => {
         tank.root.position.x = 0;
         tank.root.position.z = 0;

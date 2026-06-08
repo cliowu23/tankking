@@ -683,6 +683,8 @@
       flex-direction: column;
       gap: 10px;
       width: 240px;
+      max-height: 90vh;
+      overflow-y: auto;
       padding: 20px 22px;
       background: rgba(0,8,20,0.93);
       border: 1px solid #00e5ff;
@@ -869,36 +871,39 @@
 
   <!-- Lounge customization — left-docked so the live lounge stays visible -->
   <div id="lounge-panel" style="display:none">
-    <div class="lng-head">SW LOUNGE</div>
-    <div class="lng-sub">L-COUCH · CORNER REST AREA</div>
+    <div class="lng-head">CREW QUARTERS</div>
+    <div class="lng-sub">DRIVER · SW LOUNGE</div>
 
     <div class="lng-grp">
-      <div class="lng-lbl">Upholstery</div>
+      <div class="lng-lbl">Character</div>
       <div class="lng-btns">
-        <button data-uph="oxblood">Oxblood</button>
-        <button data-uph="olive">Olive</button>
-        <button data-uph="gray">Gray wool</button>
+        <button data-character="character-male-a">M1</button>
+        <button data-character="character-male-b">M2</button>
+        <button data-character="character-male-c">M3</button>
+        <button data-character="character-male-d">M4</button>
+        <button data-character="character-male-e">M5</button>
+        <button data-character="character-male-f">M6</button>
+        <button data-character="character-female-a">F1</button>
+        <button data-character="character-female-b">F2</button>
+        <button data-character="character-female-c">F3</button>
+        <button data-character="character-female-d">F4</button>
+        <button data-character="character-female-e">F5</button>
+        <button data-character="character-female-f">F6</button>
       </div>
     </div>
 
+    <!-- Accessory row temporarily hidden — glasses/mask attach buried inside the
+         head (head-bone pivot issue); re-enable + fix placement when verifiable.
     <div class="lng-grp">
-      <div class="lng-lbl">Coffee table</div>
+      <div class="lng-lbl">Accessory</div>
       <div class="lng-btns">
-        <button data-table="crate">Ammo crate</button>
-        <button data-table="metal">Metal</button>
-        <button data-table="spool">Spool</button>
+        <button data-accessory="none">None</button>
+        <button data-accessory="aid-glasses">Glasses</button>
+        <button data-accessory="aid-sunglasses">Shades</button>
+        <button data-accessory="aid-mask">Mask</button>
       </div>
     </div>
-
-    <div class="lng-grp">
-      <div class="lng-lbl">Extras (toggle)</div>
-      <div class="lng-btns">
-        <button data-extra="lamp">Lamp</button>
-        <button data-extra="rug">Rug</button>
-        <button data-extra="poster">Poster</button>
-        <button data-extra="scatter">Scatter</button>
-      </div>
-    </div>
+    -->
 
     <button id="lounge-panel-close">CLOSE [E / ESC]</button>
   </div>

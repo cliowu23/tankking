@@ -264,7 +264,7 @@ document.addEventListener('keydown', (e) => {
       if (!station) return;
       if (station.id === 'tank') { hangarScene.mountTank(); return; }
       if (station.id === 'exit') { hangarScene.exitToMenu(); return; }
-      if (station.id === 'lounge') { hangarScene.openLounge(); syncLoungeButtons(hangarScene.getLoungeConfig()); return; }
+      if (station.id === 'lounge') { hangarScene.openLounge(); syncDriverButtons(hangarScene.getDriverConfig()); return; }
       hangarScene.openPanel(station);
     }
     if (e.code === 'Escape' && hangarScene._panelOpen) {
@@ -332,36 +332,29 @@ document.getElementById('hangar-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
 });
 
-// ── Lounge customization panel ────────────────────────────────────────────────
-// Reflect the active config on the panel buttons (`.on` class = selected).
-function syncLoungeButtons(cfg) {
-  document.querySelectorAll('#lounge-panel [data-uph]').forEach(b =>
-    b.classList.toggle('on', b.dataset.uph === cfg.uph));
-  document.querySelectorAll('#lounge-panel [data-table]').forEach(b =>
-    b.classList.toggle('on', b.dataset.table === cfg.table));
-  document.querySelectorAll('#lounge-panel [data-extra]').forEach(b =>
-    b.classList.toggle('on', !!cfg.extras[b.dataset.extra]));
-}
-
-document.querySelectorAll('#lounge-panel [data-uph]').forEach(b =>
-  b.addEventListener('click', () => {
-    if (!hangarScene) return;
-    syncLoungeButtons(hangarScene.setLoungeConfig({ uph: b.dataset.uph }));
-  }));
-document.querySelectorAll('#lounge-panel [data-table]').forEach(b =>
-  b.addEventListener('click', () => {
-    if (!hangarScene) return;
-    syncLoungeButtons(hangarScene.setLoungeConfig({ table: b.dataset.table }));
-  }));
-document.querySelectorAll('#lounge-panel [data-extra]').forEach(b =>
-  b.addEventListener('click', () => {
-    if (!hangarScene) return;
-    const k = b.dataset.extra;
-    const on = !hangarScene.getLoungeConfig().extras[k];
-    syncLoungeButtons(hangarScene.setLoungeConfig({ extras: { [k]: on } }));
-  }));
+// ── Crew Quarters panel close ─────────────────────────────────────────────────
 document.getElementById('lounge-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
 });
+
+// ── Driver (crew) customization — shares the lounge "Crew Quarters" panel ──────
+function syncDriverButtons(cfg) {
+  // Presets: one character drives head+body together, so highlight by cfg.body.
+  document.querySelectorAll('#lounge-panel [data-character]').forEach(b =>
+    b.classList.toggle('on', b.dataset.character === cfg.body));
+  document.querySelectorAll('#lounge-panel [data-accessory]').forEach(b =>
+    b.classList.toggle('on', b.dataset.accessory === cfg.accessory));
+}
+
+document.querySelectorAll('#lounge-panel [data-character]').forEach(b =>
+  b.addEventListener('click', () => {
+    if (!hangarScene) return;
+    syncDriverButtons(hangarScene.setDriverConfig({ character: b.dataset.character }));
+  }));
+document.querySelectorAll('#lounge-panel [data-accessory]').forEach(b =>
+  b.addEventListener('click', () => {
+    if (!hangarScene) return;
+    syncDriverButtons(hangarScene.setDriverConfig({ accessory: b.dataset.accessory }));
+  }));
 
 window.addEventListener('resize', () => engine.resize());

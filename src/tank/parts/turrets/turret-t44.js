@@ -30,7 +30,7 @@ export default {
   defaultCannon: 'cannon-t44-100mm',
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
-  async build(scene) {
+  async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'turret-t44.glb', scene);
 
     // Read the measured trunnion baked into the GLB (see extract-t44.py).
@@ -45,7 +45,7 @@ export default {
     const base = measureBase(meshes);
     console.log(`[turret-t44] base diameter=${base.diameter.toFixed(2)} mount=(${mount.x.toFixed(2)},${mount.y.toFixed(2)},${mount.z.toFixed(2)})`);
 
-    applyModelPaint(meshes, PAINT, scene);
+    applyModelPaint(meshes, PAINT, scene, paintOverride);
     return { root, meshes, mount, base };
   },
 };

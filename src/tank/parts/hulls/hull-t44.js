@@ -25,14 +25,14 @@ export default {
   stats: {},
   nativeTurret: 'turret-t44',
 
-  async build(scene) {
+  async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'hull-t44.glb', scene);
 
     const root = new TransformNode('hull_t44_root', scene);
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
 
-    applyModelPaint(meshes, PAINT, scene);
+    applyModelPaint(meshes, PAINT, scene, paintOverride);
     return { root, meshes, mount: RING_CENTER.clone(), ringCenter: RING_CENTER.clone() };
   },
 };

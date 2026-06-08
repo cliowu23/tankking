@@ -25,7 +25,7 @@ export default {
   mountEmpty: 'turret',
   nativeTurret: 'turret-m26',
 
-  async build(scene) {
+  async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'hull-m26.glb', scene);
     const mountNode = result.transformNodes.find(n => n.name === this.mountEmpty);
     const mount = mountNode ? mountNode.getAbsolutePosition().clone() : null;
@@ -34,7 +34,7 @@ export default {
     const meshes = result.meshes.filter(m => m.name !== '__root__');
     for (const m of meshes) m.setParent(root);
 
-    applyModelPaint(meshes, PAINT, scene);
+    applyModelPaint(meshes, PAINT, scene, paintOverride);
     return { root, meshes, mount, ringCenter: mount };
   },
 };

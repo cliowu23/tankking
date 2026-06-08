@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Radio Station — Bunker Comms / Intercept (NE corner)</title>
+<!--
+  TanKING radio redesign — NE-corner ham/intercept station (the quest-giver comms hub).
+  L-desk wrapping the corner: transceiver + stacked receiver, reel-to-reel intercept deck,
+  glowing CRT terminal, desk mic + Morse key, comfy swivel chair w/ blanket, intercept
+  corkboard + DX world map, UTC clock, warm lamp. Cozy lived-in bunker tone.
+  Serve over HTTP:  cd game && python3 -m http.server 8744  →  http://localhost:8744/radio-mockup.html
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07070a; font-family: monospace; }
+  #c { width: 100%; height: 100%; touch-action: none; display: block; }
+  .panel { position: absolute; z-index: 10; background: rgba(0,8,20,0.93); border: 1px solid #00e5ff44;
+    padding: 14px 16px; color: #9bdfe8; font-size: 11px; letter-spacing: 1px; box-shadow: 0 0 24px #00000088; }
+  #left { top: 14px; left: 14px; width: 240px; }
+  h1 { color: #00e5ff; font-size: 13px; letter-spacing: 3px; margin: 0 0 4px; }
+  .sub { color: #4a6b72; font-size: 9px; margin-bottom: 10px; line-height: 1.5; }
+  .hint { margin-top: 10px; color: #4a6b72; font-size: 9px; line-height: 1.6; } .hint b { color: #7fc8d4; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="left" class="panel">
+  <h1>RADIO STATION</h1>
+  <div class="sub">NE corner · ham / intercept comms<br>(quest-giver hub)</div>
+  <div class="hint"><b>Drag</b> empty space to orbit · scroll to zoom.<br>
+  Tell me what to add/cut/move, then I build the drag-to-move editor so you can polish it.</div>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, PointLight,
+        MeshBuilder, StandardMaterial, Color3, Color4, Vector3, TransformNode } = BABYLON;
+
+const canvas = document.getElementById('c');
+const engine = new Engine(canvas, true, { preserveDrawingBuffer: true });
+const scene  = new Scene(engine);
+scene.clearColor = new Color4(0.04, 0.04, 0.06, 1.0);
+
+// NE corner: walls at east (+x) + north (+z); camera sits SW (open side) looking back.
+const cam = new ArcRotateCamera('cam', Math.PI * 1.30, 0.95, 7.8, new Vector3(1.7, 1.0, 1.7), scene);
+cam.attachControl(canvas, true); cam.lowerRadiusLimit = 3.5; cam.upperRadiusLimit = 22; cam.wheelPrecision = 26;
+const amb = new HemisphericLight('amb', new Vector3(0,1,0), scene);
+amb.intensity = 0.64; amb.diffuse = new Color3(0.86,0.82,0.74); amb.groundColor = new Color3(0.18,0.16,0.14);
+const dir = new DirectionalLight('dir', new Vector3(-0.5,-1,-0.4), scene);
+dir.intensity = 0.45; dir.position = new Vector3(-4,12,-4);
+
+function mat(name,r,g,b,spec=0.02){ const m=new StandardMaterial(name,scene);
+  m.diffuseColor=new Color3(r,g,b); m.specularColor=new Color3(spec,spec,spec); m.maxSimultaneousLights=8; return m; }
+function emat(name,r,g,b,er,eg,eb){ const m=mat(name,r,g,b,0.05); m.emissiveColor=new Color3(er,eg,eb); return m; }
+
+const M = {
+  concrete: mat('concrete',0.38,0.36,0.33), floor: mat('floor',0.13,0.12,0.11),
+  wood: mat('wood',0.30,0.22,0.10), woodDark: mat('wooddark',0.20,0.15,0.07),
+  metal: mat('metal',0.20,0.18,0.16,0.06), darkMetal: mat('darkmetal',0.15,0.14,0.13,0.08),
+  panel: mat('panel',0.24,0.24,0.27,0.1), dial: mat('dial',0.5,0.5,0.52,0.2),
+  parchment: mat('parchment',0.78,0.70,0.40), paper: mat('paper',0.82,0.78,0.62),
+  olive: mat('olive',0.22,0.26,0.14), cork: mat('cork',0.52,0.40,0.22),
+  mug: mat('mug',0.66,0.64,0.58,0.1), can: mat('can',0.40,0.40,0.43,0.1),
+  screenDark: mat('screen',0.04,0.06,0.05), cable: mat('cable',0.08,0.08,0.09),
+  chairUph: mat('chairuph',0.34,0.18,0.14), blanket: mat('blanket',0.46,0.40,0.22),
+  rug: mat('rug',0.30,0.16,0.13), tape: mat('tape',0.30,0.22,0.16),
+  vu: emat('vu',0.10,0.40,0.18,0.06,0.42,0.14), amber: emat('amber',0.55,0.40,0.10,0.55,0.32,0.05),
+  redInd: emat('redind',0.8,0.0,0.0,0.5,0.0,0.0), lampGlow: emat('lampglow',0.9,0.7,0.2,0.5,0.38,0.06),
+  clkRed: emat('clkred',0.7,0.12,0.10,0.2,0.0,0.0),
+};
+
+function box(p,n,w,h,d,x,y,z,m,ry=0,rx=0,rz=0){ const b=MeshBuilder.CreateBox(n,{width:w,height:h,depth:d},scene);
+  b.position=new Vector3(x,y,z); if(ry)b.rotation.y=ry; if(rx)b.rotation.x=rx; if(rz)b.rotation.z=rz; b.material=m; b.isPickable=false; b.parent=p; return b; }
+function cyl(p,n,dia,h,x,y,z,m,t=16,o={}){ const c=MeshBuilder.CreateCylinder(n,{diameter:dia,height:h,tessellation:t,...o},scene);
+  c.position=new Vector3(x,y,z); c.material=m; c.isPickable=false; c.parent=p; return c; }
+
+const root = new TransformNode('radio', scene);
+
+// ── corner walls + floor ─────────────────────────────────────────────────────
+box(root,'wall-e',0.15,3.4,7,3.55,1.7,0,M.concrete);
+box(root,'wall-n',7,3.4,0.15,0,1.7,3.55,M.concrete);
+const floor = MeshBuilder.CreateGround('floor',{width:10,height:10},scene);
+floor.position=new Vector3(1.4,0,1.0); floor.material=M.floor; floor.isPickable=false;
+
+// rug under the chair
+const rug = MeshBuilder.CreateGround('rug',{width:2.0,height:2.0},scene);
+rug.position=new Vector3(1.5,0.02,1.4); rug.material=M.rug; rug.isPickable=false; rug.parent=root;
+
+// ── L-desk wrapping the corner ───────────────────────────────────────────────
+const desk = new TransformNode('desk', scene); desk.parent = root;
+// True L: each segment runs into the corner so their tops overlap and fill the pocket.
+box(desk,'top-n',3.7,0.08,1.15,1.6,0.9,2.9,M.woodDark);      // north segment → reaches the east wall
+box(desk,'top-e',1.15,0.08,3.55,2.9,0.9,1.675,M.woodDark);   // east segment → reaches the north wall
+box(desk,'panel-n',3.7,0.74,0.06,1.6,0.5,3.41,M.woodDark);   // back panels along the walls
+box(desk,'panel-e',0.06,0.74,3.55,3.41,0.5,1.675,M.woodDark);
+[[-0.2,2.35],[2.35,2.35],[2.35,-0.05]].forEach(([x,z],i)=>box(desk,'leg'+i,0.1,0.9,0.1,x,0.45,z,M.wood));
+
+// ── transceiver (hero) on the north desk, face toward the operator (-z) ──────
+const tx = new TransformNode('transceiver', scene); tx.parent = root;
+box(tx,'tx-body',0.82,0.42,0.5,1.25,1.13,3.02,M.panel);
+box(tx,'tx-face',0.74,0.34,0.02,1.25,1.13,2.76,M.screenDark);
+box(tx,'tx-freq',0.32,0.09,0.02,1.18,1.24,2.75,M.amber);     // frequency display
+box(tx,'tx-vu',0.12,0.1,0.02,1.46,1.24,2.75,M.vu);           // signal meter
+[1.02,1.16,1.30,1.44].forEach((x,i)=>cyl(tx,'tx-knob'+i,0.06,0.04,x,1.04,2.75,M.dial,12).rotation.x=Math.PI/2);
+cyl(tx,'tx-ind',0.04,0.03,1.55,1.04,2.75,M.redInd,8).rotation.x=Math.PI/2;
+
+// ── stacked receiver beside it ───────────────────────────────────────────────
+const rx = new TransformNode('receiver', scene); rx.parent = root;
+box(rx,'rx-body',0.6,0.34,0.45,2.2,1.09,3.05,M.panel);
+box(rx,'rx-face',0.54,0.26,0.02,2.2,1.09,2.83,M.screenDark);
+box(rx,'rx-scope',0.16,0.16,0.02,2.12,1.12,2.82,M.vu);       // round-ish monitor scope
+[2.32,2.42].forEach((x,i)=>cyl(rx,'rx-knob'+i,0.05,0.04,x,1.04,2.82,M.dial,12).rotation.x=Math.PI/2);
+
+// ── reel-to-reel intercept deck (the "we tape the transmissions" device) ─────
+const reel = new TransformNode('reel', scene); reel.parent = root;
+box(reel,'reel-body',0.82,0.34,0.42,0.5,1.09,3.05,M.darkMetal);
+box(reel,'reel-face',0.76,0.28,0.02,0.5,1.12,2.84,M.panel);
+[[0.32,1.16],[0.7,1.16]].forEach(([x,y],i)=>{ cyl(reel,'reel'+i,0.26,0.04,x,y,2.83,M.tape,18).rotation.x=Math.PI/2;
+  cyl(reel,'reelhub'+i,0.07,0.05,x,y,2.82,M.dial,10).rotation.x=Math.PI/2; });
+box(reel,'reel-vu',0.1,0.08,0.02,0.5,1.0,2.83,M.vu);
+// spread the three deck units across the larger desk so nothing is cramped
+reel.position.x = -0.25; rx.position.x = 0.3;
+
+// ── CRT terminal on the east desk, face toward the operator (-x) ─────────────
+const term = new TransformNode('terminal', scene); term.parent = root;
+box(term,'term-body',0.46,0.4,0.46,3.0,1.16,1.25,M.darkMetal);
+box(term,'term-bezel',0.04,0.34,0.4,2.77,1.18,1.25,M.panel);
+box(term,'term-screen',0.02,0.26,0.32,2.75,1.18,1.25,M.vu);   // green phosphor screen
+box(term,'term-stand',0.3,0.06,0.3,3.0,0.95,1.25,M.darkMetal);
+box(term,'term-kbd',0.34,0.04,0.16,2.62,0.94,1.25,M.panel);   // little keyboard
+
+// ── desk microphone on a stand ───────────────────────────────────────────────
+const mic = new TransformNode('mic', scene); mic.parent = root;
+cyl(mic,'mic-base',0.22,0.04,1.85,0.96,2.45,M.darkMetal,16);
+cyl(mic,'mic-rod',0.03,0.22,1.85,1.08,2.45,M.metal,8);
+cyl(mic,'mic-head',0.1,0.18,1.83,1.22,2.4,M.darkMetal,12).rotation.x=-0.5;  // short desk mic, tilted to operator
+box(mic,'mic-grille',0.08,0.1,0.01,1.83,1.27,2.32,M.screenDark,0,-0.5);
+
+// ── Morse key on a heavy base ────────────────────────────────────────────────
+const morse = new TransformNode('morse', scene); morse.parent = root;
+box(morse,'morse-base',0.2,0.05,0.26,0.45,0.965,2.5,M.darkMetal);
+box(morse,'morse-lever',0.04,0.03,0.2,0.45,1.02,2.46,M.dial,0,0.12);
+cyl(morse,'morse-knob',0.07,0.04,0.45,1.05,2.38,M.darkMetal,12);
+
+// (hutch shelves + UTC clock removed — they read as floating clutter)
+
+// ── intercept corkboard on the east wall (clean, like the planning-desk nook) ──
+const cork = new TransformNode('cork', scene); cork.parent = root;
+box(cork,'cork-frame',0.03,1.22,1.52,3.45,1.75,1.95,M.wood);      // east wall inner face ≈ x 3.475
+box(cork,'cork-board',0.04,1.1,1.4,3.43,1.75,1.95,M.cork);        // board in FRONT of the wall
+[[0.22,0.4,M.paper,-0.06],[0.28,-0.14,M.paper,0.05],[-0.16,0.34,M.parchment,-0.05],[-0.24,-0.28,M.paper,0.06]].forEach(([dy,dz,pm,rx],i)=>
+  box(cork,'cork-note'+i,0.02,0.32,0.28,3.40,1.75+dy,1.95+dz,pm,0,rx));
+box(cork,'cork-photo',0.02,0.32,0.28,3.37,1.77,1.95,M.darkMetal);   // pinned photo, forward of the notes
+
+// ── comfy swivel chair (faces the gear, +z), with a draped blanket ──────────
+const chair = new TransformNode('chair', scene); chair.parent = root;
+const CX=1.45, CZ=1.5;
+cyl(chair,'ch-hub',0.16,0.1,CX,0.12,CZ,M.darkMetal,16);
+[[0.28,0],[-0.28,0],[0,0.28],[0,-0.28],[0.2,0.2]].forEach(([dx,dz],i)=>{
+  box(chair,'ch-leg'+i,0.34,0.05,0.08,CX+dx*0.5,0.07,CZ+dz*0.5,M.darkMetal,Math.atan2(dz,dx));
+  cyl(chair,'ch-caster'+i,0.07,0.05,CX+dx,0.05,CZ+dz,M.metal,8); });
+cyl(chair,'ch-gas',0.08,0.45,CX,0.36,CZ,M.metal,10);
+box(chair,'ch-seat',0.54,0.14,0.52,CX,0.63,CZ,M.chairUph);
+box(chair,'ch-cushion',0.5,0.06,0.48,CX,0.72,CZ,M.chairUph);
+box(chair,'ch-back',0.54,0.66,0.13,CX,1.0,CZ-0.25,M.chairUph,0,-0.12);
+box(chair,'ch-armL',0.1,0.1,0.42,CX-0.3,0.82,CZ,M.darkMetal);
+box(chair,'ch-armR',0.1,0.1,0.42,CX+0.3,0.82,CZ,M.darkMetal);
+box(chair,'ch-blanket',0.5,0.34,0.06,CX,1.02,CZ-0.31,M.blanket,0,-0.12);  // draped over back
+
+// ── warm desk lamp at the corner of the L (lights both desks) ────────────────
+const lamp = new TransformNode('lamp', scene); lamp.parent = root;
+cyl(lamp,'l-base',0.22,0.04,2.85,0.96,2.7,M.darkMetal,16);
+cyl(lamp,'l-stem',0.04,0.34,2.85,1.14,2.7,M.metal,8);
+box(lamp,'l-shade',0.34,0.1,0.18,2.78,1.32,2.7,M.lampGlow,0,0,-0.2);
+const ll=new PointLight('l-light',new Vector3(2.6,1.25,2.5),scene);
+ll.diffuse=new Color3(1.0,0.84,0.5); ll.intensity=2.4; ll.range=7; ll.parent=lamp;
+
+// soft green glow off the terminal/gear (comms mood)
+const gl=new PointLight('glow',new Vector3(1.6,1.2,2.4),scene);
+gl.diffuse=new Color3(0.3,0.8,0.45); gl.intensity=0.7; gl.range=3.0; gl.parent=root;
+
+// ── desk clutter: logbook, mug, pencils ──────────────────────────────────────
+const clutter = new TransformNode('clutter', scene); clutter.parent = root;
+box(clutter,'logbook',0.4,0.04,0.3,1.7,0.96,2.45,M.paper,0.1);
+box(clutter,'logbook-spine',0.4,0.05,0.04,1.7,0.97,2.6,M.olive,0.1);
+cyl(clutter,'mug',0.14,0.16,2.5,1.02,2.45,M.mug,12);
+cyl(clutter,'pencils',0.09,0.14,2.65,1.01,2.4,M.darkMetal,8);
+
+engine.runRenderLoop(()=>scene.render());
+window.addEventListener('resize', ()=>engine.resize());
+</script>
+</body>
+</html>

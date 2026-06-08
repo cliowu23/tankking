@@ -503,7 +503,8 @@ export default class ArenaScene {
 
     // Barrel painted to match the turret body (blue M26, red T-44) so the gun reads as part of
     // the same tank — same rule the designer uses, not a hardcoded colour.
-    const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
+    const paint = JSON.parse(localStorage.getItem('selectedPaint') || 'null');  // player paint or null
+    const bodyCol = paint ?? PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
     const cannonMat = new StandardMaterial('playerComposedCannon', this.scene);
     cannonMat.diffuseColor   = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
     cannonMat.specularColor  = new Color3(0.05, 0.06, 0.07);
@@ -512,6 +513,7 @@ export default class ArenaScene {
 
     assembleTank(this.scene, loadout, { cannon: cannonMat }, {
       target: { root: this.tank.root, turretPivot: this.tank.turretPivot, barrelPivot: this.tank.barrelPivot },
+      paint,
     }).then(assembled => {
       const { hullBuilt, turretBuilt, cannonBuilt } = assembled.parts;
       const allMeshes = [...hullBuilt.meshes, ...turretBuilt.meshes, ...cannonBuilt.meshes];
@@ -811,6 +813,14 @@ export default class ArenaScene {
   }
 
   _updateAimIndicator() {
+    if (!this._aimEl) return;
+    // Hide the aim bracket whenever we're not actively aiming — paused, extracting,
+    // or dead. (_updateExtraction runs earlier in the same frame, so without this
+    // guard a just-completed extract re-shows the bracket and leaves it stuck.)
+    if (this._paused || this._extracting || !this.tank.alive) {
+      this._aimEl.style.display = 'none';
+      return;
+    }
     // Barrel firing plane height — same formula as Tank._updateTurret so everything is consistent
     const tipY = this.tank.root.position.y
       + this.tank.turretPivot.position.y

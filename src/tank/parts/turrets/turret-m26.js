@@ -33,7 +33,7 @@ export default {
   defaultCannon: 'cannon-90mm',
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
-  async build(scene) {
+  async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'turret-m26.glb', scene);
     const mountNode = result.transformNodes.find(n => n.name === this.mountEmpty);
     const mount = mountNode ? mountNode.getAbsolutePosition().clone() : new Vector3(0, 0.14, 1.83);
@@ -46,7 +46,7 @@ export default {
     const base = measureBase(meshes);
     console.log(`[turret-m26] base center=(${base.center.x.toFixed(2)},${base.center.y.toFixed(2)},${base.center.z.toFixed(2)}) diameter=${base.diameter.toFixed(2)}`);
 
-    applyModelPaint(meshes, PAINT, scene);
+    applyModelPaint(meshes, PAINT, scene, paintOverride);
     return { root, meshes, mount, base };
   },
 };

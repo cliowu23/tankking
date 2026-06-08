@@ -15,18 +15,19 @@ function makeCollider(name, size, pos, s) {
   return m;
 }
 
-// Upholstery palettes: [cushion, frame (darker), seam (darkest)]
-const UPH = {
-  oxblood: [[0.34, 0.11, 0.09], [0.22, 0.07, 0.06], [0.14, 0.04, 0.03]],
-  olive:   [[0.24, 0.28, 0.15], [0.16, 0.19, 0.10], [0.10, 0.12, 0.06]],
-  gray:    [[0.32, 0.34, 0.38], [0.20, 0.22, 0.26], [0.13, 0.14, 0.17]],
-};
+// Final hand-tuned look (locked via the lounge layout editor — no longer
+// customizable in-game): oxblood L-couch, metal coffee table, floor lamp, rug,
+// and a mug + magazines scatter. Blanket and wall poster were dropped.
+const UPH_CUSHION = [0.34, 0.11, 0.09];
+const UPH_FRAME   = [0.22, 0.07, 0.06];
+const UPH_SEAM    = [0.14, 0.04, 0.03];
 
-export const LOUNGE_DEFAULT = {
-  uph: 'oxblood',
-  table: 'crate',
-  extras: { lamp: true, rug: true, poster: false, scatter: true },
-};
+// Baked offsets from the editor DUMP (mockup-local frame). The table and the
+// tabletop scatter were nudged off their authored centres; everything else sits
+// at delta 0.
+const T0X = -1.35, T0Z = -1.35;            // authored coffee-table centre
+const TABLE_DX = 0.315, TABLE_DZ = 0.232;  // table moved off centre
+const SCAT_DX  = 0.251, SCAT_DZ  = 0.14;   // mug + magazines moved off centre
 
 // Port the mockup's local frame (walls at x=-3.55, z=-3.55) into the hangar's
 // SW corner (west wall x=-12, south wall z=-16). Every coordinate below is
@@ -51,11 +52,10 @@ export const LOUNGE_CX = -1.4 + OX;   // ≈ -9.85
 export const LOUNGE_CZ = -1.4 + OZ;   // ≈ -13.85
 
 /**
- * Build the SW-corner lounge. Returns a handle:
- *   { collider, root, update(config) }
- * `update` live-rebuilds the couch + table and toggles the extras.
+ * Build the SW-corner lounge — a fixed, hand-tuned rest area. Returns a handle:
+ *   { collider, root, center }
  */
-export function buildLounge(s, M, config) {
+export function buildLounge(s, M) {
   const root = new TransformNode('lounge-root', s);
   // Anchor the root at the corner and scale about it (children authored below
   // are shifted by -CAX/-CAZ so their world layout is unchanged at S=1).
@@ -71,20 +71,19 @@ export function buildLounge(s, M, config) {
   };
 
   // Materials shared with the rest of the hangar where the colours already match
-  const wood     = M.wood;       // crate body, spool
-  const metal    = M.metal;      // bands, legs, lamp pole
+  const metal    = M.metal;      // table legs, lamp pole
   const darkMetal= M.darkMetal;  // metal table top, lamp base
-  const olive    = M.olive;      // crate lid, a magazine
-  const paper    = M.parchment;  // magazine / folded map
+  const olive    = M.olive;      // a magazine
+  const paper    = M.parchment;  // a magazine
   const lampGlow = M.lampGlow;   // lamp shade
 
   // Lounge-specific materials
   const rugMat    = mat('lng-rug', 0.34, 0.13, 0.11);
   const rugBorder = mat('lng-rugb', 0.20, 0.08, 0.07);
-  const blanket   = mat('lng-blanket', 0.55, 0.45, 0.20);
   const mugMat    = mat('lng-mug', 0.70, 0.70, 0.66, 0.1);
-  const posterMat = mat('lng-poster', 0.55, 0.50, 0.40);
-  posterMat.emissiveColor = new Color3(0.10, 0.10, 0.08);
+  const cushion   = mat('lng-cushion', ...UPH_CUSHION);
+  const frame     = mat('lng-frame',   ...UPH_FRAME);
+  const seam      = mat('lng-seam',    ...UPH_SEAM);
 
   // Offset-aware primitive helpers (author in mockup space, build in world space)
   // Author in world coords (x+OX, z+OZ) but store relative to the scale anchor,
@@ -102,67 +101,42 @@ export function buildLounge(s, M, config) {
     return c;
   };
 
-  // ── L-couch (rebuilt on upholstery change) ─────────────────────────────────
-  let couchNode = null;
-  function buildCouch(uphKey) {
-    if (couchNode) couchNode.dispose();
-    couchNode = new TransformNode('lng-couch', s);
-    couchNode.parent = root;
-    const [cu, fr, sm] = UPH[uphKey] || UPH.oxblood;
-    const cushion = mat('lng-cu-' + uphKey, cu[0], cu[1], cu[2]);
-    const frame   = mat('lng-fr-' + uphKey, fr[0], fr[1], fr[2]);
-    const seam    = mat('lng-sm-' + uphKey, sm[0], sm[1], sm[2]);
+  // ── L-couch (oxblood) — backs to west + south walls, seats face the room ────
+  const couchNode = new TransformNode('lng-couch', s);
+  couchNode.parent = root;
+  // WEST ARM
+  box(couchNode, 'wa-base', 0.95, 0.34, 2.7, -2.55, 0.17, -1.3, frame);
+  box(couchNode, 'wa-back', 0.26, 0.50, 2.7, -2.92, 0.59, -1.3, cushion);
+  box(couchNode, 'wa-seat1', 0.78, 0.20, 1.18, -2.50, 0.44, -1.95, cushion);
+  box(couchNode, 'wa-seat2', 0.78, 0.20, 1.18, -2.50, 0.44, -0.65, cushion);
+  box(couchNode, 'wa-seam',  0.80, 0.205, 0.04, -2.50, 0.445, -1.30, seam);
+  box(couchNode, 'wa-arm',   0.95, 0.56, 0.26, -2.55, 0.45, 0.18, frame);
+  // SOUTH ARM
+  box(couchNode, 'sa-base', 2.7, 0.34, 0.95, -1.3, 0.17, -2.55, frame);
+  box(couchNode, 'sa-back', 2.7, 0.50, 0.26, -1.3, 0.59, -2.92, cushion);
+  box(couchNode, 'sa-seat1', 1.18, 0.20, 0.78, -1.95, 0.44, -2.50, cushion);
+  box(couchNode, 'sa-seat2', 1.18, 0.20, 0.78, -0.65, 0.44, -2.50, cushion);
+  box(couchNode, 'sa-seam',  0.04, 0.205, 0.80, -1.30, 0.445, -2.50, seam);
+  box(couchNode, 'sa-arm',   0.26, 0.56, 0.95, 0.18, 0.45, -2.55, frame);
+  // CORNER cushion + back wedge
+  box(couchNode, 'c-seat', 0.85, 0.20, 0.85, -2.50, 0.44, -2.50, cushion);
+  box(couchNode, 'c-back', 0.55, 0.50, 0.55, -2.78, 0.59, -2.78, cushion);
 
-    // WEST ARM — back to west wall, seats face the room (+x)
-    box(couchNode, 'wa-base', 0.95, 0.34, 2.7, -2.55, 0.17, -1.3, frame);
-    box(couchNode, 'wa-back', 0.26, 0.50, 2.7, -2.92, 0.59, -1.3, cushion);
-    box(couchNode, 'wa-seat1', 0.78, 0.20, 1.18, -2.50, 0.44, -1.95, cushion);
-    box(couchNode, 'wa-seat2', 0.78, 0.20, 1.18, -2.50, 0.44, -0.65, cushion);
-    box(couchNode, 'wa-seam',  0.80, 0.205, 0.04, -2.50, 0.445, -1.30, seam);
-    box(couchNode, 'wa-arm',   0.95, 0.56, 0.26, -2.55, 0.45, 0.18, frame);
+  // ── coffee table (metal) — baked off the authored centre ────────────────────
+  const TX = T0X + TABLE_DX, TZ = T0Z + TABLE_DZ;
+  const tableNode = new TransformNode('lng-table', s);
+  tableNode.parent = root;
+  box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal);
+  [[-0.45, -0.28], [0.45, -0.28], [-0.45, 0.28], [0.45, 0.28]].forEach(([dx, dz], i) =>
+    box(tableNode, 't-leg' + i, 0.07, 0.42, 0.07, TX + dx, 0.21, TZ + dz, metal));
 
-    // SOUTH ARM — back to south wall, seats face the room (+z)
-    box(couchNode, 'sa-base', 2.7, 0.34, 0.95, -1.3, 0.17, -2.55, frame);
-    box(couchNode, 'sa-back', 2.7, 0.50, 0.26, -1.3, 0.59, -2.92, cushion);
-    box(couchNode, 'sa-seat1', 1.18, 0.20, 0.78, -1.95, 0.44, -2.50, cushion);
-    box(couchNode, 'sa-seat2', 1.18, 0.20, 0.78, -0.65, 0.44, -2.50, cushion);
-    box(couchNode, 'sa-seam',  0.04, 0.205, 0.80, -1.30, 0.445, -2.50, seam);
-    box(couchNode, 'sa-arm',   0.26, 0.56, 0.95, 0.18, 0.45, -2.55, frame);
-
-    // CORNER cushion + back wedge tying the two arms together
-    box(couchNode, 'c-seat', 0.85, 0.20, 0.85, -2.50, 0.44, -2.50, cushion);
-    box(couchNode, 'c-back', 0.55, 0.50, 0.55, -2.78, 0.59, -2.78, cushion);
-  }
-
-  // ── coffee table (rebuilt on table change) ─────────────────────────────────
-  const TX = -1.35, TZ = -1.35;
-  let tableNode = null;
-  function buildTable(kind) {
-    if (tableNode) tableNode.dispose();
-    tableNode = new TransformNode('lng-table', s);
-    tableNode.parent = root;
-    if (kind === 'metal') {
-      box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal);
-      [[-0.45, -0.28], [0.45, -0.28], [-0.45, 0.28], [0.45, 0.28]].forEach(([dx, dz], i) =>
-        box(tableNode, 't-leg' + i, 0.07, 0.42, 0.07, TX + dx, 0.21, TZ + dz, metal));
-    } else if (kind === 'spool') {
-      cyl(tableNode, 't-top', 1.15, 0.07, TX, 0.45, TZ, wood, 20);
-      cyl(tableNode, 't-bot', 1.15, 0.07, TX, 0.10, TZ, wood, 20);
-      cyl(tableNode, 't-hub', 0.45, 0.30, TX, 0.27, TZ, wood, 16);
-    } else { // crate (default)
-      box(tableNode, 't-body', 1.15, 0.42, 0.75, TX, 0.21, TZ, wood);
-      box(tableNode, 't-lid',  1.20, 0.06, 0.80, TX, 0.45, TZ, olive);
-      box(tableNode, 't-band1', 1.22, 0.05, 0.05, TX, 0.30, TZ - 0.35, metal);
-      box(tableNode, 't-band2', 1.22, 0.05, 0.05, TX, 0.30, TZ + 0.35, metal);
-    }
-  }
-
-  // ── extras (built once, toggled with setEnabled) ───────────────────────────
+  // ── rug (floor + border) ────────────────────────────────────────────────────
   const rug = MeshBuilder.CreateGround('lng-rug', { width: 3.6, height: 3.6 }, s);
   rug.position = new Vector3(-1.5 + OX - CAX, 0.02, -1.5 + OZ - CAZ); rug.material = rugMat;
   vis(rug); rug.parent = root;
-  const rugBox = box(root, 'lng-rug-border', 3.6, 0.015, 3.6, -1.5, 0.012, -1.5, rugBorder);
+  box(root, 'lng-rug-border', 3.6, 0.015, 3.6, -1.5, 0.012, -1.5, rugBorder);
 
+  // ── floor lamp ──────────────────────────────────────────────────────────────
   const lampNode = new TransformNode('lng-lamp', s); lampNode.parent = root;
   const LX = -2.55, LZ = 0.7;
   cyl(lampNode, 'l-base', 0.40, 0.06, LX, 0.05, LZ, darkMetal, 14);
@@ -176,37 +150,21 @@ export function buildLounge(s, M, config) {
   lampLight.intensity = 2.8;
   lampLight.range     = 11;
 
-  const posterNode = new TransformNode('lng-poster', s); posterNode.parent = root;
-  box(posterNode, 'poster-board', 0.10, 1.5, 1.2, -3.46, 1.7, -1.3, posterMat);
-  box(posterNode, 'poster-frame', 0.06, 1.62, 1.32, -3.49, 1.7, -1.3, darkMetal);
-
+  // ── tabletop scatter (mug + magazines) — baked off the authored centre ──────
+  const SX = T0X + SCAT_DX, SZ = T0Z + SCAT_DZ;
   const scatterNode = new TransformNode('lng-scatter', s); scatterNode.parent = root;
-  cyl(scatterNode, 'mug', 0.16, 0.18, TX + 0.3, 0.57, TZ - 0.1, mugMat, 12);
-  box(scatterNode, 'mag1', 0.34, 0.03, 0.26, TX - 0.25, 0.49, TZ + 0.12, paper);
-  box(scatterNode, 'mag2', 0.34, 0.03, 0.26, TX - 0.22, 0.52, TZ + 0.16, olive);
-  box(scatterNode, 'blanket', 0.30, 0.16, 0.80, 0.18, 0.60, -2.55, blanket);
-
-  // ── update / apply ─────────────────────────────────────────────────────────
-  function update(cfg) {
-    buildCouch(cfg.uph);
-    buildTable(cfg.table);
-    rug.setEnabled(cfg.extras.rug);
-    rugBox.setEnabled(cfg.extras.rug);
-    lampNode.setEnabled(cfg.extras.lamp);
-    lampLight.setEnabled(cfg.extras.lamp);
-    posterNode.setEnabled(cfg.extras.poster);
-    scatterNode.setEnabled(cfg.extras.scatter);
-  }
-  update(config);
+  cyl(scatterNode, 'mug', 0.16, 0.18, SX + 0.3, 0.57, SZ - 0.1, mugMat, 12);
+  box(scatterNode, 'mag1', 0.34, 0.03, 0.26, SX - 0.25, 0.49, SZ + 0.12, paper);
+  box(scatterNode, 'mag2', 0.34, 0.03, 0.26, SX - 0.22, 0.52, SZ + 0.16, olive);
 
   // Scaled couch centre (world). Collider stays a touch smaller than the visual
-  // footprint so the driver can step close enough to trigger the CUSTOMIZE
-  // prompt (proximity threshold is 3.5 from the collider centre).
+  // footprint so the driver can step close enough to trigger the INTERACT prompt
+  // (proximity threshold is 3.5 from the collider centre).
   const cx = CAX + NUDGE_X + S * (LOUNGE_CX - CAX);
   const cz = CAZ + NUDGE_Z + S * (LOUNGE_CZ - CAZ);
   const collider = makeCollider('station-lounge',
     { width: 3.4, height: 1.5, depth: 3.4 },
     new Vector3(cx, 0.75, cz), s);
 
-  return { collider, root, update, center: new Vector3(cx, 0.5, cz) };
+  return { collider, root, center: new Vector3(cx, 0.5, cz) };
 }

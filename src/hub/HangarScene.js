@@ -1,14 +1,17 @@
 import {
   Scene, HemisphericLight, DirectionalLight, PointLight,
   MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Mesh, SceneLoader,
-  DynamicTexture,
+  DynamicTexture, PointerEventTypes,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
-import DriverCharacter from './DriverCharacter.js';
-import { makeMats, buildWorkbench, buildQMCrates, buildMapTable, buildRadioShelf, addBlob } from './HangarProps.js';
-import { buildLounge, LOUNGE_DEFAULT } from './HangarLounge.js';
+import DriverCharacter, { DRIVER_DEFAULT } from './DriverCharacter.js';
+import { makeMats, buildWorkbench, buildQMCrates, addBlob } from './HangarProps.js';
+import { buildLounge } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
+import { buildMapTable } from './HangarMapTable.js';
+import { buildRadio } from './HangarRadio.js';
+import { POSTER_DESIGNS } from './posterArt.js';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
@@ -37,6 +40,7 @@ export default class HangarScene {
 
     this._setupDriver();
     this._setupGameLoop();
+    this._setupPosterEgg();
   }
 
   _buildRoom() {
@@ -247,10 +251,10 @@ export default class HangarScene {
         { y: opts.y ?? 0.03 });
     };
 
-    // Compact stations get one blob each. The kitchen places its own per-item
-    // blobs (table/stools/etc. are spread out, so one big blob would look wrong),
-    // and the lounge already sits on a rug, so neither is dropped here.
-    ['wb-root', 'qm-root', 'mt-root', 'rs-root'].forEach((n) => {
+    // Compact stations get one blob each. The kitchen and the NW planning desk
+    // place their own per-item blobs (props are spread out, so one big blob would
+    // look wrong), and the lounge already sits on a rug, so none are dropped here.
+    ['wb-root', 'qm-root'].forEach((n) => {
       const r = this.scene.getTransformNodeByName(n);
       if (r) drop(r);
     });
@@ -272,16 +276,27 @@ export default class HangarScene {
     const propMats = makeMats(s);
     this._blobMat = propMats.blob;
     this._stationMeshes = [
-      { mesh: buildMapTable(s,    -8,  14, propMats), data: this._stationDefs.map      },
-      { mesh: buildRadioShelf(s,    7,  15, propMats), data: this._stationDefs.radio    },
       { mesh: buildWorkbench(s,  -11,  -2, propMats), data: this._stationDefs.mechanic },
       { mesh: buildQMCrates(s,    11,   0, propMats), data: this._stationDefs.qm       },
     ];
 
-    // SW-corner lounge — a stateful, customizable station (press E to open the
-    // customization panel; choices persist in localStorage).
-    this._loungeConfig = this._loadLoungeConfig();
-    this._lounge = buildLounge(s, propMats, this._loungeConfig);
+    // NW-corner planning desk — the redesigned tactical map. Hand-tuned layout
+    // baked into HangarMapTable.js, scaled into the corner like lounge/kitchen.
+    this._map = buildMapTable(s, propMats);
+    this._stationMeshes.push({ mesh: this._map.collider, data: this._stationDefs.map });
+
+    // NE-corner radio / intercept station (quest-giver comms hub) — baked into
+    // HangarRadio.js. Carries the swappable north-wall poster (this._radio.setPoster).
+    this._radio = buildRadio(s, propMats);
+    this._stationMeshes.push({ mesh: this._radio.collider, data: this._stationDefs.radio });
+    try { const saved = localStorage.getItem('radioPoster'), savedImg = localStorage.getItem('radioPosterImg');
+      if (saved === 'photo' && savedImg) { const im = new Image(); im.onload = () => this._radio.setCustomPhoto(im); im.src = savedImg; }
+      else if (saved && POSTER_DESIGNS.includes(saved)) this._radio.setPoster(saved); } catch (e) { /* ignore */ }
+
+    // SW-corner lounge — furniture is fixed/hand-tuned (baked into
+    // HangarLounge.js, no longer customizable). Pressing E opens the character
+    // customization panel (driver look) via openLounge().
+    this._lounge = buildLounge(s, propMats);
     this._stationMeshes.push({ mesh: this._lounge.collider, data: this._stationDefs.lounge });
 
     // SE-corner kitchen — static INTERACT station (galley/mess), scaled into the
@@ -644,6 +659,36 @@ export default class HangarScene {
 
   _setupDriver() {
     this.driver = new DriverCharacter(this.scene);
+    this._driverConfig = this._loadDriverConfig();
+    // Apply the saved look once the Kenney model finishes loading.
+    this.driver.ready.then(() => this.driver.applyConfig(this._driverConfig));
+  }
+
+  // ── Driver customization (mirrors the lounge config plumbing) ────────────────
+  _loadDriverConfig() {
+    let cfg = { ...DRIVER_DEFAULT };
+    try {
+      const saved = JSON.parse(localStorage.getItem('driverConfig'));
+      if (saved && saved.head && saved.body && saved.accessory) cfg = saved;
+    } catch (e) { /* fall through to default */ }
+    cfg.accessory = 'none';   // accessories temporarily hidden (buried-in-head placement bug)
+    return cfg;
+  }
+
+  getDriverConfig() { return this._driverConfig; }
+
+  // Merge a partial change. Presets: { character } drives head+body together
+  // (no mixing); { accessory } sets the headgear. Persists + live-applies.
+  setDriverConfig(partial) {
+    if (partial.character) {
+      this._driverConfig.head = this._driverConfig.body = partial.character;
+    }
+    if (partial.head)                    this._driverConfig.head      = partial.head;
+    if (partial.body)                    this._driverConfig.body      = partial.body;
+    if (partial.accessory !== undefined) this._driverConfig.accessory = partial.accessory;
+    this.driver.applyConfig(this._driverConfig);
+    try { localStorage.setItem('driverConfig', JSON.stringify(this._driverConfig)); } catch (e) { /* ignore */ }
+    return this._driverConfig;
   }
 
   _setupGameLoop() {
@@ -729,50 +774,47 @@ export default class HangarScene {
     document.getElementById('hangar-panel').style.display = 'none';
   }
 
-  // ── Lounge customization ────────────────────────────────────────────────────
-  _loadLoungeConfig() {
-    try {
-      const saved = JSON.parse(localStorage.getItem('loungeConfig'));
-      if (saved && saved.uph && saved.table && saved.extras) return saved;
-    } catch (e) { /* fall through to default */ }
-    // Deep clone so we never mutate the shared default
-    return JSON.parse(JSON.stringify(LOUNGE_DEFAULT));
-  }
-
-  getLoungeConfig() { return this._loungeConfig; }
-
-  // Merge a partial change ({ uph } | { table } | { extras:{rug} }), live-rebuild
-  // the lounge, and persist. Returns the full updated config.
-  setLoungeConfig(partial) {
-    if (partial.extras) {
-      this._loungeConfig.extras = { ...this._loungeConfig.extras, ...partial.extras };
-    }
-    if (partial.uph)   this._loungeConfig.uph   = partial.uph;
-    if (partial.table) this._loungeConfig.table = partial.table;
-    this._lounge.update(this._loungeConfig);
-    try { localStorage.setItem('loungeConfig', JSON.stringify(this._loungeConfig)); } catch (e) { /* ignore */ }
-    return this._loungeConfig;
-  }
-
+  // ── Lounge character customization panel (driver look) ──────────────────────
   openLounge() {
     this._panelOpen  = true;   // pause driver + freeze follow-cam target
     this._loungeOpen = true;
     document.getElementById('hangar-prompt').style.display = 'none';
     document.getElementById('lounge-panel').style.display  = 'flex';
 
-    // Swing the camera to a 3/4 view of the corner so changes are easy to read
+    // Stand the driver in the open area in front of the couch (NE of the
+    // SW-corner couch, on the rug, clear of the coffee table) so it doesn't clip
+    // the furniture while being customized. Saved + restored on close.
+    this._driverHomePos = this.driver.mesh.position.clone();
+    this._driverHomeRot = this.driver.mesh.rotation.y;
+    const lc = this._lounge.center;
+    this.driver.mesh.position.set(lc.x + 2.0, 0.9, lc.z + 2.0);
+
+    // Frame the driver from the front like a character sheet so the look being
+    // edited is clearly visible. Snap to a known facing and orbit to a 3/4 front
+    // view; the follow-cam + driver.update are frozen while the panel is open.
+    this.driver.mesh.rotation.y = 0;   // turn the driver to face the camera (front +Z)
     const c = this.driver.camera;
     this._camSaved = {
       alpha: c.alpha, beta: c.beta, radius: c.radius,
       lower: c.lowerRadiusLimit, upper: c.upperRadiusLimit,
+      betaLower: c.lowerBetaLimit, betaUpper: c.upperBetaLimit,
+      panning: c.panningSensibility,
       target: c.getTarget().clone(),
     };
-    c.lowerRadiusLimit = 6;
-    c.upperRadiusLimit = 36;
-    c.alpha  = Math.PI * 0.28;
-    c.beta   = 0.95;
-    c.radius = 15;
-    c.setTarget(this._lounge.center.clone());
+    const focus = this.driver.mesh.position.clone(); focus.y += 0.9;
+    c.setTarget(focus);          // set target FIRST — setTarget recomputes alpha/beta
+    c.alpha  = Math.PI * 0.6;    // just off straight-front for a 3/4 view
+    c.beta   = 1.15;             // lower angle so we see the face, not the top of the head
+    c.radius = 6.5;
+
+    // Let the player orbit the driver with mouse drags, but LOCK zoom (radius
+    // pinned) and clamp beta so the camera can't dip under the floor or flip
+    // fully top-down. Panning is disabled so the driver stays centred.
+    c.lowerRadiusLimit = c.upperRadiusLimit = 6.5;
+    c.lowerBetaLimit = 0.25;
+    c.upperBetaLimit = 1.5;
+    c.panningSensibility = 0;
+    c.attachControl(this.scene.getEngine().getRenderingCanvas(), true);
   }
 
   _closeLounge() {
@@ -780,14 +822,24 @@ export default class HangarScene {
     this._panelOpen   = false;
     this._nearStation = null;
     document.getElementById('lounge-panel').style.display = 'none';
+    // Put the driver back where it was standing before customization.
+    if (this._driverHomePos) {
+      this.driver.mesh.position.copyFrom(this._driverHomePos);
+      this.driver.mesh.rotation.y = this._driverHomeRot;
+      this._driverHomePos = null;
+    }
     const c = this.driver.camera, sv = this._camSaved;
+    c.detachControl();           // hand the camera back to the code-driven follow loop
     if (sv) {
       c.lowerRadiusLimit = sv.lower;
       c.upperRadiusLimit = sv.upper;
+      c.lowerBetaLimit   = sv.betaLower;
+      c.upperBetaLimit   = sv.betaUpper;
+      c.panningSensibility = sv.panning;
+      c.setTarget(sv.target);   // FIRST — setTarget recomputes alpha/beta, so pin them after
       c.alpha  = sv.alpha;
       c.beta   = sv.beta;
       c.radius = sv.radius;
-      c.setTarget(sv.target);
     }
   }
 
@@ -804,9 +856,82 @@ export default class HangarScene {
     this._mountTimer = setTimeout(() => this.onDeploy(), 500);
   }
 
+  // ── Poster easter-egg: hover swaps the reticle to a "click" indicator; 5 clicks
+  //    open a small chooser menu (4 painted designs + upload-your-own). ──────────
+  _setupPosterEgg() {
+    const reticle = document.getElementById('reticle');
+    const poster  = this._radio && this._radio.posterMesh;
+    if (!poster) return;
+
+    const ORIG_RETICLE = reticle ? reticle.innerHTML : '';
+    const CLICK_RETICLE =
+      '<svg width="40" height="40" viewBox="0 0 40 40">'
+      + '<circle cx="20" cy="20" r="6" fill="none" stroke="#00eedd" stroke-width="2"/>'
+      + '<circle cx="20" cy="20" r="2.5" fill="#00eedd"/>'
+      + '<line x1="20" y1="3" x2="20" y2="9" stroke="#00eedd" stroke-width="2"/>'
+      + '<line x1="20" y1="31" x2="20" y2="37" stroke="#00eedd" stroke-width="2"/>'
+      + '<line x1="3" y1="20" x2="9" y2="20" stroke="#00eedd" stroke-width="2"/>'
+      + '<line x1="31" y1="20" x2="37" y2="20" stroke="#00eedd" stroke-width="2"/></svg>';
+
+    let hovering = false, clicks = 0, menuOpen = false;
+    const setHover = (on) => { if (on === hovering) return; hovering = on; if (reticle) reticle.innerHTML = on ? CLICK_RETICLE : ORIG_RETICLE; };
+    const persist  = (design, img) => { try { localStorage.setItem('radioPoster', design); if (img !== null) localStorage.setItem('radioPosterImg', img); } catch (e) { /* quota */ } };
+
+    // chooser menu (self-contained DOM, Tron-styled — no main.js/index.html changes)
+    const menu = document.createElement('div'); menu.id = 'poster-menu';
+    menu.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;'
+      + 'flex-direction:column;gap:8px;padding:14px 16px;width:300px;background:rgba(0,8,20,0.95);'
+      + "border:1px solid #00e5ff;box-shadow:0 0 24px rgba(0,229,255,0.25);font-family:'Press Start 2P',monospace;";
+    menu.innerHTML =
+        '<div style="color:#00e5ff;font-size:10px;letter-spacing:2px;">POSTER</div>'
+      + '<div style="color:#2f6470;font-size:7px;letter-spacing:1px;margin-bottom:6px;">PICK A DESIGN · OR UPLOAD YOUR OWN</div>'
+      + '<div id="pm-row" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+      + '<button id="pm-upload">UPLOAD YOUR OWN</button>'
+      + '<button id="pm-close">CLOSE</button>'
+      + '<input id="pm-file" type="file" accept="image/*" style="display:none">';
+    document.body.appendChild(menu);
+    this._posterMenu = menu;
+
+    const btnCss = 'background:#0a1824;color:#7fc8d4;border:1px solid #1b4250;padding:8px 9px;'
+      + 'font-family:inherit;font-size:8px;letter-spacing:1px;cursor:none;margin-top:4px;';
+    const row = menu.querySelector('#pm-row');
+    [['wanted', 'WANTED'], ['fields', 'FIELDS'], ['morale', 'MORALE'], ['photo', 'PHOTO']].forEach(([d, label]) => {
+      const b = document.createElement('button'); b.textContent = label; b.style.cssText = btnCss + 'flex:1 1 44%;text-align:center;';
+      b.onclick = () => { this._radio.setPoster(d); persist(d, null); closeMenu(); }; row.appendChild(b);
+    });
+    const fileIn = menu.querySelector('#pm-file');
+    menu.querySelector('#pm-upload').style.cssText = btnCss;
+    menu.querySelector('#pm-close').style.cssText  = btnCss;
+    menu.querySelector('#pm-upload').onclick = () => fileIn.click();
+    menu.querySelector('#pm-close').onclick  = () => closeMenu();
+    fileIn.onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return;
+      const rd = new FileReader(); rd.onload = () => { const im = new Image();
+        im.onload = () => { this._radio.setCustomPhoto(im); persist('photo', rd.result); closeMenu(); }; im.src = rd.result; };
+      rd.readAsDataURL(f); };
+
+    const openMenu  = () => { menu.style.display = 'flex'; menuOpen = true; setHover(false); };
+    const closeMenu = () => { menu.style.display = 'none'; menuOpen = false; clicks = 0; };
+    this._closePosterMenu = closeMenu;
+    this._restoreReticle  = () => { if (reticle) reticle.innerHTML = ORIG_RETICLE; };
+
+    this._posterObserver = this.scene.onPointerObservable.add((pi) => {
+      if (this._panelOpen || menuOpen) { setHover(false); return; }   // dormant while a panel/menu is up
+      if (pi.type === PointerEventTypes.POINTERMOVE) {
+        const p = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
+        setHover(!!(p && p.hit && p.pickedMesh === poster));
+      } else if (pi.type === PointerEventTypes.POINTERPICK) {
+        if (pi.pickInfo && pi.pickInfo.pickedMesh === poster) { clicks += 1; if (clicks >= 5) openMenu(); }
+        else clicks = 0;   // a click elsewhere resets the streak
+      }
+    });
+  }
+
   dispose() {
     clearTimeout(this._mountTimer);
     if (this._loopObserver) this.scene.onBeforeRenderObservable.remove(this._loopObserver);
+    if (this._posterObserver) this.scene.onPointerObservable.remove(this._posterObserver);
+    if (this._restoreReticle) this._restoreReticle();
+    if (this._posterMenu) this._posterMenu.remove();
     if (this.driver) this.driver.dispose();
     this.scene.dispose();
   }
