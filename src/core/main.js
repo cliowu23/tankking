@@ -2,6 +2,7 @@ import { Engine } from '@babylonjs/core';
 import ArenaScene        from '../world/ArenaScene.js';
 import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
+import { getBankedSalvage } from './runState.js';
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
@@ -118,7 +119,7 @@ function startGame() {
       canvas.style.display = 'block';
       document.getElementById('hud').style.display = 'block';
       if (!arenaScene) {
-        arenaScene = new ArenaScene(engine);
+        arenaScene = new ArenaScene(engine, onExtractFromArena);
         window.__arena = arenaScene;
       } else {
         arenaScene._restart();
@@ -148,6 +149,8 @@ function startHangar() {
       window.__state = 'HANGAR';
       hangarScene = new HangarScene(engine, deployToArena, goToMenu);
       window.__hangar = hangarScene; // debug hook
+      const hs = document.getElementById('hangar-salvage');
+      if (hs) { hs.textContent = `BANKED SALVAGE: ${getBankedSalvage()}`; hs.style.display = 'block'; }
       engine.runRenderLoop(() => hangarScene.scene.render());
     },
     'iris'
@@ -160,13 +163,14 @@ function deployToArena() {
     () => {
       document.getElementById('hangar-prompt').style.display = 'none';
       document.getElementById('hangar-panel').style.display  = 'none';
+      document.getElementById('hangar-salvage').style.display = 'none';
       engine.stopRenderLoop();
       if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
     },
     () => {
       canvas.style.display = 'block';
       document.getElementById('hud').style.display = 'block';
-      arenaScene = new ArenaScene(engine);
+      arenaScene = new ArenaScene(engine, onExtractFromArena);
       window.__arena = arenaScene;
       engine.runRenderLoop(() => arenaScene.scene.render());
       window.__state = 'GAME';
@@ -174,6 +178,18 @@ function deployToArena() {
     'checker'
   );
 }
+
+function onExtractFromArena(gained, banked) {
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('extract-indicator').style.display = 'none';
+  document.getElementById('extract-summary-gained').textContent = `+${gained} SALVAGE`;
+  document.getElementById('extract-summary-banked').textContent = `BANKED: ${banked}`;
+  document.getElementById('extract-summary').style.display = 'flex';
+}
+document.getElementById('extract-return').addEventListener('click', () => {
+  document.getElementById('extract-summary').style.display = 'none';
+  startHangar();
+});
 
 function dismissControls() {
   if (window.__state !== 'CONTROLS') return;
@@ -188,6 +204,7 @@ function goToMenu() {
   document.getElementById('pause').style.display = 'none';
   document.getElementById('death').style.display = 'none';
   document.getElementById('hud').style.display   = 'none';
+  document.getElementById('hangar-salvage').style.display = 'none';
   canvas.style.display = 'none';
   engine.stopRenderLoop();
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
