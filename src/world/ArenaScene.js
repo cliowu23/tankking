@@ -17,11 +17,16 @@ import AIEnemy from './AIEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
+import SalvageCrate from './SalvageCrate.js';
+import ExtractionZone from './ExtractionZone.js';
+import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
+import { bankSalvage } from '../core/runState.js';
 
 export default class ArenaScene {
-  constructor(engine) {
+  constructor(engine, onExtract) {
     this.scene = new Scene(engine);
     this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
+    this._onExtract = onExtract ?? null;
 
     this.scene._onCameraShake = (duration, intensity) => this._triggerShake(duration, intensity);
     this._shakeTime      = 0;
@@ -55,6 +60,7 @@ export default class ArenaScene {
     this._setupSky();
     this._setupHazards();
     this._setupEntities();
+    this._setupExtraction();
     // this._setupDevLabels();
     this._setupLockOn();
     this._setupFiring();
@@ -704,6 +710,7 @@ export default class ArenaScene {
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
+      this._updateExtraction(dt);
       this.vfx.update(dt);
       this._updateLockRing(dt);
       this._updateAimIndicator();
@@ -894,6 +901,69 @@ export default class ArenaScene {
     this.lockRing.isVisible  = false;
     this.fadeRing.isVisible  = false;
     this._aimEl.style.display = 'none';
+    for (const crate of this._crates) crate.reset();
+    this._extractZone.reset();
+    this._runSalvage = 0;
+    this._extracting = false;
+  }
+
+  _setupExtraction() {
+    this._runSalvage = 0;
+    this._extracting = false;
+
+    this._crates = ARENA_LOOT.salvageCrates.map((c) => {
+      const crate = new SalvageCrate(this.scene, c);
+      crate.addShadows(this.shadowGen);
+      return crate;
+    });
+
+    this._extractZone = new ExtractionZone(this.scene, ARENA_LOOT.extractionZone);
+  }
+
+  _updateExtraction(dt) {
+    for (const crate of this._crates) crate.update(dt);
+
+    if (!this.tank.alive || this._extracting) {
+      this._updateExtractionHUD(false);
+      return;
+    }
+
+    // Drive-over pickups
+    for (const crate of this._crates) {
+      if (crate.collected) continue;
+      const dx = this.tank.position.x - crate.position.x;
+      const dz = this.tank.position.z - crate.position.z;
+      if (dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
+        crate.collect();
+        this._runSalvage += crate.value;
+      }
+    }
+
+    // Extraction channel
+    const inside = this._extractZone.contains(this.tank.position);
+    const done   = this._extractZone.update(dt, inside);
+    this._updateExtractionHUD(inside);
+    if (done) this._extract();
+  }
+
+  _extract() {
+    this._extracting = true;
+    this._paused     = true;
+    window.__state   = 'EXTRACTED';
+    const banked = bankSalvage(this._runSalvage);
+    if (this._aimEl) this._aimEl.style.display = 'none';
+    if (this._onExtract) this._onExtract(this._runSalvage, banked);
+  }
+
+  _updateExtractionHUD(inside) {
+    const sal = document.getElementById('hud-salvage');
+    if (sal) sal.textContent = `SALVAGE: ${this._runSalvage}`;
+    const ind = document.getElementById('extract-indicator');
+    if (ind) {
+      ind.style.display = inside ? 'block' : 'none';
+      const bar = document.getElementById('extract-progress-fill');
+      if (bar) bar.style.width = `${Math.round(this._extractZone.progress * 100)}%`;
+    }
   }
 
   _checkCollisions() {
