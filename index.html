@@ -191,7 +191,7 @@
     }
 
     /* ─── DEATH / PAUSE ────────────────────────────────── */
-    #death, #pause {
+    #death, #pause, #extract-summary {
       position: fixed; inset: 0;
       display: none; flex-direction: column;
       align-items: center; justify-content: center;
@@ -199,6 +199,14 @@
     }
     #death { background: rgba(20, 5, 10, 0.82); }
     #pause { background: rgba(10, 10, 26, 0.80); }
+    #extract-summary { background: rgba(0, 8, 20, 0.90); }
+    #extract-summary h2 {
+      color: var(--accent);
+      font-size: 30px;
+      letter-spacing: 6px;
+      text-shadow: 0 0 14px var(--accent);
+      line-height: 1.4;
+    }
 
     #death h2 {
       color: var(--danger);
@@ -215,7 +223,7 @@
       line-height: 1.4;
     }
     #death-restart, #death-menu, #death-hangar,
-    #pause-resume, #pause-restart, #pause-menu {
+    #pause-resume, #pause-restart, #pause-menu, #extract-return {
       margin-top: 20px;
       background: var(--panel);
       cursor: none;
@@ -237,7 +245,7 @@
       outline-color: rgba(233,69,96,0.35);
     }
     #death-restart:hover, #death-menu:hover, #death-hangar:hover,
-    #pause-resume:hover, #pause-restart:hover, #pause-menu:hover {
+    #pause-resume:hover, #pause-restart:hover, #pause-menu:hover, #extract-return:hover {
       color: var(--gold);
       outline-color: var(--accent);
     }
@@ -757,6 +765,19 @@
     <button id="death-restart">RESTART</button>
     <button id="death-menu">MAIN MENU</button>
   </div>
+
+  <div id="extract-summary">
+    <h2>EXTRACTED</h2>
+    <div id="extract-summary-gained" style="margin-top:18px; font-family:monospace;
+      font-size:20px; color:var(--gold);">+0 SALVAGE</div>
+    <div id="extract-summary-banked" style="margin-top:6px; font-family:monospace;
+      font-size:14px; letter-spacing:2px; color:#9fdfff;">BANKED: 0</div>
+    <button id="extract-return">RETURN TO BUNKER</button>
+  </div>
+
+  <div id="hangar-salvage" style="display:none; position:absolute; top:18px; left:22px;
+    font-family:monospace; font-size:16px; letter-spacing:2px; color:#ffd23a;
+    text-shadow:0 0 8px rgba(255,210,58,0.6); z-index:15;">BANKED SALVAGE: 0</div>
 
   <div id="hud">
     <div id="hud-label">BOOST</div>
