@@ -763,6 +763,23 @@
     <div id="hud-track"><div id="hud-fill"></div></div>
     <div id="hud-hp-label">HULL</div>
     <div id="hud-hp-track"><div id="hud-hp-fill"></div></div>
+    <div id="hud-salvage" style="position:absolute; top:18px; right:22px;
+      font-family:monospace; font-size:18px; letter-spacing:2px; color:#ffd23a;
+      text-shadow:0 0 8px rgba(255,210,58,0.6);">SALVAGE: 0</div>
+  </div>
+
+  <!-- Extraction channel indicator -->
+  <div id="extract-indicator" style="display:none; position:absolute; left:50%;
+    bottom:120px; transform:translateX(-50%); text-align:center;
+    font-family:monospace; color:#00e5ff; z-index:20;">
+    <div style="font-size:16px; letter-spacing:3px; text-shadow:0 0 8px #00e5ff;">
+      HOLD POSITION — EXTRACTING
+    </div>
+    <div style="margin-top:8px; width:240px; height:6px; background:rgba(0,8,20,0.8);
+      border:1px solid #00e5ff;">
+      <div id="extract-progress-fill" style="height:100%; width:0%; background:#00e5ff;
+        box-shadow:0 0 10px #00e5ff;"></div>
+    </div>
   </div>
 
   <!-- Tank Designer -->
