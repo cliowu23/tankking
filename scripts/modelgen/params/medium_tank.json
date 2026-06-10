@@ -71,6 +71,57 @@
     "baffleR": 0.1,
     "brakeLen": 0.51
   },
-  "attachments": [],
+  "attachments": [
+    {
+      "part": "antenna",
+      "position": [
+        -0.833,
+        1.56,
+        -2.511
+      ],
+      "rotY": 0,
+      "scale": 0.65
+    },
+    {
+      "part": "tarp",
+      "position": [
+        -1.175,
+        1.131,
+        -2.088
+      ],
+      "rotY": 1.571,
+      "scale": 1.4
+    },
+    {
+      "part": "tarp",
+      "position": [
+        1.134,
+        1.138,
+        -2.108
+      ],
+      "rotY": 1.571,
+      "scale": 1.4
+    },
+    {
+      "part": "headlight",
+      "position": [
+        0.817,
+        1.327,
+        2.466
+      ],
+      "rotY": 0,
+      "scale": 1
+    },
+    {
+      "part": "headlight",
+      "position": [
+        -0.804,
+        1.304,
+        2.482
+      ],
+      "rotY": 0,
+      "scale": 1
+    }
+  ],
   "pins": []
 }
