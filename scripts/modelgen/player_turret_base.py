@@ -4,7 +4,7 @@
 # Tunables come from params/player_tank.json (edited live by the Tank Tuner).
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _lib import (clear_scene, flat_material, assign, add_mount_empty, bevel,
+from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_empty, bevel,
                   finalize_and_export, load_params, STANDARD_RING_DIAMETER,
                   DOCTRINE_COLORS)
 import bpy
@@ -20,7 +20,7 @@ P.update(load_params('player_tank', 'turret'))
 
 clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
-gear_mat = flat_material('gear_dark',  (0.16, 0.155, 0.15, 1.0))
+gear_mat = gear_material()
 
 RING_R   = STANDARD_RING_DIAMETER / 2      # 0.9 — the engine interface, never a slider
 SHELL_Z0 = 0.08

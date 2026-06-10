@@ -5,7 +5,7 @@ import {
   Quaternion,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import { applyModelPaint } from '../utils/modelPaint.js';
+import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { hpColor, yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
@@ -506,11 +506,7 @@ export default class ArenaScene {
     // the same tank — same rule the designer uses, not a hardcoded colour.
     const paint = JSON.parse(localStorage.getItem('selectedPaint') || 'null');  // player paint or null
     const bodyCol = paint ?? PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
-    const cannonMat = new StandardMaterial('playerComposedCannon', this.scene);
-    cannonMat.diffuseColor   = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
-    cannonMat.specularColor  = new Color3(0.05, 0.06, 0.07);
-    cannonMat.specularPower   = 8;
-    cannonMat.backFaceCulling = false;
+    const cannonMat = makePaintMaterial(this.scene, bodyCol);
 
     assembleTank(this.scene, loadout, { cannon: cannonMat }, {
       target: { root: this.tank.root, turretPivot: this.tank.turretPivot, barrelPivot: this.tank.barrelPivot },

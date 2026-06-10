@@ -4,7 +4,8 @@
 # Track geometry is DERIVED from wheel size so sliders can never break the wheel/track fit.
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _lib import (clear_scene, flat_material, assign, add_mount_empty, bevel,
+from _lib import (clear_scene, flat_material, gear_material, track_material,
+                  assign, add_mount_empty, bevel,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
@@ -46,8 +47,8 @@ NOSE_TAPER  = min(1.0, (BODY_W + 0.5) / UPPER_W)
 
 clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
-gear_mat = flat_material('gear_dark',  (0.16, 0.155, 0.15, 1.0))
-trk_mat  = flat_material('track_dark', (0.115, 0.11, 0.105, 1.0))
+gear_mat = gear_material()
+trk_mat  = track_material()
 
 
 def box(name, mat, center, size):
@@ -181,7 +182,7 @@ make_track('track_left',   TRACK_CX)
 # them as live draggable instances instead — same _greebles.py geometry).
 if not tuner_mode():
     paint2 = flat_material('player_body', DOCTRINE_COLORS['player'])
-    dark2 = flat_material('gear_dark', (0.16, 0.155, 0.15, 1.0))
+    dark2 = gear_material()
     for i, att in enumerate(load_params('player_tank', 'attachments') or []):
         builder = GREEBLES.get(att.get('part'))
         if not builder:

@@ -1,4 +1,29 @@
-import { StandardMaterial, Color3 } from '@babylonjs/core';
+import { StandardMaterial, Color3, FresnelParameters } from '@babylonjs/core';
+
+/**
+ * The tank "painted metal" finish — shared by body paint, composed cannons, and
+ * the tuner preview. StandardMaterial (PBR washes out in this scene — see
+ * ART_DIRECTION), but tuned to read as painted steel instead of plastic:
+ * stronger/tighter specular highlight + a subtle fresnel rim catching the light
+ * on curved edges. Cached per color per scene.
+ */
+export function makePaintMaterial(scene, [r, g, b], name = null) {
+  const key = name ?? `tankPaint_${r}_${g}_${b}`;
+  let mat = scene.getMaterialByName(key);
+  if (mat) return mat;
+  mat = new StandardMaterial(key, scene);
+  mat.diffuseColor  = new Color3(r, g, b);
+  mat.specularColor = new Color3(0.32, 0.33, 0.36);   // steel sheen under paint
+  mat.specularPower = 42;                              // tight painted-metal highlight
+  const rim = new FresnelParameters();
+  rim.bias = 0.35; rim.power = 2.5;
+  rim.leftColor  = new Color3(0.22, 0.24, 0.27);       // glancing-angle metal rim
+  rim.rightColor = Color3.Black();
+  mat.emissiveFresnelParameters = rim;
+  mat.emissiveColor = new Color3(1, 1, 1);             // fresnel scales this rim
+  mat.backFaceCulling = false;
+  return mat;
+}
 
 // Mesh name patterns that should NOT be painted.
 // These are parts that would remain their natural color on a real tank:
@@ -41,23 +66,13 @@ export function applyModelPaint(meshes, config, scene, colorOverride = null) {
   const paintColor = colorOverride ?? config.paintColor;
   if (!paintColor) return;
 
-  const [r, g, b] = paintColor;
-  const key = `modelPaint_${r}_${g}_${b}`;
-
   // Optional per-model skip list for models with generic Object_N names where
   // keyword matching can't work — e.g. "paintSkipMeshes": ["Object_4", "Object_6"]
   const skipSet = new Set(config.paintSkipMeshes ?? []);
 
-  let mat = scene.getMaterialByName(key);
-  if (!mat) {
-    mat = new StandardMaterial(key, scene);
-    mat.diffuseColor  = new Color3(r, g, b);
-    mat.specularColor = new Color3(0.05, 0.06, 0.07);
-    mat.specularPower = 8;
-    // Render both faces — web-optimized GLBs (e.g. the T-44) have thin single-sided
-    // plates and the odd inward-facing mesh that otherwise vanish under backface culling.
-    mat.backFaceCulling = false;
-  }
+  // Painted-metal finish (shared with cannons + tuner); backFaceCulling stays off
+  // for thin single-sided plates in web-optimized GLBs.
+  const mat = makePaintMaterial(scene, paintColor);
 
   const tintColor  = config.tintColor ?? null;
   const matCache   = {}; // shared cache for both paint and tint clones

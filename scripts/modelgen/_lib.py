@@ -58,14 +58,27 @@ def clear_scene():
                 block.remove(item)
 
 
-def flat_material(name, rgba):
+def flat_material(name, rgba, rough=0.9, metallic=0.0):
     mat = bpy.data.materials.get(name)
     if mat is None:
         mat = bpy.data.materials.new(name)
         mat.use_nodes = True
-        mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = rgba
-        mat.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.9
+        bsdf = mat.node_tree.nodes['Principled BSDF']
+        bsdf.inputs['Base Color'].default_value = rgba
+        bsdf.inputs['Roughness'].default_value = rough
+        bsdf.inputs['Metallic'].default_value = metallic
     return mat
+
+
+def gear_material():
+    """Dark gunmetal for running gear / fittings — metallic so it reads as steel
+    in-game (unpaintable meshes keep this GLB material at runtime)."""
+    return flat_material('gear_dark', (0.16, 0.155, 0.15, 1.0), rough=0.45, metallic=0.65)
+
+
+def track_material():
+    """Track rubber/steel — less shiny than fittings, still not plastic."""
+    return flat_material('track_dark', (0.115, 0.11, 0.105, 1.0), rough=0.62, metallic=0.35)
 
 
 def assign(obj, mat):

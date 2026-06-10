@@ -4,7 +4,7 @@ import {
   Vector3, Matrix, DynamicTexture, TransformNode, SceneLoader, Quaternion,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import { applyModelPaint } from '../utils/modelPaint.js';
+import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
@@ -562,12 +562,7 @@ export default class TankDesignerScene {
     // reads as part of the tank, matching the hull/turret paint.
     const paint = this._selectedPaint ?? null;   // player paint, or null = each part's own colour
     const bodyCol = paint ?? PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
-    const cannonMat = new StandardMaterial('compCannon', this.scene);
-    cannonMat.diffuseColor  = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
-    cannonMat.specularColor = new Color3(0.05, 0.06, 0.07);
-    cannonMat.specularPower = 8;
-    cannonMat.backFaceCulling = false;  // barrel base faces don't cull -> no floating gap
-    this._toDispose.push(cannonMat);
+    const cannonMat = makePaintMaterial(this.scene, bodyCol);  // shared painted-metal finish
 
     assembleTank(this.scene, loadout, { cannon: cannonMat }, { paint })
       .then(tank => {

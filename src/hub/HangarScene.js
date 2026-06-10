@@ -12,7 +12,7 @@ import { buildKitchen } from './HangarKitchen.js';
 import { buildMapTable } from './HangarMapTable.js';
 import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
-import { applyModelPaint } from '../utils/modelPaint.js';
+import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
@@ -332,10 +332,7 @@ export default class HangarScene {
       const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
         ?? DEFAULT_LOADOUT;
       const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
-      const cannonMat = new StandardMaterial('hangarComposedCannon', s);
-      cannonMat.diffuseColor    = new Color3(bodyCol[0], bodyCol[1], bodyCol[2]);
-      cannonMat.specularColor   = new Color3(0.05, 0.06, 0.07);
-      cannonMat.backFaceCulling = false;
+      const cannonMat = makePaintMaterial(s, bodyCol);
       let assembled;
       try {
         assembled = await assembleTank(s, loadout, { cannon: cannonMat });
