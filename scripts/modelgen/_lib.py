@@ -78,8 +78,8 @@ def gear_material():
 
 
 def track_material():
-    """Track metal — near-black, mostly dielectric so the dark base color shows."""
-    return flat_material('track_dark', (0.055, 0.053, 0.05, 1.0), rough=0.72, metallic=0.12)
+    """Track metal — effectively black, fully dielectric, matte."""
+    return flat_material('track_dark', (0.028, 0.027, 0.025, 1.0), rough=0.82, metallic=0.05)
 
 
 def assign(obj, mat):
