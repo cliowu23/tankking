@@ -9,3 +9,4 @@ architecture/verify-screenshots/
 .playwright-mcp/
 /*.png
 .obsidian/
+__pycache__/
