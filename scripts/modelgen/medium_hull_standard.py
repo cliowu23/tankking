@@ -64,17 +64,30 @@ make_box('hull_driver_step', body_mat,
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
     make_box(f'fender_{side}', body_mat, (x, 0.0, FENDER_Z), (TRACK_W + 0.06, HULL_LEN * 0.98, 0.07))
 
-# ── Schuerzen: 4 segmented skirt plates per side + dark hanger bars ─────────
-SKIRT_X   = TRACK_CX + TRACK_W / 2 + 0.10
-SKIRT_LEN = HULL_LEN * 0.17
+# ── Schuerzen: continuous wall — plates hang edge-to-edge from a mounting rail
+# (real Pz III M arrangement; "make sure they are all connected")
+SKIRT_X    = TRACK_CX + TRACK_W / 2 + 0.10
+SKIRT_SPAN = HULL_LEN * 0.74
+SKIRT_H    = 0.76
+SKIRT_ZC   = FENDER_Z - 0.10
+N_PLATES   = 4
+PLATE_L    = SKIRT_SPAN / N_PLATES + 0.015          # slight overlap → no gaps
 for side, sx in (('r', -1), ('l', 1)):
-    for i in range(4):
-        y = -HULL_LEN * 0.33 + (HULL_LEN * 0.66) * i / 3
+    # continuous top mounting rail tying the whole wall together
+    make_box(f'skirt_rail_{side}_trim_dark', gear_mat,
+             (sx * (SKIRT_X - 0.025), 0, SKIRT_ZC + SKIRT_H / 2 + 0.015),
+             (0.10, SKIRT_SPAN + 0.12, 0.06))
+    for i in range(N_PLATES):
+        y = -SKIRT_SPAN / 2 + PLATE_L * (i + 0.5) - 0.0075
         p = make_box(f'skirt_plate_{side}{i}', body_mat,
-                     (sx * SKIRT_X, y, FENDER_Z - 0.12), (0.035, SKIRT_LEN, 0.74))
+                     (sx * SKIRT_X, y, SKIRT_ZC), (0.035, PLATE_L, SKIRT_H))
         bevel(p, width=0.012, segments=1)
-        make_box(f'skirt_hanger_{side}{i}_trim_dark', gear_mat,
-                 (sx * (SKIRT_X - 0.06), y, FENDER_Z + 0.02), (0.12, 0.05, 0.035))
+    # hanger tabs at the plate seams, connecting rail to plates
+    for i in range(N_PLATES + 1):
+        y = -SKIRT_SPAN / 2 + PLATE_L * i - 0.0075 * (1 if 0 < i < N_PLATES else 0)
+        make_box(f'skirt_tab_{side}{i}_trim_dark', gear_mat,
+                 (sx * (SKIRT_X - 0.01), max(min(y, SKIRT_SPAN / 2), -SKIRT_SPAN / 2),
+                  SKIRT_ZC + SKIRT_H / 2 - 0.04), (0.06, 0.05, 0.14))
 
 # ── Running gear: FRONT drive sprocket, rear idler (authentic Pz III) ───────
 for side, x in (('r', -TRACK_CX), ('l', TRACK_CX)):

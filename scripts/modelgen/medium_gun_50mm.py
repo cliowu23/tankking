@@ -28,8 +28,15 @@ def cyl(name, r, depth, z, verts=14):
 
 cyl('gun_sleeve', P['sleeveR'], P['sleeveL'], P['sleeveL'] / 2)
 cyl('gun_tube', P['tubeR'], P['tubeL'], P['tubeL'] / 2)
-# Small single-baffle brake — restrained, fits the slim 50mm
-bevel(cyl('gun_brake_baffle', P['baffleR'], 0.08, P['tubeL'] + P['brakeLen'] * 0.5), width=0.015, segments=2)
-cyl('gun_muzzle_tip', P['tubeR'] * 0.8, 0.07, P['tubeL'] + P['brakeLen'] + 0.04, verts=10)
+# Ball-style muzzle brake — the Pz III KwK signature: globular single chamber
+bpy.ops.mesh.primitive_uv_sphere_add(segments=14, ring_count=8, radius=P['baffleR'],
+                                     location=(0, 0, P['tubeL'] + P['baffleR'] * 0.5))
+ball = bpy.context.object
+ball.name = 'gun_brake_ball'
+ball.scale = (1.0, 1.0, 1.15)            # slightly egg-shaped along the bore
+bpy.ops.object.transform_apply(scale=True)
+assign(ball, gun_mat)
+cyl('gun_muzzle_tip', P['tubeR'] * 0.8, 0.08,
+    P['tubeL'] + P['baffleR'] * 0.5 + P['baffleR'] * 1.15 + 0.02, verts=10)
 
 finalize_and_export('medium_gun_50mm')

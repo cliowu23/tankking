@@ -15,7 +15,7 @@
   },
   "turret": {
     "shellR1": 0.95,
-    "shellR2": 0.76,
+    "shellR2": 0.84,
     "shellH": 0.55,
     "shellElong": 1.15,
     "bustleW": 0.0,

@@ -32,18 +32,21 @@ ring = bpy.context.object
 ring.name = 'turret_ring'
 assign(ring, body_mat)
 
-# Faceted shell — 10 flat sides (angular, deliberately NOT the player's round cast)
-bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=P['shellR1'], radius2=P['shellR2'],
-                                depth=SHELL_H, location=(0, 0, SHELL_Z0 + SHELL_H / 2))
+# Boxy faceted shell — 8 flat sides with a FLAT FACE square to the front (rotated
+# half a facet) and minimal taper: reads as an angular welded box, not a cone.
+bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=P['shellR1'], radius2=P['shellR2'],
+                                depth=SHELL_H, location=(0, 0, SHELL_Z0 + SHELL_H / 2),
+                                rotation=(0, 0, math.pi / 8))
 shell = bpy.context.object
 shell.name = 'turret_shell'
 shell.scale = (1.0, P['shellElong'], 1.0)
 bpy.ops.object.transform_apply(scale=True)
 assign(shell, body_mat)
 
-# Schuerzen turret skirt: thin 8-facet band floating around the shell
+# Schuerzen turret skirt: thin 8-facet band, facets aligned with the shell
 bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=P['shellR1'] + 0.20, depth=0.46,
-                                    location=(0, -0.02, SHELL_Z0 + 0.26))
+                                    location=(0, -0.02, SHELL_Z0 + 0.26),
+                                    rotation=(0, 0, math.pi / 8))
 skirtband = bpy.context.object
 skirtband.name = 'skirt_turret_band'
 skirtband.scale = (1.0, 1.18, 1.0)
