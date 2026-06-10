@@ -1,4 +1,10 @@
-# [Your Game Title] — Design Document
+# [Your Game Title] — Design Document (V1 — SUPERSEDED)
+
+> ⚠️ **SUPERSEDED (2026-06-07): this is the V1 design, kept for history only.**
+> The authoritative V2 design lives in the root `CLAUDE.md` (extraction roguelite,
+> classless tank, flat-shot combat, parts from the world). Where this document
+> disagrees with `CLAUDE.md` — charge-to-fire, fixed chassis classes, the RP
+> research tree unlocking parts, wave-based arena runs — **V2 wins.**
 
 > **Sticky Note:** *"Build your tank in the garage. Survive arena waves. Earn RP. Research new parts. Build something nastier next run."*
 
