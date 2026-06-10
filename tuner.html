@@ -79,7 +79,7 @@ const PAINT = new BABYLON.Color3(0.12, 0.42, 0.88);   // cobalt — current play
 const UNPAINTABLE = ['track','tread','wheel','sprocket','idler','roller','bogie','suspension',
   'tire','vehicle-gear','lens','glass','optic','periscope','sight','vision','interior','crew',
   'engine','rubber','seal','exhaust','muffler','antenna','aerial','machinegun','machine_gun',
-  'dshk','coaxial','mg','laser'];
+  'dshk','coaxial','mg','laser','mantlet'];
 const isPaintable = n => n && n !== '__root__' && !UNPAINTABLE.some(k => n.toLowerCase().includes(k));
 
 // Slider schema — keys match params/player_tank.json; group → which part regenerates.

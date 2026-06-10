@@ -15,6 +15,7 @@ const UNPAINTABLE = [
   'antenna', 'aerial',
   'machinegun', 'machine_gun', 'dshk', 'coaxial', 'mg',
   'laser',
+  'mantlet',                 // mantlet group reads as dark canvas cover (art decision, pass 2)
 ];
 
 function isPaintable(name) {

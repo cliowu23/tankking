@@ -62,6 +62,10 @@ bpy.ops.object.transform_apply(scale=True)
 bevel(bustle, width=0.09, segments=3)
 assign(bustle, body_mat)
 
+# Mantlet group — ALL dark gunmetal (tuning pass 2: "blend into the turret more
+# organically, introduce more blacks"). Reads as the canvas dust cover on real
+# tanks; 'mantlet' is an UNPAINTABLE keyword so runtime paint never touches it.
+
 # Gun mantlet: chunky curved-face block at the gun mount
 bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=P['mantletR'], depth=P['mantletW'],
                                     location=(0, MOUNT[1] - 0.02, MOUNT[2]),
@@ -70,22 +74,33 @@ mantlet = bpy.context.object
 mantlet.name = 'gun_mantlet'
 mantlet.scale = (1.0, 0.85, 1.0)
 bpy.ops.object.transform_apply(scale=True)
-assign(mantlet, body_mat)
+bevel(mantlet, width=0.03, segments=2)
+assign(mantlet, gear_mat)
 
-# Mantlet hood: tapered collar blending the mantlet into the shell front
-# (tuning-pass pin: "add another piece to better blend the mantlet into the turret")
+# Seal collar: fat soft ring right behind the mantlet — the organic transition
+bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=P['mantletR'] + 0.07, depth=P['mantletW'] * 0.62,
+                                    location=(0, MOUNT[1] + 0.17, MOUNT[2]),
+                                    rotation=(0, math.pi / 2, 0))
+seal = bpy.context.object
+seal.name = 'mantlet_seal'
+seal.scale = (1.0, 0.9, 1.0)
+bpy.ops.object.transform_apply(scale=True)
+bevel(seal, width=0.07, segments=3)
+assign(seal, gear_mat)
+
+# Mantlet hood: tapered collar carrying the dark mass up into the shell front
 hood_y0 = MOUNT[1] + 0.16                 # just behind the mantlet
-bpy.ops.mesh.primitive_cube_add(location=(0, hood_y0 + 0.26, MOUNT[2] + 0.02))
+bpy.ops.mesh.primitive_cube_add(location=(0, hood_y0 + 0.28, MOUNT[2] + 0.02))
 hood = bpy.context.object
 hood.name = 'mantlet_hood'
-hood.scale = (P['mantletW'] * 0.46, 0.26, P['mantletR'] + 0.10)
+hood.scale = (P['mantletW'] * 0.44, 0.28, P['mantletR'] + 0.08)
 bpy.ops.object.transform_apply(scale=True)
 for v in hood.data.vertices:              # taper: narrower + lower at the mantlet end
-    if v.co.y < hood_y0 + 0.26:
+    if v.co.y < hood_y0 + 0.28:
         v.co.x *= 0.82
         v.co.z = (v.co.z - (MOUNT[2] + 0.02)) * 0.85 + (MOUNT[2] + 0.02)
-bevel(hood, width=0.05, segments=2)
-assign(hood, body_mat)
+bevel(hood, width=0.08, segments=3)
+assign(hood, gear_mat)
 
 # Commander's cupola — tank's RIGHT = Blender -X
 bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=P['cupolaR'], depth=0.20,

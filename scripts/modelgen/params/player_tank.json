@@ -1,8 +1,8 @@
 {
   "hull": {
     "hullLen": 6.05,
-    "bodyW": 2.35,
-    "trackW": 0.7,
+    "bodyW": 2.1,
+    "trackW": 0.74,
     "groundClear": 0.52,
     "beltZ": 1.3,
     "hullTop": 1.72,

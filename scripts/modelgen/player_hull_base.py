@@ -4,7 +4,7 @@
 # Track geometry is DERIVED from wheel size so sliders can never break the wheel/track fit.
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _lib import (clear_scene, flat_material, assign, add_mount_empty,
+from _lib import (clear_scene, flat_material, assign, add_mount_empty, bevel,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
@@ -37,11 +37,12 @@ END_R       = TRACK_R_IN              # they fill the band's end caps exactly
 WHEEL_Y1    = END_CY - END_R - WHEEL_R - 0.06
 WHEEL_Y0    = -WHEEL_Y1
 FENDER_Z    = WHEEL_Z + TRACK_R_OUT + 0.11
-# Upper hull spans the FULL width over the fenders (Panther/real-M26 style —
-# fixes the "narrow wedge between wide tracks" read; tuning-pass pin #8). The
-# wide deck starts above the track top, never inside it.
-UPPER_W     = 2 * TRACK_CX + TRACK_W - 0.08
+# Upper hull stays INSIDE the track guards (tuning pass 2: "make the hull not
+# overlap with the trackguards") — flush with the lower hull, fenders exposed.
+UPPER_W     = BODY_W
 UPPER_Z0    = max(LOWER_Z1, WHEEL_Z + TRACK_R_OUT + 0.06)
+# Glacis nose taper only when the upper hull is wider than the nose target
+NOSE_TAPER  = min(1.0, (BODY_W + 0.5) / UPPER_W)
 
 clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
@@ -120,7 +121,7 @@ upper = box('hull_upper', body_mat, (0, 0, (UPPER_Z0 + UPPER_Z1) / 2),
 for v in upper.data.vertices:
     if v.co.y < 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
         v.co.y += P['glacisPull']                   # main glacis slope
-        v.co.x *= (BODY_W + 0.5) / UPPER_W          # glacis narrows toward the nose
+        v.co.x *= NOSE_TAPER                        # glacis narrows toward the nose
     if v.co.y > 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
         v.co.y -= P['rearDeckPull']                 # rear deck slope
 
@@ -128,12 +129,13 @@ for v in upper.data.vertices:
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
     box(f'fender_{side}', body_mat, (x, 0.05, FENDER_Z), (TRACK_W + 0.06, HULL_LEN * 0.98, 0.08))
 
-# Flat, wide stowage bins at track-guard level (tuning-pass pins). With the
-# full-width upper hull the fender top is enclosed, so the bins mount proud of
-# the hull sides at fender height — the Panther solution, reads as fender bins.
-for side, x in (('right', -(UPPER_W / 2 + 0.02)), ('left', UPPER_W / 2 + 0.02)):
-    box(f'stowage_bin_{side}', body_mat, (x, 0.85, FENDER_Z + 0.20),
-        (0.28, 1.6, 0.32))
+# M26-style fender stowage: flat, wide bins ON the track guards, ~70% of the
+# guard length (tuning pass 2 pin — "look at how the m26 looks").
+BIN_LEN = HULL_LEN * 0.98 * 0.70
+for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
+    b = box(f'stowage_bin_{side}', body_mat, (x, 0.25, FENDER_Z + 0.04 + 0.09),
+            (TRACK_W - 0.08, BIN_LEN, 0.18))
+    bevel(b, width=0.025, segments=2)
 
 # Twin Tiger-style exhausts on the rear plate (tuning-pass pin), armored-shroud look
 rear_y = HULL_LEN / 2

@@ -28,13 +28,28 @@ def cyl(name, r, depth, z, verts=16):
     return o
 
 
+from _lib import bevel
+
 cyl('gun_sleeve', P['sleeveR'], P['sleeveL'], P['sleeveL'] / 2)
 cyl('gun_tube', P['tubeR'], TUBE_L, TUBE_L / 2)
-# Double-baffle muzzle brake: two discs + connecting core + muzzle cap
+
+# Chambered double-baffle muzzle brake (tuning pass 2: "enhance the detail"):
+# two thick rounded baffles, top+bottom frame plates closing the chambers so the
+# side openings read, a core, and a stepped muzzle tip.
 b = P['brakeLen']
-cyl('gun_brake_baffle_1', P['baffleR'], 0.09, TUBE_L + b * 0.24)
-cyl('gun_brake_baffle_2', P['baffleR'], 0.09, TUBE_L + b * 0.71)
-cyl('gun_brake_core', P['tubeR'] + 0.01, b, TUBE_L + b / 2, verts=12)
-cyl('gun_muzzle_cap', 0.10, 0.10, TUBE_L + b, verts=12)
+R = P['baffleR']
+z1, z2 = TUBE_L + b * 0.24, TUBE_L + b * 0.71
+bevel(cyl('gun_brake_baffle_1', R, 0.11, z1), width=0.02, segments=2)
+bevel(cyl('gun_brake_baffle_2', R, 0.11, z2), width=0.02, segments=2)
+cyl('gun_brake_core', P['tubeR'] + 0.012, b, TUBE_L + b / 2, verts=12)
+for i, y in ((0, R - 0.045), (1, -(R - 0.045))):     # frame plates → open side chambers
+    bpy.ops.mesh.primitive_cube_add(location=(0, y, (z1 + z2) / 2))
+    o = bpy.context.object
+    o.name = f'gun_brake_frame_{i}'
+    o.scale = (R * 0.74, 0.038, (z2 - z1) / 2 + 0.05)
+    bpy.ops.object.transform_apply(scale=True)
+    assign(o, gun_mat)
+bevel(cyl('gun_muzzle_step', R * 0.62, 0.10, TUBE_L + b + 0.03, verts=14), width=0.015, segments=2)
+cyl('gun_muzzle_tip', P['tubeR'] * 0.78, 0.07, TUBE_L + b + 0.10, verts=12)
 
 finalize_and_export('player_gun_90mm')
