@@ -3,6 +3,8 @@
 # Run any part script headless:  blender --background --python scripts/modelgen/<part>.py
 # Contract: _docs/TANKING_MODEL_SPEC.md → "INTEGRATION CONTRACT".
 import bpy
+import bmesh
+import math
 import os
 
 # One ring diameter for ALL doctrines — cross-doctrine turret/hull mixes compose at
@@ -85,6 +87,62 @@ def track_material():
 def assign(obj, mat):
     obj.data.materials.clear()
     obj.data.materials.append(mat)
+
+
+def make_box(name, mat, center, size):
+    bpy.ops.mesh.primitive_cube_add(location=center)
+    o = bpy.context.object
+    o.name = name
+    o.scale = (size[0] / 2, size[1] / 2, size[2] / 2)
+    bpy.ops.object.transform_apply(scale=True)
+    assign(o, mat)
+    return o
+
+
+def make_wheel(name, mat, x, y, z, r, depth, verts=24):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=depth,
+                                        location=(x, y, z), rotation=(0, math.pi / 2, 0))
+    o = bpy.context.object
+    o.name = name
+    assign(o, mat)
+    return o
+
+
+def make_track_band(name, mat, x_center, track_w, end_cy, cz, r_out, r_in, n_arc=12):
+    """Closed track band: stadium ribbon (outer/inner walls + side annuli) wrapping
+    the idler and sprocket circles. One manifold mesh. (Hoisted from the player
+    hull — the proven Batch-1 geometry, shared by every tracked vehicle.)"""
+    def loop_pts(r):
+        pts = []
+        for i in range(n_arc + 1):
+            t = math.pi * i / n_arc
+            pts.append((end_cy + r * math.sin(t), cz - r * math.cos(t)))
+        for i in range(n_arc + 1):
+            t = math.pi * i / n_arc
+            pts.append((-end_cy - r * math.sin(t), cz + r * math.cos(t)))
+        return pts
+
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    xl, xr = x_center - track_w / 2, x_center + track_w / 2
+    V = {}
+    for tag, r in (('out', r_out), ('in', r_in)):
+        for side, x in (('l', xl), ('r', xr)):
+            V[(tag, side)] = [bm.verts.new((x, y, z)) for (y, z) in loop_pts(r)]
+    n = len(V[('out', 'l')])
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((V[('out', 'l')][i], V[('out', 'l')][j], V[('out', 'r')][j], V[('out', 'r')][i]))
+        bm.faces.new((V[('in', 'l')][j],  V[('in', 'l')][i],  V[('in', 'r')][i],  V[('in', 'r')][j]))
+        bm.faces.new((V[('out', 'l')][j], V[('out', 'l')][i], V[('in', 'l')][i],  V[('in', 'l')][j]))
+        bm.faces.new((V[('out', 'r')][i], V[('out', 'r')][j], V[('in', 'r')][j],  V[('in', 'r')][i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    assign(o, mat)
+    return o
 
 
 def bevel(obj, width=0.05, segments=2):

@@ -75,7 +75,18 @@
 const HELPER = 'http://localhost:7077';
 const ASSETS = '/assets/models/tanks/parts/';
 const RING_STD = 1.8;
-const PAINT = new BABYLON.Color3(0.12, 0.42, 0.88);   // cobalt — current player default
+// Multi-tank: open /tuner.html?tank=medium_tank (default = player_tank)
+const TANK = new URLSearchParams(location.search).get('tank') ?? 'player_tank';
+const TANK_FILES = {
+  player_tank: ['player_hull_base.glb', 'player_turret_base.glb', 'player_gun_90mm.glb'],
+  medium_tank: ['medium_hull_standard.glb', 'medium_turret_angular.glb', 'medium_gun_50mm.glb'],
+};
+const TANK_PAINTS = {
+  player_tank: new BABYLON.Color3(0.12, 0.42, 0.88),   // cobalt
+  medium_tank: new BABYLON.Color3(0.78, 0.66, 0.43),   // doctrine sand
+};
+const PAINT = TANK_PAINTS[TANK] ?? TANK_PAINTS.player_tank;
+document.querySelector('h1').textContent = `⚙ TANK TUNER — ${TANK}`;
 const UNPAINTABLE = ['track','tread','wheel','sprocket','idler','roller','bogie','suspension',
   'tire','vehicle-gear','lens','glass','optic','periscope','sight','vision','interior','crew',
   'engine','rubber','seal','exhaust','muffler','antenna','aerial','machinegun','machine_gun',
@@ -176,13 +187,14 @@ function paintMeshes(meshes, all = false) {
 async function loadTank() {
   if (tankRoot) tankRoot.dispose();
   tankRoot = new BABYLON.TransformNode('tank', scene);
-  const hull = await importPart('player_hull_base.glb');
+  const [hullFile, turretFile, gunFile] = TANK_FILES[TANK];
+  const hull = await importPart(hullFile);
   hull.root.parent = tankRoot;
   paintMeshes(hull.meshes);
-  const tur = await importPart('player_turret_base.glb');
+  const tur = await importPart(turretFile);
   tur.root.parent = tankRoot; tur.root.position = hull.ring ?? new BABYLON.Vector3(0,1.7,0);
   paintMeshes(tur.meshes);
-  const gun = await importPart('player_gun_90mm.glb');
+  const gun = await importPart(gunFile);
   gun.root.parent = tur.root;
   gun.root.position = tur.mount ?? new BABYLON.Vector3(0,0.34,1.0);
   gun.root.rotation.x = Math.PI/2;                    // same as the game part module
@@ -220,7 +232,7 @@ async function regen(parts) {
   try {
     const r = await fetch(HELPER + '/regen', { method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ params: canonParams(), parts }) });
+      body: JSON.stringify({ tank: TANK, params: canonParams(), parts }) });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'regen failed');
     await loadTank();
@@ -320,14 +332,14 @@ document.getElementById('dump').onclick = async () => {
   box.style.display = 'block'; box.value = txt;
   try { await navigator.clipboard.writeText(txt); } catch (e) { /* box has it */ }
   await fetch(HELPER + '/save', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ params: canon }) });
+    body: JSON.stringify({ tank: TANK, params: canon }) });
   status('✓ canon saved + JSON copied');
 };
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 (async () => {
   try {
-    params = await (await fetch(HELPER + '/params')).json();
+    params = await (await fetch(HELPER + `/params?tank=${TANK}`)).json();
   } catch (e) {
     status('✗ helper not running — start: node scripts/modelgen/tuner-server.mjs');
     return;
