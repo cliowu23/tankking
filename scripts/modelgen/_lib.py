@@ -73,6 +73,17 @@ def assign(obj, mat):
     obj.data.materials.append(mat)
 
 
+def bevel(obj, width=0.05, segments=2):
+    """Round an object's hard edges (angle-limited bevel, applied immediately)."""
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    m = obj.modifiers.new('bvl', 'BEVEL')
+    m.width, m.segments, m.limit_method = width, segments, 'ANGLE'
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    return obj
+
+
 def add_mount_empty(name, location):
     """Mount empties per the Integration Contract: 'turret' on hulls, 'mount' on turrets."""
     empty = bpy.data.objects.new(name, None)

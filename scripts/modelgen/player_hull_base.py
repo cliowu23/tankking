@@ -32,9 +32,16 @@ TRACK_R_IN  = WHEEL_R + 0.02          # band inner radius — wheels show throug
 WHEEL_Z     = TRACK_R_OUT             # wheel axle height
 END_CY      = HULL_LEN / 2 - 0.40     # idler / sprocket centers
 END_R       = TRACK_R_IN              # they fill the band's end caps exactly
-WHEEL_Y1    = END_CY - 0.55           # road-wheel span
+# Road-wheel span DERIVED from the idler/sprocket radii so the end wheels can
+# NEVER clip the drive wheels, at any slider combination (tuning-pass pins #1-4).
+WHEEL_Y1    = END_CY - END_R - WHEEL_R - 0.06
 WHEEL_Y0    = -WHEEL_Y1
 FENDER_Z    = WHEEL_Z + TRACK_R_OUT + 0.11
+# Upper hull spans the FULL width over the fenders (Panther/real-M26 style —
+# fixes the "narrow wedge between wide tracks" read; tuning-pass pin #8). The
+# wide deck starts above the track top, never inside it.
+UPPER_W     = 2 * TRACK_CX + TRACK_W - 0.08
+UPPER_Z0    = max(LOWER_Z1, WHEEL_Z + TRACK_R_OUT + 0.06)
 
 clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
@@ -108,17 +115,39 @@ for v in lower.data.vertices:                       # lower glacis: bottom-front
     if v.co.y < 0 and v.co.z < (LOWER_Z0 + LOWER_Z1) / 2:
         v.co.y += P['lowerGlacisPull']
 
-upper = box('hull_upper', body_mat, (0, 0, (LOWER_Z1 + UPPER_Z1) / 2),
-            (BODY_W, HULL_LEN, UPPER_Z1 - LOWER_Z1))
+upper = box('hull_upper', body_mat, (0, 0, (UPPER_Z0 + UPPER_Z1) / 2),
+            (UPPER_W, HULL_LEN, UPPER_Z1 - UPPER_Z0))
 for v in upper.data.vertices:
-    if v.co.y < 0 and v.co.z > (LOWER_Z1 + UPPER_Z1) / 2:
+    if v.co.y < 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
         v.co.y += P['glacisPull']                   # main glacis slope
-    if v.co.y > 0 and v.co.z > (LOWER_Z1 + UPPER_Z1) / 2:
+        v.co.x *= (BODY_W + 0.5) / UPPER_W          # glacis narrows toward the nose
+    if v.co.y > 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
         v.co.y -= P['rearDeckPull']                 # rear deck slope
 
 # Fenders over the tracks (body color, like the real vehicle)
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
     box(f'fender_{side}', body_mat, (x, 0.05, FENDER_Z), (TRACK_W + 0.06, HULL_LEN * 0.98, 0.08))
+
+# Flat, wide stowage bins at track-guard level (tuning-pass pins). With the
+# full-width upper hull the fender top is enclosed, so the bins mount proud of
+# the hull sides at fender height — the Panther solution, reads as fender bins.
+for side, x in (('right', -(UPPER_W / 2 + 0.02)), ('left', UPPER_W / 2 + 0.02)):
+    box(f'stowage_bin_{side}', body_mat, (x, 0.85, FENDER_Z + 0.20),
+        (0.28, 1.6, 0.32))
+
+# Twin Tiger-style exhausts on the rear plate (tuning-pass pin), armored-shroud look
+rear_y = HULL_LEN / 2
+for i, x in ((0, -0.38), (1, 0.38)):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.115, depth=0.62,
+                                        location=(x, rear_y + 0.06, LOWER_Z1 + 0.18))
+    o = bpy.context.object
+    o.name = f'exhaust_pipe_{i}'
+    assign(o, gear_mat)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.085, depth=0.14,
+                                        location=(x, rear_y + 0.06, LOWER_Z1 + 0.18 + 0.36))
+    cap = bpy.context.object
+    cap.name = f'exhaust_tip_{i}'
+    assign(cap, gear_mat)
 
 # Driver + co-driver hatches on the glacis top
 for side, x in (('driver', -0.55), ('codriver', 0.55)):
@@ -130,7 +159,8 @@ for side, x in (('driver', -0.55), ('codriver', 0.55)):
 
 # Rear engine deck grilles ('engine' keyword → stays dark at runtime)
 for i, fy in enumerate((0.49, 0.68, 0.86)):
-    box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, UPPER_Z1 + 0.015), (1.7, 0.42, 0.05))
+    box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, UPPER_Z1 + 0.015),
+        (UPPER_W * 0.58, 0.42, 0.05))
 
 # ── Running gear: N road wheels + idler + sprocket per side ─────────────────
 for side, x in (('r', -TRACK_CX), ('l', TRACK_CX)):
