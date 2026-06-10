@@ -10,6 +10,7 @@ from _lib import (clear_scene, flat_material, gear_material, track_material,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
+from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
 import bpy
 
 P = {
@@ -127,6 +128,22 @@ if not tuner_mode():
         obj.rotation_euler = (0, 0, -att.get('rotY', 0))
         s = att.get('scale', 1)
         obj.scale = (s, s, s)
+
+# ── Tertiary detail pass (Detail Doctrine) ───────────────────────────────────
+# Driver plate (the stepped bow's vertical face — anchors from the canon profile)
+_dp_y = -2.2 if not P.get('hullProfile') else -max(gz for gz, gy in P['hullProfile'][2:5])
+vision_slit('driver', gear_mat, (-0.42, _dp_y - 0.025, HULL_TOP - 0.075), 0.32)
+bolt_row('driverplate', gear_mat, (-0.85, _dp_y - 0.02, HULL_TOP - 0.025),
+         (0.85, _dp_y - 0.02, HULL_TOP - 0.025), 8, 'y')
+_rear_y = (-min(gz for gz, gy in P['hullProfile'])) if P.get('hullProfile') else HULL_LEN / 2
+bolt_row('hullrear', gear_mat, (-0.8, _rear_y + 0.012, LOWER_Z1 + 0.05),
+         (0.8, _rear_y + 0.012, LOWER_Z1 + 0.05), 7, 'y')
+for sx in (-1, 1):                                          # bow tow shackles
+    tow_shackle(f'bow{sx}', gear_mat, (sx * 0.5, -_rear_y * 0.985, 0.95))
+for sy, yy in ((-1, -1.7), (1, 2.3)):                       # lifting eyes x4
+    for sx in (-1, 1):
+        lifting_eye(f'hull{sx}{sy}', gear_mat,
+                    (sx * (BODY_W / 2 - 0.16), yy, HULL_TOP + 0.04))
 
 add_mount_empty('turret', (0, P['ringY'], HULL_TOP))
 finalize_and_export('medium_hull_standard')

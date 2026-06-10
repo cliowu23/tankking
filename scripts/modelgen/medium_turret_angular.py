@@ -7,6 +7,7 @@ from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_e
                   bevel, make_box, finalize_and_export, load_params,
                   STANDARD_RING_DIAMETER, DOCTRINE_COLORS)
 import bpy
+from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
 
 P = {
     'shellR1': 0.95, 'shellR2': 0.76, 'shellH': 0.55, 'shellElong': 1.15,
@@ -84,6 +85,14 @@ assign(cupola, body_mat)
 m = make_box('gun_mantlet', gear_mat, (0, MOUNT[1] - 0.04, MOUNT[2]),
              (0.46, 0.30, 0.42))
 bevel(m, width=0.04, segments=2)
+
+# ── Tertiary detail pass ─────────────────────────────────────────────────────
+periscope('cmdr', gear_mat, (-0.32, -0.45, SHELL_Z0 + SHELL_H + 0.05))
+bolt_row('turfront', gear_mat, (-0.55, -0.02 - SHELL_L / 2 - 0.015, SHELL_Z0 + 0.18),
+         (0.55, -0.02 - SHELL_L / 2 - 0.015, SHELL_Z0 + 0.18), 6, 'y')
+if P['bustleW'] > 0:
+    grab_handle('bustle', gear_mat,
+                (0, P['bustleY'] + P['bustleL'] / 2 + 0.035, SHELL_Z0 + 0.30))
 
 add_mount_empty('mount', MOUNT)
 finalize_and_export('medium_turret_angular')

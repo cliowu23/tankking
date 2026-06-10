@@ -10,6 +10,7 @@ from _lib import (clear_scene, flat_material, gear_material, track_material,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
+from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
 import bpy
 import bmesh
 
@@ -187,6 +188,24 @@ if not tuner_mode():
         obj.scale = (s, s, s)
 
 # ── Turret ring mount (Integration Contract) ────────────────────────────────
+# ── Tertiary detail pass (Detail Doctrine: nameable, repeated, dark) ─────────
+for sx, nrm in ((-1, '-x'), (1, 'x')):                      # belt-line armor join
+    bolt_row(f'hull_belt_{nrm}', gear_mat,
+             (sx * (BODY_W / 2 + 0.012), -HULL_LEN * 0.30, LOWER_Z1 + 0.05),
+             (sx * (BODY_W / 2 + 0.012),  HULL_LEN * 0.38, LOWER_Z1 + 0.05), 9, nrm)
+bolt_row('hull_rear', gear_mat,
+         (-0.8, HULL_LEN / 2 + 0.012, LOWER_Z1 + 0.12),
+         (0.8, HULL_LEN / 2 + 0.012, LOWER_Z1 + 0.12), 7, 'y')
+for sx in (-1, 1):                                          # bow tow shackles
+    tow_shackle(f'bow{sx}', gear_mat, (sx * 0.55, -HULL_LEN / 2 - 0.02, LOWER_Z1 - 0.28))
+for sy in (-1, 1):                                          # crane lifting eyes x4
+    for sx in (-1, 1):
+        lifting_eye(f'hull{sx}{sy}', gear_mat,
+                    (sx * (BODY_W / 2 - 0.18), sy * (HULL_LEN / 2 - 1.0), HULL_TOP + 0.04))
+for sx in (-1, 1):                                          # roof side weld beads
+    weld_seam(f'roof{sx}', gear_mat, (sx * (BODY_W / 2 - 0.01), 0.4, HULL_TOP - 0.015),
+              HULL_LEN * 0.5, 'y')
+
 add_mount_empty('turret', (0, P['ringY'], HULL_TOP))
 
 finalize_and_export('player_hull_base')

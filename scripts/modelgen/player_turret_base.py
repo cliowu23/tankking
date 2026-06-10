@@ -8,6 +8,7 @@ from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_e
                   finalize_and_export, load_params, STANDARD_RING_DIAMETER,
                   DOCTRINE_COLORS)
 import bpy
+from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
 
 P = {
     'shellR1': 1.00, 'shellR2': 0.74, 'shellH': 0.62, 'shellElong': 1.18,
@@ -123,6 +124,14 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.12, depth=0.08,
 vent = bpy.context.object
 vent.name = 'roof_ventilator'
 assign(vent, gear_mat)
+
+# ── Tertiary detail pass ─────────────────────────────────────────────────────
+for sx in (-1, 1):                                          # crew periscopes, front roof
+    periscope(f'roof{sx}', gear_mat, (sx * 0.28, -0.5, SHELL_Z0 + SHELL_H + 0.10))
+for sx in (-1, 1):                                          # turret lifting eyes
+    lifting_eye(f'tur{sx}', gear_mat, (sx * 0.78, 0.15, SHELL_Z0 + SHELL_H - 0.02))
+grab_handle('bustle', gear_mat,
+            (0, P['bustleY'] + P['bustleL'] / 2 + 0.035, 0.40))
 
 add_mount_empty('mount', MOUNT)
 
