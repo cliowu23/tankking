@@ -49,20 +49,20 @@ for v in shell.data.vertices:                      # walls lean in toward the ro
         v.co.y = (v.co.y + 0.02) * (taper * 0.5 + 0.5) - 0.02
 bevel(shell, width=0.035, segments=2)              # soften the welded edges
 
-# Turret Schuerzen: rectangular standoff plates on the sides + rear (front open
-# for the mantlet) — matches the box shell, like the hull skirt wall
+# Turret Schuerzen: side standoff plates only (rear plate REMOVED — clipped the
+# bustle, tuning pin). Each plate carried by TWO stout mount bars that overlap
+# into the tapered shell wall — visibly attached, not floating (tuning pin).
 SK_H, SK_OFF = 0.40, 0.16
+MOUNT_LEN = SK_OFF + 0.22                          # reaches inside the leaning wall
 for side, sx in (('r', -1), ('l', 1)):
     make_box(f'skirt_turret_{side}', body_mat,
              (sx * (SHELL_W / 2 + SK_OFF), -0.02, SHELL_Z0 + 0.26),
              (0.03, SHELL_L * 0.92, SK_H))
-make_box('skirt_turret_rear', body_mat,
-         (0, -0.02 + SHELL_L / 2 + SK_OFF, SHELL_Z0 + 0.26),
-         (SHELL_W * 0.92, 0.03, SK_H))
-for side, sx in (('r', -1), ('l', 1)):             # dark mounts tying plates to shell
-    make_box(f'skirt_turret_mount_{side}_trim_dark', gear_mat,
-             (sx * (SHELL_W / 2 + SK_OFF / 2), -0.02, SHELL_Z0 + 0.42),
-             (SK_OFF, 0.06, 0.04))
+    for j, fy in ((0, -0.30), (1, 0.30)):
+        make_box(f'skirt_turret_mount_{side}{j}_trim_dark', gear_mat,
+                 (sx * (SHELL_W / 2 + SK_OFF + 0.015 - MOUNT_LEN / 2),
+                  -0.02 + SHELL_L * fy, SHELL_Z0 + 0.22),
+                 (MOUNT_LEN, 0.07, 0.06))
 
 # Rear stowage bustle (Cromwell-style bin) — driven by the bustle sliders;
 # all-zero = no bustle

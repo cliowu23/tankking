@@ -1,17 +1,17 @@
 {
   "hull": {
-    "hullLen": 5.4,
+    "hullLen": 5.2,
     "bodyW": 2,
     "trackW": 0.47,
     "groundClear": 0.45,
     "beltZ": 1.26,
     "hullTop": 1.54,
     "glacisPull": 0.18,
-    "lowerGlacisPull": 0.2,
+    "lowerGlacisPull": 0.35,
     "rearDeckPull": 0,
     "wheelR": 0.27,
     "wheelCount": 6,
-    "ringY": -0.15,
+    "ringY": -0.1,
     "hullProfile": [
       [
         2.5,
@@ -22,7 +22,15 @@
         1.26
       ],
       [
-        2.52,
+        2.62,
+        1.38
+      ],
+      [
+        2.2,
+        1.38
+      ],
+      [
+        2.2,
         1.54
       ],
       [
@@ -40,20 +48,20 @@
     ]
   },
   "turret": {
-    "shellR1": 0.95,
-    "shellR2": 0.76,
-    "shellH": 0.55,
-    "shellElong": 1.08,
-    "bustleW": 1.25,
-    "bustleL": 1.2,
-    "bustleH": 0.69,
-    "bustleY": 1.5,
-    "mantletR": 0.44,
-    "mantletW": 0.62,
-    "cupolaR": 0.26,
+    "shellR1": 0.88,
+    "shellR2": 0.7,
+    "shellH": 0.56,
+    "shellElong": 1.14,
+    "bustleW": 1.15,
+    "bustleL": 0.84,
+    "bustleH": 0.43,
+    "bustleY": 1.15,
+    "mantletR": 0.36,
+    "mantletW": 1.18,
+    "cupolaR": 0.33,
     "cupolaX": 0,
-    "mountY": -0.95,
-    "mountZ": 0.3
+    "mountY": -1,
+    "mountZ": 0.35
   },
   "gun": {
     "tubeL": 2.3,

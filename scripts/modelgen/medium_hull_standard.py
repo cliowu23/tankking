@@ -47,9 +47,8 @@ PROFILE = P.get('hullProfile') or default_hull_profile(P)
 make_profile_prism('hull_body', body_mat, PROFILE, BODY_W)
 HULL_TOP = max(gy for _, gy in PROFILE)
 
-# Stepped driver plate proud of the front face
-make_box('hull_driver_step', body_mat,
-         (0, -HULL_LEN / 2 + 0.21, HULL_TOP - 0.13), (BODY_W * 0.96, 0.46, 0.26))
+# (The proud driver-step box is gone — the Pz III stepped bow now lives IN the
+# hull profile itself: nose → belt → shelf → vertical driver plate → roof.)
 
 # Fenders
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
