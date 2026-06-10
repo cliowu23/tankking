@@ -56,6 +56,10 @@ def _join(objs, name):
     bpy.ops.object.join()
     o = bpy.context.object
     o.name = name
+    # Normalize to identity: join inherits the ACTIVE part's object rotation, and
+    # the attachment bake OVERWRITES rotation with the placement yaw — a rotated
+    # first part (tarp!) ended up vertical in-game. Bake it into the mesh instead.
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     return o
 
 
