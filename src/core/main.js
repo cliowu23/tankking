@@ -243,6 +243,7 @@ function startDesigner() {
       document.getElementById('designer-bottom-hint').style.display = 'block';
       window.__state = 'INSPECTOR';
       if (!designerScene) designerScene = new TankDesignerScene(engine, exitDesigner);
+      window.__designer = designerScene; // debug hook (mirrors __arena / __hangar)
       engine.runRenderLoop(() => designerScene.scene.render());
     }
   );

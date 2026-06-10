@@ -130,7 +130,9 @@ The engine scales an equipped turret so its base diameter matches the hull's nat
 models must instead **share ONE standard ring diameter across all doctrines** so every
 hull × turret cross-mix composes at scale = 1 with no overhang:
 
-- `STANDARD_RING_DIAMETER = ⟨measure in Batch 0 — see Priority Build Order⟩`
+- `STANDARD_RING_DIAMETER = 1.8` ✅ **calibrated 2026-06-10** (composed M26 measured base =
+  1.83, so authored turrets also seat on the M26 hull at scale 1.017 during transition).
+  The constant lives in `scripts/modelgen/_lib.py` — use it, never restate the number.
 - Every turret's base cylinder uses this diameter. Every hull's ring/seat is sized to it.
 - Doctrine identity comes from the mass ABOVE the ring (slab vs rounded vs open), never
   from ring size. A huge heavy turret on a tiny scout hull looking slightly absurd is
@@ -420,10 +422,16 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
    *Note: the old extraction-pipeline rule "never transform_apply" applied to IMPORTED
    Sketchfab hierarchies with baked root corrections — it does NOT apply to from-scratch
    authored models, where applying transforms is correct and required.*
-5. **Axis mapping is locked in Batch 0, not assumed.** Blender→glTF→Babylon axis conversion
-   has burned this project before. Batch 0 exports a calibration part with an unambiguous
-   front marker, loads it in the designer, and records the verified Blender-side authoring
-   axes (up / forward) in this section. Every subsequent script uses the recorded convention.
+5. **Axis mapping — ✅ LOCKED by Batch 0 calibration (2026-06-10), measured in the live
+   designer scene** (`scripts/modelgen/calib_hull_axes.py`, front/side markers):
+   - Blender **Z up** → game **Y up**
+   - Blender **−Y** → game **+Z (FORWARD)** — author tanks facing −Y
+   - Blender **+X** → game **−X (LEFT)** — asymmetric details meant for the tank's RIGHT
+     go on Blender **−X**
+   - Empties survive at the equivalent mapping (Blender `(0,0,0.86)` → game `(0,0.86,0)`)
+6. **Never `transform_apply` an empty** — it ZEROES the empty's location, silently
+   destroying the mount points. `_lib.finalize_and_export` applies transforms to meshes
+   only; always export through it.
 
 ### Materials (placeholder)
 - Assign flat diffuse materials with the correct base color for each doctrine
@@ -472,14 +480,13 @@ When the developer reviews a generated model and provides feedback:
 
 Build in this order. Stop and await developer review after each batch.
 
-**Batch 0 — Calibration + pipeline template (no art, ~minutes)**
-0a. Measure the composed M26 in the designer: record its logged turret base diameter
-    (`[turret-m26] base … diameter=` in the console) → set `STANDARD_RING_DIAMETER` in the
-    Integration Contract; record hull footprint (width 3.4 ref) as the player-tank size anchor.
-0b. Write `scripts/modelgen/_lib.py` + one throwaway calibration part (box hull with a front
-    marker + `turret` empty) → export → load composed in the designer. Verifies the full
-    script→GLB→part-module→`assembleTank` chain and locks the Blender authoring axes
-    (record them in the Workflow section).
+**Batch 0 — Calibration + pipeline template — ✅ DONE 2026-06-10**
+0a. ✅ Measured: composed M26 turret base diameter = 1.83 → `STANDARD_RING_DIAMETER = 1.8`.
+0b. ✅ `scripts/modelgen/_lib.py` + `calib_hull_axes.py` (marker hull) → exported → composed
+    with the M26 turret in the designer, correct seating, zero `[validateComposition]`
+    warnings. Axes recorded in the Workflow section. Found + fixed the transform_apply-
+    zeroes-empties trap. Calibration part stays registered (`hull-calib` in the designer
+    sidebar) until Batch 1 replaces it as the pipeline reference.
 
 **⚠️ BATCH 1 IS THE GO/NO-GO GATE.** This project tried procedural parts once before (the
 photoreal cannons) and they failed the developer's visual bar — that's why extraction

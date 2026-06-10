@@ -1,0 +1,74 @@
+# scripts/modelgen/_lib.py
+# Shared helpers for TanKING procedural part generation.
+# Run any part script headless:  blender --background --python scripts/modelgen/<part>.py
+# Contract: _docs/TANKING_MODEL_SPEC.md → "INTEGRATION CONTRACT".
+import bpy
+import os
+
+# One ring diameter for ALL doctrines — cross-doctrine turret/hull mixes compose at
+# scale ≈ 1. Calibrated against the composed M26's measured base (1.83) in Batch 0.
+STANDARD_RING_DIAMETER = 1.8
+
+EXPORT_DIR = os.path.join(os.path.dirname(__file__), '..', '..',
+                          'public', 'assets', 'models', 'tanks', 'parts')
+
+# Doctrine preview colors (runtime paint replaces these — spec "Materials" section)
+DOCTRINE_COLORS = {
+    'light':   (0.545, 0.722, 0.478, 1.0),  # 8BB87A sage
+    'medium':  (0.784, 0.663, 0.431, 1.0),  # C8A96E sand
+    'heavy':   (0.420, 0.482, 0.553, 1.0),  # 6B7B8D steel blue-grey
+    'player':  (0.361, 0.478, 0.306, 1.0),  # 5C7A4E olive (color decision pending)
+    'teadee':  (0.176, 0.290, 0.478, 1.0),  # 2D4A7A navy
+    'tanking': (0.545, 0.102, 0.102, 1.0),  # 8B1A1A deep red
+}
+
+
+def clear_scene():
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
+    for block in (bpy.data.meshes, bpy.data.materials):
+        for item in list(block):
+            if item.users == 0:
+                block.remove(item)
+
+
+def flat_material(name, rgba):
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        mat = bpy.data.materials.new(name)
+        mat.use_nodes = True
+        mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = rgba
+        mat.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.9
+    return mat
+
+
+def assign(obj, mat):
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+
+
+def add_mount_empty(name, location):
+    """Mount empties per the Integration Contract: 'turret' on hulls, 'mount' on turrets."""
+    empty = bpy.data.objects.new(name, None)
+    empty.empty_display_size = 0.2
+    empty.location = location
+    bpy.context.collection.objects.link(empty)
+    return empty
+
+
+def finalize_and_export(part_id):
+    """Apply transforms, sync mesh data names (paint system needs them), export GLB."""
+    # MESHES ONLY — transform_apply on an empty ZEROES its location, which silently
+    # destroys the mount empties ('turret'/'mount'). Found the hard way in Batch 0.
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            obj.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            obj.data.name = obj.name
+    out = os.path.abspath(os.path.join(EXPORT_DIR, f'{part_id}.glb'))
+    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB')
+    print(f'[modelgen] exported {out}')
+    return out
