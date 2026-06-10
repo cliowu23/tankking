@@ -10,6 +10,7 @@ import bpy
 
 P = {
     'shellR1': 0.95, 'shellR2': 0.76, 'shellH': 0.55, 'shellElong': 1.15,
+    'bustleW': 0.0, 'bustleL': 0.0, 'bustleH': 0.0, 'bustleY': 0.0,
     'mantletR': 0.22, 'mantletW': 0.62,
     'cupolaR': 0.26, 'cupolaX': 0.0,
     'mountY': -0.95, 'mountZ': 0.30,
@@ -32,26 +33,44 @@ ring = bpy.context.object
 ring.name = 'turret_ring'
 assign(ring, body_mat)
 
-# Boxy faceted shell — 8 flat sides with a FLAT FACE square to the front (rotated
-# half a facet) and minimal taper: reads as an angular welded box, not a cone.
-bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=P['shellR1'], radius2=P['shellR2'],
-                                depth=SHELL_H, location=(0, 0, SHELL_Z0 + SHELL_H / 2),
-                                rotation=(0, 0, math.pi / 8))
-shell = bpy.context.object
-shell.name = 'turret_shell'
-shell.scale = (1.0, P['shellElong'], 1.0)
-bpy.ops.object.transform_apply(scale=True)
-assign(shell, body_mat)
+# RECTANGULAR shell — Cromwell/Churchill reference (user direction 2026-06-10):
+# slab-sided welded box, near-vertical walls (slight Churchill-style top taper),
+# flat roof, flat front face carrying the mantlet.
+# Param mapping: shellR1 = half-width at base, shellR2 = half-width at roof,
+# length = width * shellElong.
+SHELL_W = P['shellR1'] * 2
+SHELL_L = SHELL_W * P['shellElong']
+shell = make_box('turret_shell', body_mat, (0, -0.02, SHELL_Z0 + SHELL_H / 2),
+                 (SHELL_W, SHELL_L, SHELL_H))
+taper = P['shellR2'] / P['shellR1']
+for v in shell.data.vertices:                      # walls lean in toward the roof
+    if v.co.z > SHELL_Z0 + SHELL_H / 2:
+        v.co.x *= taper
+        v.co.y = (v.co.y + 0.02) * (taper * 0.5 + 0.5) - 0.02
+bevel(shell, width=0.035, segments=2)              # soften the welded edges
 
-# Schuerzen turret skirt: thin 8-facet band, facets aligned with the shell
-bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=P['shellR1'] + 0.20, depth=0.46,
-                                    location=(0, -0.02, SHELL_Z0 + 0.26),
-                                    rotation=(0, 0, math.pi / 8))
-skirtband = bpy.context.object
-skirtband.name = 'skirt_turret_band'
-skirtband.scale = (1.0, 1.18, 1.0)
-bpy.ops.object.transform_apply(scale=True)
-assign(skirtband, body_mat)
+# Turret Schuerzen: rectangular standoff plates on the sides + rear (front open
+# for the mantlet) — matches the box shell, like the hull skirt wall
+SK_H, SK_OFF = 0.40, 0.16
+for side, sx in (('r', -1), ('l', 1)):
+    make_box(f'skirt_turret_{side}', body_mat,
+             (sx * (SHELL_W / 2 + SK_OFF), -0.02, SHELL_Z0 + 0.26),
+             (0.03, SHELL_L * 0.92, SK_H))
+make_box('skirt_turret_rear', body_mat,
+         (0, -0.02 + SHELL_L / 2 + SK_OFF, SHELL_Z0 + 0.26),
+         (SHELL_W * 0.92, 0.03, SK_H))
+for side, sx in (('r', -1), ('l', 1)):             # dark mounts tying plates to shell
+    make_box(f'skirt_turret_mount_{side}_trim_dark', gear_mat,
+             (sx * (SHELL_W / 2 + SK_OFF / 2), -0.02, SHELL_Z0 + 0.42),
+             (SK_OFF, 0.06, 0.04))
+
+# Rear stowage bustle (Cromwell-style bin) — driven by the bustle sliders;
+# all-zero = no bustle
+if P['bustleW'] > 0 and P['bustleL'] > 0 and P['bustleH'] > 0:
+    bustle = make_box('turret_bustle', body_mat,
+                      (0, P['bustleY'], SHELL_Z0 + P['bustleH'] / 2 + 0.04),
+                      (P['bustleW'], P['bustleL'], P['bustleH']))
+    bevel(bustle, width=0.05, segments=2)
 
 # Drum cupola — REAR-CENTER (Pz III signature), beveled rim
 bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=P['cupolaR'], depth=0.24,
