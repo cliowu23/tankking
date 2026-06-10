@@ -17,6 +17,8 @@ export const DRIVER_CHARACTERS = [
   'character-male-d', 'character-male-e', 'character-male-f',
   'character-female-a', 'character-female-b', 'character-female-c',
   'character-female-d', 'character-female-e', 'character-female-f',
+  'char-calib',    // Batch C0 calibration dummy (original) — remove after C1 ships
+  'char-driver-a', // Batch C1 — first ORIGINAL character (CHARACTER_MODEL_SPEC)
 ];
 export const DRIVER_ACCESSORIES = ['none', 'aid-glasses', 'aid-sunglasses', 'aid-mask'];
 
