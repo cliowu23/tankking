@@ -1,32 +1,40 @@
 # player_hull_base — M26 Pershing-inspired hull, original mesh (no third-party geometry).
-# Stylized per TANKING_MODEL_SPEC.md; proportions from the real vehicle:
-#   hull ~6.3m long x 3.5m wide, 6 road wheels/side, rear drive sprocket, front idler,
-#   0.6m tracks, sloped glacis, fenders, rear engine deck.
-# Axes (Batch-0 calibrated): Z=up, -Y=front, -X = tank's RIGHT.
+# Stylized per TANKING_MODEL_SPEC.md. Axes (Batch-0): Z=up, -Y=front, -X = tank's RIGHT.
+# ALL tunables come from params/player_tank.json (edited live by the Tank Tuner).
+# Track geometry is DERIVED from wheel size so sliders can never break the wheel/track fit.
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, assign, add_mount_empty,
-                  finalize_and_export, DOCTRINE_COLORS)
+                  finalize_and_export, load_params, tuner_mode, game_to_blender,
+                  DOCTRINE_COLORS)
+from _greebles import GREEBLES
 import bpy
 import bmesh
 
-# ── Dimensions (1u = 1m game scale) ─────────────────────────────────────────
-HULL_LEN    = 6.3
-BODY_W      = 2.2          # hull body between the tracks
-TRACK_W     = 0.62
-TRACK_GAP   = 0.04         # clearance between body and track
-TRACK_CX    = BODY_W / 2 + TRACK_GAP + TRACK_W / 2   # ±1.45 → total width 3.52
-LOWER_Z0, LOWER_Z1 = 0.50, 1.20    # lower hull box
-UPPER_Z1    = 1.70                  # upper hull top (turret deck)
-GLACIS_PULL = 1.10                  # how far the top-front edge slopes back
-WHEEL_R     = 0.34
-WHEEL_Z     = 0.50
-WHEEL_Y0, WHEEL_Y1 = -2.20, 2.20    # 6 road wheels evenly spaced over this span
-END_CY      = 2.75                  # idler (front) / sprocket (rear) centers ±Y
-END_R       = 0.36                  # idler/sprocket radius (fills the track caps)
-TRACK_R_OUT = 0.50                  # track band outer radius at the caps
-TRACK_R_IN  = 0.36                  # → band thickness 0.14, top run at z=1.0
-RING_Y      = -0.20                 # turret ring slightly forward of center
+# ── Parameters (defaults = current canon; JSON overrides) ───────────────────
+P = {
+    'hullLen': 6.3, 'bodyW': 2.2, 'trackW': 0.62,
+    'groundClear': 0.5, 'beltZ': 1.2, 'hullTop': 1.7,
+    'glacisPull': 1.1, 'lowerGlacisPull': 0.45, 'rearDeckPull': 0.3,
+    'wheelR': 0.34, 'wheelCount': 6, 'ringY': -0.2,
+}
+P.update(load_params('player_tank', 'hull'))
+
+HULL_LEN, BODY_W, TRACK_W = P['hullLen'], P['bodyW'], P['trackW']
+LOWER_Z0, LOWER_Z1, UPPER_Z1 = P['groundClear'], P['beltZ'], P['hullTop']
+WHEEL_R, N_WHEELS = P['wheelR'], int(P['wheelCount'])
+
+# Derived (feedback_no_hardcoding: derive, don't offset) ──────────────────────
+TRACK_GAP   = 0.04
+TRACK_CX    = BODY_W / 2 + TRACK_GAP + TRACK_W / 2
+TRACK_R_OUT = WHEEL_R + 0.16          # band outer radius — bottom run sits at z=0
+TRACK_R_IN  = WHEEL_R + 0.02          # band inner radius — wheels show through
+WHEEL_Z     = TRACK_R_OUT             # wheel axle height
+END_CY      = HULL_LEN / 2 - 0.40     # idler / sprocket centers
+END_R       = TRACK_R_IN              # they fill the band's end caps exactly
+WHEEL_Y1    = END_CY - 0.55           # road-wheel span
+WHEEL_Y0    = -WHEEL_Y1
+FENDER_Z    = WHEEL_Z + TRACK_R_OUT + 0.11
 
 clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
@@ -98,36 +106,36 @@ lower = box('hull_lower', body_mat, (0, 0, (LOWER_Z0 + LOWER_Z1) / 2),
             (BODY_W, HULL_LEN, LOWER_Z1 - LOWER_Z0))
 for v in lower.data.vertices:                       # lower glacis: bottom-front tucks back
     if v.co.y < 0 and v.co.z < (LOWER_Z0 + LOWER_Z1) / 2:
-        v.co.y += 0.45
+        v.co.y += P['lowerGlacisPull']
 
 upper = box('hull_upper', body_mat, (0, 0, (LOWER_Z1 + UPPER_Z1) / 2),
             (BODY_W, HULL_LEN, UPPER_Z1 - LOWER_Z1))
 for v in upper.data.vertices:
     if v.co.y < 0 and v.co.z > (LOWER_Z1 + UPPER_Z1) / 2:
-        v.co.y += GLACIS_PULL                       # main glacis slope
+        v.co.y += P['glacisPull']                   # main glacis slope
     if v.co.y > 0 and v.co.z > (LOWER_Z1 + UPPER_Z1) / 2:
-        v.co.y -= 0.30                              # rear deck slope
+        v.co.y -= P['rearDeckPull']                 # rear deck slope
 
 # Fenders over the tracks (body color, like the real vehicle)
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
-    box(f'fender_{side}', body_mat, (x, 0.05, 1.11), (TRACK_W + 0.06, HULL_LEN * 0.98, 0.08))
+    box(f'fender_{side}', body_mat, (x, 0.05, FENDER_Z), (TRACK_W + 0.06, HULL_LEN * 0.98, 0.08))
 
 # Driver + co-driver hatches on the glacis top
 for side, x in (('driver', -0.55), ('codriver', 0.55)):
-    wheel_o = bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.19, depth=0.06,
-                                                  location=(x, -1.55, UPPER_Z1 + 0.03))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.19, depth=0.06,
+                                        location=(x, -1.55, UPPER_Z1 + 0.03))
     o = bpy.context.object
     o.name = f'hatch_{side}'
     assign(o, body_mat)
 
 # Rear engine deck grilles ('engine' keyword → stays dark at runtime)
-for i, gy in enumerate((1.55, 2.15, 2.70)):
-    box(f'engine_grille_{i}', gear_mat, (0, gy, UPPER_Z1 + 0.015), (1.7, 0.42, 0.05))
+for i, fy in enumerate((0.49, 0.68, 0.86)):
+    box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, UPPER_Z1 + 0.015), (1.7, 0.42, 0.05))
 
-# ── Running gear: 6 road wheels + idler + sprocket per side ────────────────
+# ── Running gear: N road wheels + idler + sprocket per side ─────────────────
 for side, x in (('r', -TRACK_CX), ('l', TRACK_CX)):
-    for i in range(6):
-        y = WHEEL_Y0 + (WHEEL_Y1 - WHEEL_Y0) * i / 5
+    for i in range(N_WHEELS):
+        y = WHEEL_Y0 + (WHEEL_Y1 - WHEEL_Y0) * i / max(N_WHEELS - 1, 1)
         wheel(f'wheel_road_{side}{i}', x, y, WHEEL_Z, WHEEL_R, TRACK_W * 0.82, gear_mat)
         wheel(f'wheel_hub_{side}{i}',  x, y, WHEEL_Z, WHEEL_R * 0.45, TRACK_W * 0.88, trk_mat, verts=16)
     wheel(f'wheel_idler_{side}',    x, -END_CY, WHEEL_Z, END_R, TRACK_W * 0.78, gear_mat)
@@ -136,7 +144,24 @@ for side, x in (('r', -TRACK_CX), ('l', TRACK_CX)):
 make_track('track_right', -TRACK_CX)
 make_track('track_left',   TRACK_CX)
 
+# ── Attachments (greebles placed in the tuner) ───────────────────────────────
+# Baked into the hull GLB for the game; SKIPPED in tuner mode (the tuner shows
+# them as live draggable instances instead — same _greebles.py geometry).
+if not tuner_mode():
+    paint2 = flat_material('player_body', DOCTRINE_COLORS['player'])
+    dark2 = flat_material('gear_dark', (0.16, 0.155, 0.15, 1.0))
+    for i, att in enumerate(load_params('player_tank', 'attachments') or []):
+        builder = GREEBLES.get(att.get('part'))
+        if not builder:
+            continue
+        obj = builder(paint2, dark2)
+        obj.name = f"{obj.name}_{i}"
+        obj.location = game_to_blender(att['position'])
+        obj.rotation_euler = (0, 0, -att.get('rotY', 0))   # game +Y rot = blender -Z rot
+        s = att.get('scale', 1)
+        obj.scale = (s, s, s)
+
 # ── Turret ring mount (Integration Contract) ────────────────────────────────
-add_mount_empty('turret', (0, RING_Y, UPPER_Z1))
+add_mount_empty('turret', (0, P['ringY'], UPPER_Z1))
 
 finalize_and_export('player_hull_base')

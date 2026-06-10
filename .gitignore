@@ -10,3 +10,4 @@ architecture/verify-screenshots/
 /*.png
 .obsidian/
 __pycache__/
+refs/

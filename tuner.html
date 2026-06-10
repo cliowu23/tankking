@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TanKING — Tank Tuner</title>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<style>
+  :root { --accent:#00eedd; --gold:#ffcc00; --bg:#050d1a; --panel:#081830; --dim:#206878; --white:#ddfff8; }
+  * { box-sizing:border-box; }
+  body { margin:0; display:flex; height:100vh; background:var(--bg); color:var(--white);
+         font-family:monospace; font-size:12px; overflow:hidden; }
+  #panel { width:300px; min-width:300px; background:var(--panel); border-right:1px solid var(--dim);
+           overflow-y:auto; padding:10px; }
+  h1 { font-size:14px; color:var(--gold); margin:4px 0 10px; }
+  h2 { font-size:11px; color:var(--accent); border-bottom:1px solid var(--dim);
+       padding-bottom:3px; margin:14px 0 6px; cursor:pointer; user-select:none; }
+  .row { display:flex; align-items:center; gap:6px; margin:3px 0; }
+  .row label { width:110px; color:#9fd8d0; }
+  .row input[type=range] { flex:1; accent-color:var(--accent); }
+  .row .val { width:44px; text-align:right; color:var(--gold); }
+  button { background:#0a2240; color:var(--white); border:1px solid var(--dim);
+           padding:5px 8px; cursor:pointer; font-family:monospace; font-size:11px; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.on { border-color:var(--gold); color:var(--gold); }
+  #greebles { display:flex; flex-wrap:wrap; gap:4px; }
+  #status { position:fixed; top:8px; right:12px; padding:4px 10px; background:#081830cc;
+            border:1px solid var(--dim); z-index:5; }
+  #status.busy { color:var(--gold); border-color:var(--gold); }
+  #views { position:fixed; top:8px; left:316px; display:flex; gap:6px; z-index:5; }
+  #canvas { flex:1 1 0; min-width:0; height:100%; display:block; outline:none; }
+  #dumpbox { width:100%; height:120px; background:#03101e; color:var(--accent);
+             border:1px solid var(--dim); display:none; margin-top:6px; }
+  #selinfo { color:var(--gold); margin:4px 0; min-height:14px; }
+  .hint { color:#5a8a90; font-size:10px; margin:4px 0; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>⚙ TANK TUNER — player_tank</h1>
+  <div class="hint">Drag a slider, release → Blender re-exports the real GLB (~2s).</div>
+  <div id="sliders"></div>
+
+  <h2>DETAILS — click to add, drag to place</h2>
+  <div id="greebles"></div>
+  <div id="selinfo"></div>
+  <div class="row">
+    <label>sel. scale</label>
+    <input type="range" id="selscale" min="0.5" max="2" step="0.05" value="1" disabled>
+    <span class="val" id="selscaleval">1.0</span>
+  </div>
+  <div class="row">
+    <button id="rotsel">ROTATE 45°</button>
+    <button id="delsel">DELETE</button>
+  </div>
+  <div class="hint">Click a placed detail to select it. Drag the arrows to move.</div>
+
+  <h2>PINS — bespoke requests</h2>
+  <button id="pinmode">📍 PIN MODE: OFF</button>
+  <div id="pinlist"></div>
+  <div class="hint">Pin mode on → click the tank → type a note. I script it there.</div>
+
+  <h2>EXPORT</h2>
+  <button id="dump">⬇ DUMP (save canon + copy JSON)</button>
+  <textarea id="dumpbox" readonly></textarea>
+</div>
+<div id="views">
+  <button data-v="side">SIDE</button><button data-v="front">FRONT</button>
+  <button data-v="rear">REAR</button><button data-v="top">TOP</button>
+</div>
+<div id="status">ready</div>
+<canvas id="canvas"></canvas>
+
+<script>
+const HELPER = 'http://localhost:7077';
+const ASSETS = '/assets/models/tanks/parts/';
+const RING_STD = 1.8;
+const PAINT = new BABYLON.Color3(0.12, 0.42, 0.88);   // cobalt — current player default
+const UNPAINTABLE = ['track','tread','wheel','sprocket','idler','roller','bogie','suspension',
+  'tire','vehicle-gear','lens','glass','optic','periscope','sight','vision','interior','crew',
+  'engine','rubber','seal','exhaust','muffler','antenna','aerial','machinegun','machine_gun',
+  'dshk','coaxial','mg','laser'];
+const isPaintable = n => n && n !== '__root__' && !UNPAINTABLE.some(k => n.toLowerCase().includes(k));
+
+// Slider schema — keys match params/player_tank.json; group → which part regenerates.
+const SCHEMA = {
+  hull: [
+    ['hullLen','hull length',5,7.5,0.05], ['bodyW','body width',1.8,2.8,0.05],
+    ['trackW','track width',0.4,0.9,0.02], ['groundClear','ground clear',0.3,0.8,0.02],
+    ['beltZ','belt line',0.9,1.5,0.02], ['hullTop','hull height',1.4,2.1,0.02],
+    ['glacisPull','glacis slope',0.4,1.8,0.05], ['lowerGlacisPull','lower glacis',0,0.9,0.05],
+    ['rearDeckPull','rear slope',0,0.8,0.05], ['wheelR','wheel radius',0.22,0.48,0.01],
+    ['wheelCount','wheel count',4,8,1], ['ringY','turret ring pos',-0.8,0.5,0.05],
+  ],
+  turret: [
+    ['shellR1','shell base R',0.8,1.3,0.02], ['shellR2','shell top R',0.5,1.1,0.02],
+    ['shellH','shell height',0.4,0.95,0.02], ['shellElong','shell elongation',1,1.5,0.02],
+    ['bustleW','bustle width',0.6,1.6,0.05], ['bustleL','bustle length',0.4,1.2,0.04],
+    ['bustleH','bustle height',0.25,0.7,0.02], ['bustleY','bustle pos',0.7,1.5,0.05],
+    ['mantletR','mantlet radius',0.18,0.45,0.01], ['mantletW','mantlet width',0.5,1.2,0.04],
+    ['cupolaR','cupola radius',0.14,0.36,0.01], ['cupolaX','cupola offset',-0.7,0,0.02],
+    ['mountY','gun mount fwd',-1.4,-0.6,0.05], ['mountZ','gun mount height',0.15,0.6,0.02],
+  ],
+  gun: [
+    ['tubeL','barrel length',1.8,4.2,0.05], ['tubeR','barrel radius',0.05,0.13,0.005],
+    ['sleeveL','sleeve length',0.5,1.5,0.05], ['sleeveR','sleeve radius',0.08,0.18,0.005],
+    ['baffleR','brake radius',0.1,0.26,0.005], ['brakeLen','brake length',0.25,0.7,0.02],
+  ],
+};
+const GREEBLE_IDS = ['jerrycan','crate','tracklinks','toolbox','antenna','headlight','sparewheel','tarp'];
+
+let params = null;            // canon JSON (live)
+let scene, tankRoot = null, attRoots = [], pinMeshes = [];
+let selected = null, gizmoPos = null, gizmoRot = null;
+const status = (t, busy) => { const s = document.getElementById('status');
+  s.textContent = t; s.className = busy ? 'busy' : ''; };
+
+// ── Scene ────────────────────────────────────────────────────────────────────
+const engine = new BABYLON.Engine(document.getElementById('canvas'), true);
+scene = new BABYLON.Scene(engine);
+scene.clearColor = BABYLON.Color4.FromHexString('#0a1626ff');
+const cam = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, 1.1, 12, new BABYLON.Vector3(0,1.2,0), scene);
+cam.attachControl(document.getElementById('canvas'), true);
+cam.wheelDeltaPercentage = 0.02; cam.lowerRadiusLimit = 4; cam.upperRadiusLimit = 30;
+new BABYLON.HemisphericLight('h', new BABYLON.Vector3(0.3,1,0.2), scene).intensity = 0.75;
+const dir = new BABYLON.DirectionalLight('d', new BABYLON.Vector3(-0.4,-1,0.5), scene);
+dir.position = new BABYLON.Vector3(8,14,-8); dir.intensity = 0.7;
+const ground = BABYLON.MeshBuilder.CreateGround('g', {width:40,height:40}, scene);
+const groundMat = new BABYLON.StandardMaterial('gm', scene);
+groundMat.diffuseColor = new BABYLON.Color3(0.08,0.12,0.18);
+groundMat.specularColor = BABYLON.Color3.Black();
+ground.material = groundMat; ground.isPickable = false;
+engine.runRenderLoop(() => scene.render());
+window.addEventListener('resize', () => engine.resize());
+
+const VIEWS = { side:[0,1.45,11], front:[Math.PI/2,1.35,10], rear:[-Math.PI/2,1.35,10], top:[-Math.PI/4,0.25,14] };
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => {
+  const [a,be,r] = VIEWS[b.dataset.v];
+  cam.setTarget(new BABYLON.Vector3(0,1.2,0));
+  cam.alpha=a; cam.beta=be; cam.radius=r;
+});
+
+// ── Tank loading (mini-assembleTank: same ring/mount empties as the game) ───
+async function importPart(file) {
+  const r = await BABYLON.SceneLoader.ImportMeshAsync('', ASSETS, file + '?v=' + Date.now(), scene, null, '.glb');
+  const root = new BABYLON.TransformNode(file, scene);
+  const meshes = r.meshes.filter(m => m.name !== '__root__');
+  for (const m of meshes) m.setParent(root);
+  const find = n => r.transformNodes.find(t => t.name === n);
+  return { root, meshes, ring: find('turret')?.getAbsolutePosition().clone(),
+           mount: find('mount')?.getAbsolutePosition().clone() };
+}
+function paintMeshes(meshes, all = false) {
+  let body = scene.getMaterialByName('tunerPaint');
+  if (!body) { body = new BABYLON.StandardMaterial('tunerPaint', scene);
+    body.diffuseColor = PAINT; body.specularColor = new BABYLON.Color3(0.05,0.06,0.07); }
+  let dark = scene.getMaterialByName('tunerDark');
+  if (!dark) { dark = new BABYLON.StandardMaterial('tunerDark', scene);
+    dark.diffuseColor = new BABYLON.Color3(0.16,0.155,0.15); dark.specularColor = BABYLON.Color3.Black(); }
+  for (const m of meshes) m.material = (all || isPaintable(m.name)) ? body : dark;
+}
+async function loadTank() {
+  if (tankRoot) tankRoot.dispose();
+  tankRoot = new BABYLON.TransformNode('tank', scene);
+  const hull = await importPart('player_hull_base.glb');
+  hull.root.parent = tankRoot;
+  paintMeshes(hull.meshes);
+  const tur = await importPart('player_turret_base.glb');
+  tur.root.parent = tankRoot; tur.root.position = hull.ring ?? new BABYLON.Vector3(0,1.7,0);
+  paintMeshes(tur.meshes);
+  const gun = await importPart('player_gun_90mm.glb');
+  gun.root.parent = tur.root;
+  gun.root.position = tur.mount ?? new BABYLON.Vector3(0,0.34,1.0);
+  gun.root.rotation.x = Math.PI/2;                    // same as the game part module
+  paintMeshes(gun.meshes, true);
+  for (const a of attRoots) a.parent = tankRoot;      // keep placed details on the tank
+}
+
+// ── Sliders ──────────────────────────────────────────────────────────────────
+function buildSliders() {
+  const host = document.getElementById('sliders');
+  for (const [group, defs] of Object.entries(SCHEMA)) {
+    const h = document.createElement('h2');
+    h.textContent = group.toUpperCase();
+    host.appendChild(h);
+    for (const [key, label, min, max, step] of defs) {
+      const row = document.createElement('div'); row.className = 'row';
+      const val = params[group][key];
+      row.innerHTML = `<label>${label}</label>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${val}">
+        <span class="val">${val}</span>`;
+      const inp = row.querySelector('input'), out = row.querySelector('.val');
+      inp.autocomplete = 'off';
+      inp.value = val;   // hard-set: browsers can restore stale form state across reloads
+      inp.addEventListener('input', () => out.textContent = inp.value);
+      inp.addEventListener('change', async () => {        // on release → regen
+        params[group][key] = parseFloat(inp.value);
+        await regen([group]);
+      });
+      host.appendChild(row);
+    }
+  }
+}
+async function regen(parts) {
+  status(`⟳ regenerating ${parts.join('+')}…`, true);
+  try {
+    const r = await fetch(HELPER + '/regen', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ params: canonParams(), parts }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'regen failed');
+    await loadTank();
+    status(`✓ ${parts.join('+')} in ${(j.ms/1000).toFixed(1)}s`);
+  } catch (e) { status('✗ ' + e.message.slice(0,60)); }
+}
+
+// ── Greebles: palette + drag-to-place ────────────────────────────────────────
+const utility = new BABYLON.UtilityLayerRenderer(scene);
+gizmoPos = new BABYLON.PositionGizmo(utility); gizmoPos.scaleRatio = 0.9;
+gizmoRot = new BABYLON.PlaneRotationGizmo(new BABYLON.Vector3(0,1,0), BABYLON.Color3.Yellow(), utility);
+gizmoPos.attachedNode = null; gizmoRot.attachedNode = null;
+const syncSel = () => {
+  const info = document.getElementById('selinfo');
+  const sc = document.getElementById('selscale');
+  if (!selected) { info.textContent = ''; sc.disabled = true; return; }
+  info.textContent = `selected: ${selected.metadata.part} #${attRoots.indexOf(selected)}`;
+  sc.disabled = false; sc.value = selected.metadata.scaleF;
+  document.getElementById('selscaleval').textContent = (+sc.value).toFixed(2);
+};
+function select(node) {
+  selected = node;
+  gizmoPos.attachedNode = node; gizmoRot.attachedNode = node;
+  syncSel();
+}
+async function addGreeble(id) {
+  const r = await BABYLON.SceneLoader.ImportMeshAsync('', ASSETS + 'greebles/', `greeble_${id}.glb`, scene, null, '.glb');
+  const tn = new BABYLON.TransformNode(`att_${id}_${attRoots.length}`, scene);
+  const meshes = r.meshes.filter(m => m.name !== '__root__');
+  for (const m of meshes) { m.setParent(tn); m.metadata = { attOwner: tn }; }
+  paintMeshes(meshes);
+  tn.metadata = { part: id, scaleF: 1 };
+  tn.parent = tankRoot;
+  tn.position = new BABYLON.Vector3(0, (params.hull.hullTop ?? 1.7) + 0.02, -1.2); // rear deck default
+  attRoots.push(tn);
+  select(tn);
+}
+GREEBLE_IDS.forEach(id => {
+  const b = document.createElement('button'); b.textContent = id;
+  b.onclick = () => addGreeble(id);
+  document.getElementById('greebles').appendChild(b);
+});
+document.getElementById('selscale').addEventListener('input', e => {
+  if (!selected) return;
+  const s = parseFloat(e.target.value);
+  selected.metadata.scaleF = s; selected.scaling.setAll(s);
+  document.getElementById('selscaleval').textContent = s.toFixed(2);
+});
+document.getElementById('rotsel').onclick = () => { if (selected) selected.rotation.y += Math.PI/4; };
+document.getElementById('delsel').onclick = () => {
+  if (!selected) return;
+  attRoots = attRoots.filter(a => a !== selected);
+  selected.dispose(); select(null);
+};
+
+// ── Pins ─────────────────────────────────────────────────────────────────────
+let pinMode = false, pins = [];
+document.getElementById('pinmode').onclick = function () {
+  pinMode = !pinMode;
+  this.textContent = `📍 PIN MODE: ${pinMode ? 'ON' : 'OFF'}`;
+  this.classList.toggle('on', pinMode);
+};
+function renderPins() {
+  document.getElementById('pinlist').innerHTML =
+    pins.map((p,i) => `<div class="row">#${i+1} ${p.note.slice(0,30)}</div>`).join('');
+}
+scene.onPointerObservable.add(pi => {
+  if (pi.type !== BABYLON.PointerEventTypes.POINTERPICK) return;
+  const mesh = pi.pickInfo?.pickedMesh;
+  if (!mesh) return;
+  if (mesh.metadata?.attOwner) { select(mesh.metadata.attOwner); return; }
+  if (!pinMode || !pi.pickInfo.pickedPoint) return;
+  const note = prompt('Pin note — what do you want here?');
+  if (!note) return;
+  const p = pi.pickInfo.pickedPoint;
+  const s = BABYLON.MeshBuilder.CreateSphere('pin', {diameter:0.16}, scene);
+  s.position = p.clone(); s.isPickable = false;
+  const m = new BABYLON.StandardMaterial('pinm', scene);
+  m.emissiveColor = new BABYLON.Color3(1,0.2,0.2); s.material = m;
+  pinMeshes.push(s);
+  pins.push({ position:[+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)], mesh: mesh.name, note });
+  renderPins();
+});
+
+// ── DUMP / canon ─────────────────────────────────────────────────────────────
+function canonParams() {
+  return { ...params,
+    attachments: attRoots.map(a => ({ part: a.metadata.part,
+      position: [+a.position.x.toFixed(3), +a.position.y.toFixed(3), +a.position.z.toFixed(3)],
+      rotY: +a.rotation.y.toFixed(3), scale: a.metadata.scaleF })),
+    pins };
+}
+document.getElementById('dump').onclick = async () => {
+  const canon = canonParams();
+  const txt = JSON.stringify(canon, null, 2);
+  const box = document.getElementById('dumpbox');
+  box.style.display = 'block'; box.value = txt;
+  try { await navigator.clipboard.writeText(txt); } catch (e) { /* box has it */ }
+  await fetch(HELPER + '/save', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ params: canon }) });
+  status('✓ canon saved + JSON copied');
+};
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    params = await (await fetch(HELPER + '/params')).json();
+  } catch (e) {
+    status('✗ helper not running — start: node scripts/modelgen/tuner-server.mjs');
+    return;
+  }
+  // restore previously placed attachments + pins from canon
+  buildSliders();
+  await loadTank();
+  for (const att of params.attachments ?? []) {
+    await addGreeble(att.part);
+    const tn = attRoots[attRoots.length-1];
+    tn.position.fromArray(att.position); tn.rotation.y = att.rotY ?? 0;
+    tn.metadata.scaleF = att.scale ?? 1; tn.scaling.setAll(tn.metadata.scaleF);
+  }
+  pins = params.pins ?? []; renderPins();
+  select(null);
+  engine.resize();   // flex layout settles after Engine() ran — resync the buffer
+  status('ready — drag a slider');
+})();
+</script>
+</body>
+</html>

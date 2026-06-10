@@ -11,6 +11,32 @@ STANDARD_RING_DIAMETER = 1.8
 
 EXPORT_DIR = os.path.join(os.path.dirname(__file__), '..', '..',
                           'public', 'assets', 'models', 'tanks', 'parts')
+PARAMS_DIR = os.path.join(os.path.dirname(__file__), 'params')
+
+
+def load_params(tank, group):
+    """Read a parameter group from the canon JSON (single source of truth — the
+    tuner edits this same file). Missing file/group → empty dict; scripts merge
+    over their own defaults."""
+    import json
+    path = os.path.join(PARAMS_DIR, f'{tank}.json')
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f).get(group, {}) or {}
+
+
+def tuner_mode():
+    """True when the tuner server invoked us: skip baking attachments into the
+    hull GLB (the tuner previews them as live draggable instances instead)."""
+    return os.environ.get('TANK_TUNER') == '1'
+
+
+def game_to_blender(p):
+    """Game-space [x,y,z] (Babylon, Y up, +Z fwd) → Blender (Z up, -Y front).
+    Inverse of the Batch-0 calibrated mapping. Rotation about game Y = -rotation
+    about Blender Z."""
+    return (-p[0], -p[2], p[1])
 
 # Doctrine preview colors (runtime paint replaces these — spec "Materials" section)
 DOCTRINE_COLORS = {
