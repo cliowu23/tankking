@@ -6,6 +6,7 @@ import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, track_material,
                   assign, add_mount_empty, bevel, make_box, make_wheel, make_track_band,
+                  make_profile_prism, default_hull_profile,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
@@ -41,24 +42,14 @@ body_mat = flat_material('medium_body', DOCTRINE_COLORS['medium'])
 gear_mat = gear_material()
 trk_mat  = track_material()
 
-# ── Hull: boxy slabs, near-vertical front with the Pz III stepped driver plate ──
-lower = make_box('hull_lower', body_mat, (0, 0, (LOWER_Z0 + LOWER_Z1) / 2),
-                 (BODY_W, HULL_LEN, LOWER_Z1 - LOWER_Z0))
-for v in lower.data.vertices:
-    if v.co.y < 0 and v.co.z < (LOWER_Z0 + LOWER_Z1) / 2:
-        v.co.y += P['lowerGlacisPull']
-
-upper = make_box('hull_upper', body_mat, (0, 0, (UPPER_Z0 + UPPER_Z1) / 2),
-                 (BODY_W, HULL_LEN, UPPER_Z1 - UPPER_Z0))
-for v in upper.data.vertices:
-    if v.co.y < 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
-        v.co.y += P['glacisPull']          # barely sloped — boxy
-    if v.co.y > 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
-        v.co.y -= P['rearDeckPull']
+# ── Hull body — profile prism (Sprocket-style control points) ───────────────
+PROFILE = P.get('hullProfile') or default_hull_profile(P)
+make_profile_prism('hull_body', body_mat, PROFILE, BODY_W)
+HULL_TOP = max(gy for _, gy in PROFILE)
 
 # Stepped driver plate proud of the front face
 make_box('hull_driver_step', body_mat,
-         (0, -HULL_LEN / 2 + 0.21, UPPER_Z1 - 0.13), (BODY_W * 0.96, 0.46, 0.26))
+         (0, -HULL_LEN / 2 + 0.21, HULL_TOP - 0.13), (BODY_W * 0.96, 0.46, 0.26))
 
 # Fenders
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
@@ -114,13 +105,13 @@ for i, x in ((0, -0.45), (1, 0.45)):
 
 # Engine deck grilles
 for i, fy in enumerate((0.52, 0.74)):
-    make_box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, UPPER_Z1 + 0.015),
+    make_box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, HULL_TOP + 0.015),
              (BODY_W * 0.62, 0.4, 0.05))
 
 # Hull roof hatches (driver/radio operator, front corners)
 for side, x in (('driver', -0.52), ('radioop', 0.52)):
     bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.17, depth=0.05,
-                                        location=(x, -HULL_LEN / 2 + 0.85, UPPER_Z1 + 0.025))
+                                        location=(x, -HULL_LEN / 2 + 0.85, HULL_TOP + 0.025))
     o = bpy.context.object
     o.name = f'hatch_{side}'
     assign(o, body_mat)
@@ -138,5 +129,5 @@ if not tuner_mode():
         s = att.get('scale', 1)
         obj.scale = (s, s, s)
 
-add_mount_empty('turret', (0, P['ringY'], UPPER_Z1))
+add_mount_empty('turret', (0, P['ringY'], HULL_TOP))
 finalize_and_export('medium_hull_standard')

@@ -145,6 +145,46 @@ def make_track_band(name, mat, x_center, track_w, end_cy, cz, r_out, r_in, n_arc
     return o
 
 
+def make_profile_prism(name, mat, profile_game, width):
+    """Solid hull body from a side-profile polygon (Sprocket-style control points).
+    profile_game = ordered closed loop of [zGame(fwd), yGame(up)] pairs, as edited in
+    the tuner. Extruded across X to `width`. Replaces the legacy box+vertex-pull body."""
+    pts = [(-gz, gy) for gz, gy in profile_game]   # game [z,y] → blender (y=-z, z=y)
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    xl, xr = -width / 2, width / 2
+    L = [bm.verts.new((xl, y, z)) for (y, z) in pts]
+    R = [bm.verts.new((xr, y, z)) for (y, z) in pts]
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((L[i], L[j], R[j], R[i]))     # wall quads
+    bm.faces.new(L)                                 # side caps (planar n-gons)
+    bm.faces.new(tuple(reversed(R)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    assign(o, mat)
+    return o
+
+
+def default_hull_profile(P):
+    """Legacy-equivalent profile (game [z,y] pairs): exactly the outline the old
+    lower+upper boxes with vertex pulls produced. Front = +z game."""
+    L, gc, belt, top = P['hullLen'], P['groundClear'], P['beltZ'], P['hullTop']
+    front, rear = L / 2, -L / 2
+    return [
+        [front - P['lowerGlacisPull'], gc],
+        [front, belt],
+        [front - P['glacisPull'], top],
+        [rear + P['rearDeckPull'], top],
+        [rear, belt],
+        [rear, gc],
+    ]
+
+
 def bevel(obj, width=0.05, segments=2):
     """Round an object's hard edges (angle-limited bevel, applied immediately)."""
     bpy.ops.object.select_all(action='DESELECT')

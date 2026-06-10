@@ -41,6 +41,14 @@
   <div class="hint">Drag a slider, release → Blender re-exports the real GLB (~2s).</div>
   <div id="sliders"></div>
 
+  <h2>HULL PROFILE — Sprocket-style control points</h2>
+  <div class="row">
+    <button id="profmode">✏ EDIT PROFILE: OFF</button>
+    <button id="profreset">RESET</button>
+  </div>
+  <div class="hint">Drag the orange points in the side plane (use SIDE view).
+  Release → regen. RESET rebuilds from the shape sliders.</div>
+
   <h2>DETAILS — click to add, drag to place</h2>
   <div id="greebles"></div>
   <div id="selinfo"></div>
@@ -239,6 +247,73 @@ async function regen(parts) {
     status(`✓ ${parts.join('+')} in ${(j.ms/1000).toFixed(1)}s`);
   } catch (e) { status('✗ ' + e.message.slice(0,60)); }
 }
+
+// ── Hull profile editor: draggable control points (Sprocket-style) ──────────
+// params.hull.hullProfile = ordered [zFwd, yUp] loop. Mirrors _lib.default_hull_profile.
+let profHandles = [], profLines = null, profMode = false;
+function defaultProfile(h) {
+  const front = h.hullLen / 2, rear = -h.hullLen / 2;
+  return [
+    [+(front - h.lowerGlacisPull).toFixed(3), h.groundClear],
+    [front, h.beltZ],
+    [+(front - h.glacisPull).toFixed(3), h.hullTop],
+    [+(rear + h.rearDeckPull).toFixed(3), h.hullTop],
+    [rear, h.beltZ],
+    [rear, h.groundClear],
+  ];
+}
+function clearProf() {
+  profHandles.forEach(h => h.dispose());
+  profHandles = [];
+  if (profLines) { profLines.dispose(); profLines = null; }
+}
+function drawProfLines() {
+  const x = params.hull.bodyW / 2 + 0.06;
+  const pts = params.hull.hullProfile.map(([z, y]) => new BABYLON.Vector3(x, y, z));
+  pts.push(pts[0].clone());
+  if (profLines) profLines.dispose();
+  profLines = BABYLON.MeshBuilder.CreateLines('profLines', { points: pts }, scene);
+  profLines.color = new BABYLON.Color3(1, 0.6, 0.1);
+  profLines.isPickable = false;
+  profLines.parent = tankRoot;
+}
+function spawnProfHandles() {
+  clearProf();
+  if (!params.hull.hullProfile) params.hull.hullProfile = defaultProfile(params.hull);
+  const x = params.hull.bodyW / 2 + 0.06;
+  params.hull.hullProfile.forEach((pt, i) => {
+    const s = BABYLON.MeshBuilder.CreateSphere('prof_' + i, { diameter: 0.2 }, scene);
+    const m = new BABYLON.StandardMaterial('profm' + i, scene);
+    m.emissiveColor = new BABYLON.Color3(1, 0.55, 0.05);
+    m.disableLighting = true;
+    s.material = m;
+    s.position.set(x, pt[1], pt[0]);
+    s.parent = tankRoot;
+    const drag = new BABYLON.PointerDragBehavior({ dragPlaneNormal: new BABYLON.Vector3(1, 0, 0) });
+    drag.onDragObservable.add(() => {
+      params.hull.hullProfile[i] = [+s.position.z.toFixed(3), +s.position.y.toFixed(3)];
+      drawProfLines();
+    });
+    drag.onDragEndObservable.add(async () => {
+      await regen(['hull']);
+      if (profMode) spawnProfHandles();   // tankRoot was rebuilt — respawn on it
+    });
+    s.addBehavior(drag);
+    profHandles.push(s);
+  });
+  drawProfLines();
+}
+document.getElementById('profmode').onclick = function () {
+  profMode = !profMode;
+  this.textContent = `✏ EDIT PROFILE: ${profMode ? 'ON' : 'OFF'}`;
+  this.classList.toggle('on', profMode);
+  if (profMode) spawnProfHandles(); else clearProf();
+};
+document.getElementById('profreset').onclick = async () => {
+  params.hull.hullProfile = defaultProfile(params.hull);
+  await regen(['hull']);
+  if (profMode) spawnProfHandles();
+};
 
 // ── Greebles: palette + drag-to-place ────────────────────────────────────────
 const utility = new BABYLON.UtilityLayerRenderer(scene);

@@ -5,7 +5,8 @@
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, track_material,
-                  assign, add_mount_empty, bevel,
+                  assign, add_mount_empty, bevel, make_profile_prism,
+                  default_hull_profile,
                   finalize_and_export, load_params, tuner_mode, game_to_blender,
                   DOCTRINE_COLORS)
 from _greebles import GREEBLES
@@ -110,21 +111,12 @@ def make_track(name, x_center):
     return o
 
 
-# ── Hull body ────────────────────────────────────────────────────────────────
-lower = box('hull_lower', body_mat, (0, 0, (LOWER_Z0 + LOWER_Z1) / 2),
-            (BODY_W, HULL_LEN, LOWER_Z1 - LOWER_Z0))
-for v in lower.data.vertices:                       # lower glacis: bottom-front tucks back
-    if v.co.y < 0 and v.co.z < (LOWER_Z0 + LOWER_Z1) / 2:
-        v.co.y += P['lowerGlacisPull']
-
-upper = box('hull_upper', body_mat, (0, 0, (UPPER_Z0 + UPPER_Z1) / 2),
-            (UPPER_W, HULL_LEN, UPPER_Z1 - UPPER_Z0))
-for v in upper.data.vertices:
-    if v.co.y < 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
-        v.co.y += P['glacisPull']                   # main glacis slope
-        v.co.x *= NOSE_TAPER                        # glacis narrows toward the nose
-    if v.co.y > 0 and v.co.z > (UPPER_Z0 + UPPER_Z1) / 2:
-        v.co.y -= P['rearDeckPull']                 # rear deck slope
+# ── Hull body — profile prism (Sprocket-style control points) ───────────────
+# params.hullProfile = ordered [zGame, yGame] loop, draggable in the tuner.
+# Absent → derived from the legacy shape sliders (identical silhouette).
+PROFILE = P.get('hullProfile') or default_hull_profile(P)
+make_profile_prism('hull_body', body_mat, PROFILE, BODY_W)
+HULL_TOP = max(gy for _, gy in PROFILE)
 
 # Fenders over the tracks (body color, like the real vehicle)
 for side, x in (('right', -TRACK_CX), ('left', TRACK_CX)):
@@ -155,15 +147,15 @@ for i, x in ((0, -0.38), (1, 0.38)):
 # Driver + co-driver hatches on the glacis top
 for side, x in (('driver', -0.55), ('codriver', 0.55)):
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.19, depth=0.06,
-                                        location=(x, -1.55, UPPER_Z1 + 0.03))
+                                        location=(x, -1.55, HULL_TOP + 0.03))
     o = bpy.context.object
     o.name = f'hatch_{side}'
     assign(o, body_mat)
 
 # Rear engine deck grilles ('engine' keyword → stays dark at runtime)
 for i, fy in enumerate((0.49, 0.68, 0.86)):
-    box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, UPPER_Z1 + 0.015),
-        (UPPER_W * 0.58, 0.42, 0.05))
+    box(f'engine_grille_{i}', gear_mat, (0, HULL_LEN / 2 * fy, HULL_TOP + 0.015),
+        (BODY_W * 0.58, 0.42, 0.05))
 
 # ── Running gear: N road wheels + idler + sprocket per side ─────────────────
 for side, x in (('r', -TRACK_CX), ('l', TRACK_CX)):
@@ -195,6 +187,6 @@ if not tuner_mode():
         obj.scale = (s, s, s)
 
 # ── Turret ring mount (Integration Contract) ────────────────────────────────
-add_mount_empty('turret', (0, P['ringY'], UPPER_Z1))
+add_mount_empty('turret', (0, P['ringY'], HULL_TOP))
 
 finalize_and_export('player_hull_base')
