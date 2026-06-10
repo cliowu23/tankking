@@ -16,6 +16,7 @@ const UNPAINTABLE = [
   'machinegun', 'machine_gun', 'dshk', 'coaxial', 'mg',
   'laser',
   'mantlet',                 // mantlet group reads as dark canvas cover (art decision, pass 2)
+  'trim_dark',               // greeble two-tone contract: '<part>_trim_dark' children stay dark
 ];
 
 function isPaintable(name) {
