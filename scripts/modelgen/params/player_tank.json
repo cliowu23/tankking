@@ -37,6 +37,27 @@
     "baffleR": 0.175,
     "brakeLen": 0.41
   },
-  "attachments": [],
+  "attachments": [
+    {
+      "part": "headlight",
+      "position": [
+        0,
+        1.502,
+        2.503
+      ],
+      "rotY": 0,
+      "scale": 1
+    },
+    {
+      "part": "antenna",
+      "position": [
+        -0.86,
+        1.74,
+        -2.67
+      ],
+      "rotY": 0,
+      "scale": 1.25
+    }
+  ],
   "pins": []
 }

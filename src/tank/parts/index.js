@@ -25,3 +25,11 @@ export const PARTS = {
 export const PARTS_BY_ID = Object.fromEntries(
   Object.values(PARTS).flat().map(p => [p.id, p])
 );
+
+// The standard player medium tank (original modelgen assets — user canon 2026-06-10).
+// Used wherever no saved loadout exists.
+export const DEFAULT_LOADOUT = {
+  hull:   'player-hull-base',
+  turret: 'player-turret-base',
+  cannon: 'player-gun-90mm',
+};

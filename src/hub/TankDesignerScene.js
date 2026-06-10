@@ -7,7 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { applyModelPaint } from '../utils/modelPaint.js';
 import { yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
-import { PARTS, PARTS_BY_ID } from '../tank/parts/index.js';
+import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 
@@ -33,7 +33,7 @@ export default class TankDesignerScene {
     this._selectedFilename = localStorage.getItem('selectedTank') || 'composed';
 
     // Cannon parts state
-    this._equippedCannon          = 'cannon-90mm';
+    this._equippedCannon          = DEFAULT_LOADOUT.cannon;
     this._cannonRoot              = null;
     this._cannonMeshes            = [];
     this._glbBarrelMeshes         = [];
@@ -45,8 +45,8 @@ export default class TankDesignerScene {
     this._hideCannonDropdownTimer = null;
 
     // Modular parts state
-    this._equippedHull            = 'hull-m26';
-    this._equippedTurret          = 'turret-m26';
+    this._equippedHull            = DEFAULT_LOADOUT.hull;
+    this._equippedTurret          = DEFAULT_LOADOUT.turret;
     this._selectedPaint           = JSON.parse(localStorage.getItem('selectedPaint') || 'null'); // [r,g,b] or null
     this._isComposedMode          = false;
     this._turretMeshesComposed    = [];
@@ -551,7 +551,7 @@ export default class TankDesignerScene {
   }
 
   // Composed tank — built from swappable hull + turret + cannon parts via assembleTank.
-  _loadComposed(btn, loadout = { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' }) {
+  _loadComposed(btn, loadout = DEFAULT_LOADOUT) {
     if (this._activeBtn) this._activeBtn.classList.remove('active');
     if (btn) { btn.classList.add('active'); this._activeBtn = btn; }
     this._isComposedMode = true;

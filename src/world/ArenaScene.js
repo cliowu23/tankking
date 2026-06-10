@@ -10,7 +10,7 @@ import { hpColor, yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
-import { PARTS_BY_ID } from '../tank/parts/index.js';
+import { PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
 import Tank from '../tank/Tank.js';
 import Enemy from './Enemy.js';
 import AIEnemy from './AIEnemy.js';
@@ -330,7 +330,7 @@ export default class ArenaScene {
         // manifest (e.g. the removed whole-GLB M26), so a stale save can't 404.
         if (modelFile === 'composed' || !manifest[modelFile]) {
           const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
-            ?? { hull: 'hull-m26', turret: 'turret-m26', cannon: 'cannon-90mm' };
+            ?? DEFAULT_LOADOUT;
           this._loadPlayerComposed(loadout);
           return;
         }
