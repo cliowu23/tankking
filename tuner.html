@@ -156,20 +156,20 @@ function paintMeshes(meshes, all = false) {
   if (!body) {
     body = new BABYLON.StandardMaterial('tunerPaint', scene);
     body.diffuseColor = PAINT;
-    body.specularColor = new BABYLON.Color3(0.32,0.33,0.36);
-    body.specularPower = 42;
+    body.specularColor = new BABYLON.Color3(0.16,0.17,0.19);
+    body.specularPower = 48;
     const rim = new BABYLON.FresnelParameters();
-    rim.bias = 0.35; rim.power = 2.5;
-    rim.leftColor = new BABYLON.Color3(0.22,0.24,0.27); rim.rightColor = BABYLON.Color3.Black();
+    rim.bias = 0.5; rim.power = 3.2;
+    rim.leftColor = new BABYLON.Color3(0.10,0.11,0.13); rim.rightColor = BABYLON.Color3.Black();
     body.emissiveFresnelParameters = rim;
     body.emissiveColor = new BABYLON.Color3(1,1,1);
   }
   let dark = scene.getMaterialByName('tunerDark');
   if (!dark) {
     dark = new BABYLON.StandardMaterial('tunerDark', scene);
-    dark.diffuseColor = new BABYLON.Color3(0.16,0.155,0.15);
-    dark.specularColor = new BABYLON.Color3(0.25,0.25,0.27);
-    dark.specularPower = 28;
+    dark.diffuseColor = new BABYLON.Color3(0.09,0.087,0.085);
+    dark.specularColor = new BABYLON.Color3(0.12,0.12,0.13);
+    dark.specularPower = 32;
   }
   for (const m of meshes) m.material = (all || isPaintable(m.name)) ? body : dark;
 }

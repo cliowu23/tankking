@@ -13,11 +13,11 @@ export function makePaintMaterial(scene, [r, g, b], name = null) {
   if (mat) return mat;
   mat = new StandardMaterial(key, scene);
   mat.diffuseColor  = new Color3(r, g, b);
-  mat.specularColor = new Color3(0.32, 0.33, 0.36);   // steel sheen under paint
-  mat.specularPower = 42;                              // tight painted-metal highlight
+  mat.specularColor = new Color3(0.16, 0.17, 0.19);   // muted steel sheen under paint
+  mat.specularPower = 48;                              // tight, restrained highlight
   const rim = new FresnelParameters();
-  rim.bias = 0.35; rim.power = 2.5;
-  rim.leftColor  = new Color3(0.22, 0.24, 0.27);       // glancing-angle metal rim
+  rim.bias = 0.5; rim.power = 3.2;                     // rim only at extreme glancing angles
+  rim.leftColor  = new Color3(0.10, 0.11, 0.13);
   rim.rightColor = Color3.Black();
   mat.emissiveFresnelParameters = rim;
   mat.emissiveColor = new Color3(1, 1, 1);             // fresnel scales this rim

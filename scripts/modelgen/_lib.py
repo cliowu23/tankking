@@ -71,14 +71,15 @@ def flat_material(name, rgba, rough=0.9, metallic=0.0):
 
 
 def gear_material():
-    """Dark gunmetal for running gear / fittings — metallic so it reads as steel
-    in-game (unpaintable meshes keep this GLB material at runtime)."""
-    return flat_material('gear_dark', (0.16, 0.155, 0.15, 1.0), rough=0.45, metallic=0.65)
+    """Dark gunmetal for running gear / fittings (unpaintable meshes keep this GLB
+    material at runtime). Low metallic — with no env map, high metallic just
+    desaturates to flat grey in Babylon."""
+    return flat_material('gear_dark', (0.10, 0.097, 0.095, 1.0), rough=0.55, metallic=0.25)
 
 
 def track_material():
-    """Track rubber/steel — less shiny than fittings, still not plastic."""
-    return flat_material('track_dark', (0.115, 0.11, 0.105, 1.0), rough=0.62, metallic=0.35)
+    """Track metal — near-black, mostly dielectric so the dark base color shows."""
+    return flat_material('track_dark', (0.055, 0.053, 0.05, 1.0), rough=0.72, metallic=0.12)
 
 
 def assign(obj, mat):
