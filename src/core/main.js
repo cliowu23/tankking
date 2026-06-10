@@ -10,6 +10,7 @@ const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: 
 let arenaScene    = null;
 let designerScene = null;
 let hangarScene   = null;
+let controlsSeen  = false;   // HOW-TO-PLAY shows on the first arena entry per session only
 
 window.__state = 'MENU'; // 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
 
@@ -173,7 +174,17 @@ function deployToArena() {
       arenaScene = new ArenaScene(engine, onExtractFromArena);
       window.__arena = arenaScene;
       engine.runRenderLoop(() => arenaScene.scene.render());
-      window.__state = 'GAME';
+      // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
+      // (The menu routes through the hangar now, so this no longer runs via the
+      // dead startGame(); on later deploys we drop straight into the run.)
+      if (!controlsSeen) {
+        controlsSeen = true;
+        arenaScene._paused = true;
+        window.__state = 'CONTROLS';
+        document.getElementById('controls-screen').style.display = 'flex';
+      } else {
+        window.__state = 'GAME';
+      }
     },
     'checker'
   );
