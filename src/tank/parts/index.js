@@ -1,15 +1,9 @@
-import cannon90mm   from './cannons/cannon-90mm.js';
-import cannonT44100 from './cannons/cannon-t44-100mm.js';
 import gunPlayer90  from './cannons/player-gun-90mm.js';
 import gunMedium50  from './cannons/medium-gun-50mm.js';
 import hullMedium   from './hulls/medium-hull-standard.js';
 import turretMedium from './turrets/medium-turret-angular.js';
-import hullM26      from './hulls/hull-m26.js';
-import hullT44      from './hulls/hull-t44.js';
 import hullCalib    from './hulls/hull-calib.js'; // Batch-0 axis calibration — remove after
 import hullPlayer   from './hulls/player-hull-base.js';
-import turretM26    from './turrets/turret-m26.js';
-import turretT44    from './turrets/turret-t44.js';
 import turretPlayer from './turrets/player-turret-base.js';
 
 // Central parts registry.
@@ -19,9 +13,9 @@ import turretPlayer from './turrets/player-turret-base.js';
 // had no rig empties (web-optimized) and fused mantlet+barrel, so it's handled by extract-t44.py
 // (bisect + measured trunnion + its own barrel cannon). The composition engine is model-agnostic.
 export const PARTS = {
-  hulls:   [hullPlayer, hullMedium, hullM26, hullT44, hullCalib],
-  turrets: [turretPlayer, turretMedium, turretM26, turretT44],
-  cannons: [gunPlayer90, gunMedium50, cannon90mm, cannonT44100],
+  hulls:   [hullPlayer, hullMedium, hullCalib],
+  turrets: [turretPlayer, turretMedium],
+  cannons: [gunPlayer90, gunMedium50],
 };
 
 // Flat lookup by id — useful for save/load and equip logic.
@@ -36,3 +30,11 @@ export const DEFAULT_LOADOUT = {
   turret: 'player-turret-base',
   cannon: 'player-gun-90mm',
 };
+
+// Guard for loadouts read from localStorage: stale saves may reference retired
+// parts (e.g. the removed WT-era hull-m26) — fall back to the default loadout.
+export function validLoadout(loadout) {
+  const ok = loadout && PARTS_BY_ID[loadout.hull] && PARTS_BY_ID[loadout.turret]
+    && PARTS_BY_ID[loadout.cannon];
+  return ok ? loadout : DEFAULT_LOADOUT;
+}

@@ -15,7 +15,7 @@ import { POSTER_DESIGNS } from './posterArt.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
-import { PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
+import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 
 const ROOM_W   = 24;    // width (X)
 const ROOM_D   = 32;    // depth (Z), north = positive Z
@@ -329,8 +329,7 @@ export default class HangarScene {
     // Composed (modular) tank — rebuild the saved hull+turret+cannon loadout, scaled onto the
     // plinth like the single-GLB display. Mirrors how the arena rebuilds the player tank.
     if (filename === 'composed') {
-      const loadout = JSON.parse(localStorage.getItem('selectedLoadout') || 'null')
-        ?? DEFAULT_LOADOUT;
+      const loadout = validLoadout(JSON.parse(localStorage.getItem('selectedLoadout') || 'null'));
       const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
       const cannonMat = makePaintMaterial(s, bodyCol);
       let assembled;

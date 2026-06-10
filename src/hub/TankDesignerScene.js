@@ -7,7 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
-import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT } from '../tank/parts/index.js';
+import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 
@@ -286,7 +286,7 @@ export default class TankDesignerScene {
       localStorage.setItem('selectedLoadout', JSON.stringify({
         hull:   this._equippedHull,
         turret: this._equippedTurret,
-        cannon: this._equippedCannon || 'cannon-90mm',
+        cannon: this._equippedCannon || DEFAULT_LOADOUT.cannon,
       }));
     }
     if (this._selectedBtn) this._selectedBtn.classList.remove('selected');
@@ -523,7 +523,7 @@ export default class TankDesignerScene {
     this._toDispose.push(modelRoot, turretPivot, barrelPivot, hullMat, turretMat, trackMat);
 
     // Barrel — async GLB load; fire-and-forget (appears shortly after tank loads)
-    this._activeModelConfig  = { cannonOffsets: { 'cannon-90mm': { z: -0.6 }, 'cannon-t44-100mm': { z: -0.35 } } };
+    this._activeModelConfig  = { cannonOffsets: {} };  // per-cannon nudges (WT-era entries retired)
     this._buildCannon(this._equippedCannon, turretMat).catch(e =>
       console.error('[cannon] build failed:', e)
     );
@@ -546,7 +546,7 @@ export default class TankDesignerScene {
     this._loadComposed(null, {
       hull:   this._equippedHull,
       turret: this._equippedTurret,
-      cannon: this._equippedCannon || 'cannon-90mm',
+      cannon: this._equippedCannon || DEFAULT_LOADOUT.cannon,
     });
   }
 
