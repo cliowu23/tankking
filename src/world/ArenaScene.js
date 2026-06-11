@@ -55,6 +55,10 @@ export default class ArenaScene {
     this._obstacles = [];
     this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
 
+    // Resolves when the player tank's async model work is done (or immediately
+    // for the primitive). The deploy loading screen awaits this before fading.
+    this.ready = new Promise(res => { this._readyResolve = res; });
+
     this._setupCamera();
     this._setupLighting();
     this._setupGround();
@@ -371,6 +375,7 @@ export default class ArenaScene {
         if (modelFile === 'primitive') {
           // Primitive Tank.js entity already has turretPivot/barrelPivot — nothing to load
           document.getElementById('controls-start').textContent = 'PRESS ENTER TO BATTLE';
+          this._readyResolve();
           return;
         }
         // Composed modular tank — also the fallback for any selectedTank no longer in the
@@ -526,11 +531,13 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this._readyResolve();
     }).catch(e => {
       console.error(`[GLB] ${modelFile} load failed:`, e);
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this._readyResolve();
     });
   }
 
@@ -574,11 +581,13 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this._readyResolve();
     }).catch(e => {
       console.error('[Composed] assembly failed for', loadout, e);
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this._readyResolve();
     });
   }
 

@@ -159,36 +159,63 @@ function startHangar() {
   );
 }
 
+const DEPLOY_TIPS = [
+  'AMBUSHERS HIDE IN THE TALL GRASS — WATCH FOR THE OFF-COLOR PATCHES',
+  'EXTRACTION = DRIVE BACK INTO THE TUNNEL AND HOLD THE PAD',
+  'LOOT GETS RICHER THE FURTHER NORTH YOU PUSH — SO DO THE PATROLS',
+  'THE FLANKS HIDE POINTS OF INTEREST. GREED IS A CHOICE',
+  'DIE OUT THERE AND THE RUN\'S SALVAGE STAYS OUT THERE',
+  'LOCK-ON (HOLD F) ALERTS THE TARGET — MANUAL AIM KEEPS YOU QUIET',
+];
+
+// Deploy uses the loading screen, not the checker transition: the overlay goes
+// up instantly, the arena builds + the tank GLB loads behind it (arenaScene.ready),
+// then it fades into the world. _tBusy still guards against double-deploys.
 function deployToArena() {
   if (_tBusy) return;
-  transition(
-    () => {
-      document.getElementById('hangar-prompt').style.display = 'none';
-      document.getElementById('hangar-panel').style.display  = 'none';
-      document.getElementById('hangar-salvage').style.display = 'none';
-      engine.stopRenderLoop();
-      if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
-    },
-    () => {
-      canvas.style.display = 'block';
-      document.getElementById('hud').style.display = 'block';
-      arenaScene = new ArenaScene(engine, onExtractFromArena, WORLD1);
-      window.__arena = arenaScene;
-      engine.runRenderLoop(() => arenaScene.scene.render());
-      // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
-      // (The menu routes through the hangar now, so this no longer runs via the
-      // dead startGame(); on later deploys we drop straight into the run.)
-      if (!controlsSeen) {
-        controlsSeen = true;
-        arenaScene._paused = true;
-        window.__state = 'CONTROLS';
-        document.getElementById('controls-screen').style.display = 'flex';
-      } else {
-        window.__state = 'GAME';
-      }
-    },
-    'checker'
-  );
+  _tBusy = true;
+
+  const lo = document.getElementById('deploy-loading');
+  document.getElementById('deploy-tip').textContent =
+    DEPLOY_TIPS[Math.floor(Math.random() * DEPLOY_TIPS.length)];
+  lo.classList.remove('done');
+  lo.style.opacity = '1';
+  lo.style.display = 'flex';
+
+  document.getElementById('hangar-prompt').style.display  = 'none';
+  document.getElementById('hangar-panel').style.display   = 'none';
+  document.getElementById('hangar-salvage').style.display = 'none';
+  engine.stopRenderLoop();
+  if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
+
+  // Build on the next frame so the overlay paints before the heavy work starts.
+  requestAnimationFrame(() => {
+    canvas.style.display = 'block';
+    arenaScene = new ArenaScene(engine, onExtractFromArena, WORLD1);
+    window.__arena = arenaScene;
+
+    const MIN_MS = 900;   // let the loading screen breathe even on instant loads
+    const t0 = performance.now();
+    arenaScene.ready.then(() => {
+      lo.classList.add('done');   // bar snaps full
+      const wait = Math.max(250, MIN_MS - (performance.now() - t0));
+      setTimeout(() => {
+        document.getElementById('hud').style.display = 'block';
+        engine.runRenderLoop(() => arenaScene.scene.render());
+        // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
+        if (!controlsSeen) {
+          controlsSeen = true;
+          arenaScene._paused = true;
+          window.__state = 'CONTROLS';
+          document.getElementById('controls-screen').style.display = 'flex';
+        } else {
+          window.__state = 'GAME';
+        }
+        lo.style.opacity = '0';
+        setTimeout(() => { lo.style.display = 'none'; _tBusy = false; }, 500);
+      }, wait);
+    });
+  });
 }
 
 function onExtractFromArena(gained, banked) {

@@ -208,6 +208,45 @@
       line-height: 1.4;
     }
 
+    /* ─── DEPLOY LOADING ───────────────────────────────── */
+    #deploy-loading {
+      position: fixed; inset: 0; z-index: 26;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg);            /* solid — covers scene construction */
+      transition: opacity 0.45s ease;
+    }
+    #deploy-loading .dl-kicker {
+      font-family: monospace; font-size: 11px; letter-spacing: 7px;
+      color: var(--dim); margin-bottom: 16px;
+    }
+    #deploy-loading h2 {
+      color: var(--accent); font-size: 26px; letter-spacing: 6px;
+      text-shadow: 0 0 14px var(--accent); line-height: 1.4;
+    }
+    #deploy-loading .dl-sub {
+      margin-top: 12px; font-family: monospace; font-size: 13px;
+      letter-spacing: 5px; color: var(--green);
+    }
+    #dl-track {
+      margin-top: 36px; width: 320px; height: 10px;
+      background: rgba(0,238,221,0.10);
+      outline: 1px solid rgba(0,238,221,0.35); outline-offset: 3px;
+      overflow: hidden; position: relative;
+    }
+    #dl-fill {
+      position: absolute; top: 0; bottom: 0; left: -40%; width: 40%;
+      background: var(--accent); box-shadow: 0 0 12px var(--accent);
+      animation: dl-sweep 1.1s linear infinite;
+    }
+    #deploy-loading.done #dl-fill { animation: none; left: 0; width: 100%; }
+    @keyframes dl-sweep { from { left: -40%; } to { left: 100%; } }
+    #deploy-tip {
+      margin-top: 28px; font-family: monospace; font-size: 11px;
+      letter-spacing: 1.5px; color: #9fdfff; opacity: 0.85;
+      max-width: 540px; text-align: center; line-height: 1.8;
+    }
+
     #death h2 {
       color: var(--danger);
       font-size: 30px;
@@ -767,6 +806,14 @@
     <button id="death-hangar">RETURN TO HANGAR</button>
     <button id="death-restart">RESTART</button>
     <button id="death-menu">MAIN MENU</button>
+  </div>
+
+  <div id="deploy-loading">
+    <div class="dl-kicker">DEPLOYING</div>
+    <h2 id="deploy-loading-title">WORLD 1</h2>
+    <div class="dl-sub" id="deploy-loading-sub">GREEN FIELDS</div>
+    <div id="dl-track"><div id="dl-fill"></div></div>
+    <div id="deploy-tip"></div>
   </div>
 
   <div id="extract-summary">
