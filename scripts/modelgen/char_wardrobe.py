@@ -42,9 +42,12 @@ def box(c, s, col, name, rot=(0, 0, 0)):
     return o
 
 
-# ── HAIR (6, x4 colors) — v5: SCULPTED curve-locks (_hairlib) over a thin scalp.
-# Kenney finding: quality = form language (swoops/locks/tips), ~500 verts total.
-from _hairlib import lock, crown_flow, fringe_swoops
+# ── HAIR — v6 "shell + sculpted hairline" (proven live vs Kenney refs 2026-06-11).
+# Kenney formula (observed in-viewport): ONE thin shell hugging top/sides/back of
+# the skull; ALL style lives in the hairline edge (diagonal sweep / arc / blunt).
+# Built as a subdivided cube, faces deleted by per-style windows, solidified.
+import bmesh as _bmesh
+from _hairlib import lock
 HX, HY = HW + 0.012, HD + 0.012
 
 def hpiece(c, sz, col, name):
@@ -57,132 +60,82 @@ def hpiece(c, sz, col, name):
     return o
 
 
-def _scalp(col, thick=0.032, side_drop=0.10, back_drop=0.13):
-    hpiece((0, 0.012, HTOP + thick / 2 - 0.014), (2 * HX - 0.012, 2 * HY - 0.012, thick + 0.03), col, 'hair_scalp')
-    for sx in (-1, 1):
-        hpiece((sx * (HX - 0.004), 0.018, HTOP - side_drop / 2 + 0.016), (0.026, 2 * HY - 0.05, side_drop + 0.04), col, f'hair_scalp_s{sx}')
-    hpiece((0, HY - 0.008, HTOP - back_drop / 2 + 0.016), (2 * HX - 0.03, 0.032, back_drop + 0.04), col, 'hair_scalp_b')
-
-
-def fuse_hair(col, except_names=()):
-    """Blend all current hair parts into ONE fused organic mesh: join -> voxel
-    remesh (true union, melts the lock/base seams) -> decimate -> smooth -> tint.
-    (User note: locks read as a separate layer on the base — this fuses them.)"""
-    parts = [o for o in bpy.context.scene.objects
-             if o.type == 'MESH' and o.name not in except_names]
-    bpy.ops.object.select_all(action='DESELECT')
-    for o in parts:
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = parts[0]
-    bpy.ops.object.join()
+def hair_shell(col, hairline, cz=0.165, hz=0.115, shx=0.165, shy=0.145,
+               side_cut=-0.04, nape_cut=-0.105, thick=0.024, bump=0.0, name='hair_shell'):
+    bpy.ops.mesh.primitive_cube_add(location=(0, 0.012, cz))
     o = bpy.context.object
-    m = o.modifiers.new('rm', 'REMESH')
-    m.mode = 'VOXEL'
-    m.voxel_size = 0.013
-    bpy.ops.object.modifier_apply(modifier=m.name)
-    ratio = min(1.0, 1400 / max(len(o.data.vertices), 1))
-    d = o.modifiers.new('dec', 'DECIMATE')
-    d.ratio = ratio
-    bpy.ops.object.modifier_apply(modifier=d.name)
-    # de-lump (discovered in the live Blender MCP sculpt session 2026-06-11)
-    sm = o.modifiers.new('smooth', 'SMOOTH')
-    sm.factor = 0.6
-    sm.iterations = 6
-    bpy.ops.object.modifier_apply(modifier=sm.name)
-    # face-clearance: nothing hangs into the eye line (front verts below z=0.16
-    # get lifted and tucked back — the 'fringe over the eyes' fix)
+    o.name = name
+    o.scale = (shx, shy, hz)
+    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.subdivide(number_cuts=9)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    def keep(c):
+        x, y, z = c.x, c.y - 0.012, c.z - cz
+        if y < -0.09 and z < hairline(x):
+            return False
+        if z < side_cut and y < 0.05:
+            return False
+        if z < nape_cut:
+            return False
+        return True
+
+    bm = _bmesh.new()
+    bm.from_mesh(o.data)
+    _bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep(f.calc_center_median())],
+                      context='FACES')
+    bm.to_mesh(o.data)
+    bm.free()
+    # snap the cut boundary to the exact hairline -> crisp straight edge, no staircase
+    cell = 2 * hz / 10
     for v in o.data.vertices:
-        if v.co.y < -0.10 and v.co.z < 0.16:
-            f = 0.16 - v.co.z
-            v.co.z += f * 0.55
-            v.co.y += f * 0.35
-    bpy.ops.object.shade_smooth()
-    o.name = 'hair_fused'
+        x, y, z = v.co.x, v.co.y - 0.012, v.co.z - cz
+        hl = hairline(x)
+        if y < -0.07 and hl - cell * 0.2 <= z <= hl + cell * 1.3:
+            v.co.z = cz + hl
+    m = o.modifiers.new('sol', 'SOLIDIFY')
+    m.thickness = thick
+    m.offset = 1.0
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    if bump > 0:                                  # curly: noisy outward push
+        import math as _m
+        for v in o.data.vertices:
+            n = 0.5 + 0.5 * _m.sin(v.co.x * 53 + v.co.y * 71 + v.co.z * 37)
+            d = (v.co - type(v.co)((0, 0.012, cz))).normalized()
+            v.co += d * bump * n
     tint(o, col)
-    o.data.materials.clear()
     o.data.materials.append(char_material())
     return o
 
 
-def _locks(paths, col, radius=0.034, tip=0.25):
-    for i, pts in enumerate(paths):
-        o = lock(pts, radius=radius, tip=tip)
-        o.name = f'hair_lock_{i}'
-        tint(o, col)
-        o.data.materials.append(char_material())
+def hair_short(col):                               # classic arc hairline
+    hair_shell(col, lambda x: 0.030 + 2.2 * x * x)
 
 
-def hair_short(col):
-    _scalp(col)
-    _locks(crown_flow(n=11, droop=0.09, crown=(0.025, 0.035)), col, radius=0.036)
-    _locks(fringe_swoops(k=3, width=0.20, drop=0.075), col, radius=0.034)
-    fuse_hair(col)
+def hair_side(col):                                # the proven diagonal sweep
+    hair_shell(col, lambda x: 0.055 - 0.30 * x)
 
 
-def hair_side(col):
-    _scalp(col)
-    _locks(crown_flow(n=10, droop=0.10, crown=(-0.055, 0.025), sweep=0.025), col, radius=0.037)
-    _locks(fringe_swoops(k=2, width=0.13, drop=0.10, sweep=0.075), col, radius=0.042)
-    fuse_hair(col)
+def hair_bob(col):                                 # blunt low fringe + deep curtains
+    hair_shell(col, lambda x: -0.050, cz=0.145, hz=0.15,
+               side_cut=-0.135, nape_cut=-0.142, thick=0.028)
 
 
-def hair_buzz(col):                                   # v4 shell stays (correct as-is)
-    _scalp(col, thick=0.045, side_drop=0.10, back_drop=0.12)
-
-
-def hair_bob(col):
-    # unified helmet volume (one sculpted mass), inward-curling bottom rim, blunt fringe
-    hpiece((0, 0.012, HTOP + 0.022), (2 * HX + 0.015, 2 * HY + 0.015, 0.075), col, 'bob_crown')
-    for sx in (-1, 1):
-        hpiece((sx * (HX + 0.008), 0.015, 0.135), (0.045, 2 * HY - 0.005, 0.26), col, f'bob_side_{sx}')
-    hpiece((0, HY + 0.006, 0.12), (2 * HX + 0.005, 0.05, 0.30), col, 'bob_back')
-    hpiece((0, -HY - 0.006, HTOP - 0.045), (2 * HX - 0.015, 0.04, 0.075), col, 'bob_fringe')
-    for sx in (-1, 1):                                    # inward curl at the jaw
-        o = lock([(sx * (HX + 0.012), 0.0, 0.06), (sx * (HX + 0.006), -0.02, 0.025),
-                  (sx * (HX - 0.025), -0.03, 0.015)], radius=0.038, tip=0.5)
-        o.name = f'bob_curl_{sx}'
-        tint(o, col)
-        o.data.materials.append(char_material())
-    o = lock([(0, HY + 0.015, 0.055), (0, HY + 0.005, 0.02), (0, HY - 0.03, 0.012)],
-             radius=0.04, tip=0.5)
-    o.name = 'bob_curl_back'
-    tint(o, col)
-    o.data.materials.append(char_material())
-    fuse_hair(col)
-
-
-def hair_pony(col):
-    _scalp(col, thick=0.04)
-    _locks(crown_flow(n=8, droop=0.04, crown=(0.0, 0.06)), col, radius=0.030, tip=0.55)
-    _locks(fringe_swoops(k=2, width=0.17, drop=0.045), col, radius=0.032)
-    hpiece((0, HY + 0.03, 0.245), (0.085, 0.085, 0.075), col, 'hair_bun')
-    o = lock([(0, HY + 0.04, 0.235), (0, HY + 0.095, 0.16),
-              (0, HY + 0.09, 0.06), (0, HY + 0.055, -0.01)], radius=0.045, tip=0.3)
+def hair_pony(col):                                # arc hairline + bun + thick tail
+    hair_shell(col, lambda x: 0.038 + 1.8 * x * x)
+    hpiece((0, HY + 0.03, 0.235), (0.085, 0.085, 0.075), col, 'hair_bun')
+    o = lock([(0, HY + 0.04, 0.23), (0, HY + 0.09, 0.15),
+              (0, HY + 0.085, 0.05), (0, HY + 0.05, -0.015)], radius=0.045, tip=0.3)
     o.name = 'hair_tail'
     tint(o, col)
     o.data.materials.append(char_material())
-    fuse_hair(col)
-    box((0, HY + 0.04, 0.205), (0.09, 0.08, 0.026), DARK, 'hair_tie')
+    box((0, HY + 0.038, 0.20), (0.09, 0.08, 0.026), DARK, 'hair_tie')
 
 
-def hair_curly(col):
-    # soft rounded puff cluster (organic dome) + a few restrained curl tips
-    hpiece((0, 0.012, HTOP + 0.055), (2 * HX + 0.02, 2 * HY + 0.02, 0.115), col, 'curl_dome')
-    hpiece((0, 0.012, HTOP + 0.115), (2 * HX - 0.05, 2 * HY - 0.05, 0.07), col, 'curl_top')
-    hpiece((0, -HY - 0.004, HTOP - 0.02), (2 * HX - 0.03, 0.05, 0.075), col, 'curl_front')
-    for sx in (-1, 1):
-        hpiece((sx * (HX + 0.01), 0.015, HTOP - 0.035), (0.05, 2 * HY - 0.03, 0.10), col, f'curl_side_{sx}')
-    hpiece((0, HY + 0.008, HTOP - 0.05), (2 * HX - 0.03, 0.05, 0.12), col, 'curl_back')
-    import math as _m
-    for i in range(6):                                    # small curl tips around the dome
-        a = -_m.pi / 2 + 0.7 + (2 * _m.pi - 1.4) * i / 6
-        ex, ey = _m.cos(a) * (HX + 0.02), _m.sin(a) * (HY + 0.02)
-        o = lock([(ex * 0.8, ey * 0.8, HTOP + 0.075), (ex, ey, HTOP + 0.03),
-                  (ex * 0.95, ey * 0.95, HTOP + 0.06)], radius=0.034, tip=0.5)
-        o.name = f'curl_tip_{i}'
-        tint(o, col)
-        o.data.materials.append(char_material())
-    fuse_hair(col)
+def hair_curly(col):                               # shell + noise puff
+    hair_shell(col, lambda x: 0.028 + 2.0 * x * x, hz=0.125, thick=0.040, bump=0.022)
 
 
 # ── HEADWEAR (6) — box shells over the hair envelope ────────────────────────
