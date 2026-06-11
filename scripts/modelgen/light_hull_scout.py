@@ -43,6 +43,7 @@ trk_mat  = track_material()
 # Hull body — profile prism with steep Chaffee glacis
 PROFILE = P.get('hullProfile') or default_hull_profile(P)
 make_profile_prism('hull_body', body_mat, PROFILE, BODY_W)
+HULL_TOP = max(gy for _, gy in PROFILE)  # actual top Z from profile (overrides default)
 
 # Fender skirts (body color — partial coverage, 77% of hull length)
 FENDER_LEN = HULL_LEN * 0.77
@@ -58,7 +59,7 @@ for side, x in (('left', TRACK_CX), ('right', -TRACK_CX)):
 # Engine deck (rear top section)
 bpy.ops.mesh.primitive_cube_add(location=(0, HULL_LEN * 0.30, HULL_TOP - 0.028))
 deck = bpy.context.object
-deck.name = 'engine_deck'
+deck.name = 'rear_deck'
 deck.scale = (BODY_W * 0.44, HULL_LEN * 0.38 / 2, 0.042)
 bpy.ops.object.transform_apply(scale=True)
 assign(deck, body_mat)

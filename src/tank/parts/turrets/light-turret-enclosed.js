@@ -26,6 +26,7 @@ export default {
     for (const m of meshes) m.computeWorldMatrix(true);
 
     const base = measureBase(meshes);
+    console.log(`[light-turret-enclosed] base diameter=${base.diameter.toFixed(2)}`);
     applyModelPaint(meshes, PAINT, scene, paintOverride);
     return { root, meshes, mount, base };
   },
