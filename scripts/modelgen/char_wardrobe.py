@@ -64,6 +64,34 @@ def _scalp(col, thick=0.032, side_drop=0.10, back_drop=0.13):
     hpiece((0, HY - 0.008, HTOP - back_drop / 2 + 0.016), (2 * HX - 0.03, 0.032, back_drop + 0.04), col, 'hair_scalp_b')
 
 
+def fuse_hair(col, except_names=()):
+    """Blend all current hair parts into ONE fused organic mesh: join -> voxel
+    remesh (true union, melts the lock/base seams) -> decimate -> smooth -> tint.
+    (User note: locks read as a separate layer on the base — this fuses them.)"""
+    parts = [o for o in bpy.context.scene.objects
+             if o.type == 'MESH' and o.name not in except_names]
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    o = bpy.context.object
+    m = o.modifiers.new('rm', 'REMESH')
+    m.mode = 'VOXEL'
+    m.voxel_size = 0.013
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    ratio = min(1.0, 1400 / max(len(o.data.vertices), 1))
+    d = o.modifiers.new('dec', 'DECIMATE')
+    d.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier=d.name)
+    bpy.ops.object.shade_smooth()
+    o.name = 'hair_fused'
+    tint(o, col)
+    o.data.materials.clear()
+    o.data.materials.append(char_material())
+    return o
+
+
 def _locks(paths, col, radius=0.034, tip=0.25):
     for i, pts in enumerate(paths):
         o = lock(pts, radius=radius, tip=tip)
@@ -76,12 +104,14 @@ def hair_short(col):
     _scalp(col)
     _locks(crown_flow(n=11, droop=0.09, crown=(0.025, 0.035)), col, radius=0.036)
     _locks(fringe_swoops(k=3, width=0.20, drop=0.075), col, radius=0.034)
+    fuse_hair(col)
 
 
 def hair_side(col):
     _scalp(col)
     _locks(crown_flow(n=10, droop=0.10, crown=(-0.055, 0.025), sweep=0.025), col, radius=0.037)
     _locks(fringe_swoops(k=2, width=0.13, drop=0.10, sweep=0.075), col, radius=0.042)
+    fuse_hair(col)
 
 
 def hair_buzz(col):                                   # v4 shell stays (correct as-is)
@@ -106,6 +136,7 @@ def hair_bob(col):
     o.name = 'bob_curl_back'
     tint(o, col)
     o.data.materials.append(char_material())
+    fuse_hair(col)
 
 
 def hair_pony(col):
@@ -118,6 +149,7 @@ def hair_pony(col):
     o.name = 'hair_tail'
     tint(o, col)
     o.data.materials.append(char_material())
+    fuse_hair(col)
     box((0, HY + 0.04, 0.205), (0.09, 0.08, 0.026), DARK, 'hair_tie')
 
 
@@ -138,6 +170,7 @@ def hair_curly(col):
         o.name = f'curl_tip_{i}'
         tint(o, col)
         o.data.materials.append(char_material())
+    fuse_hair(col)
 
 
 # ── HEADWEAR (6) — box shells over the hair envelope ────────────────────────
