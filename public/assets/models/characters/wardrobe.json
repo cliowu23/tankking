@@ -258,6 +258,32 @@
         ]
       },
       {
+        "model": "hair-topbun",
+        "label": "Top Bun",
+        "variants": [
+          {
+            "id": "hair-topbun-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-topbun-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-topbun-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-topbun-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
+      },
+      {
         "model": "hair-curly",
         "label": "Curly",
         "variants": [

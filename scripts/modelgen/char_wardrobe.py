@@ -137,11 +137,17 @@ def hair_pony(col):                                # arc hairline + bun + thick 
     box((0, HY + 0.045, 0.145), (0.10, 0.09, 0.03), DARK, 'hair_tie')
 
 
-def hair_buns(col):                                # Kenney twin/space buns
+def hair_buns(col):                                # Kenney twin/space buns — BIG
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
     for sx in (-1, 1):
-        hpiece((sx * 0.155, 0.035, 0.25), (0.115, 0.115, 0.10), col, f'hair_bun_{sx}')
-        box((sx * 0.155, 0.035, 0.197), (0.085, 0.085, 0.024), DARK, f'hair_buntie_{sx}')
+        hpiece((sx * 0.175, 0.03, 0.285), (0.17, 0.17, 0.155), col, f'hair_bun_{sx}')
+        box((sx * 0.175, 0.03, 0.205), (0.115, 0.115, 0.028), DARK, f'hair_buntie_{sx}')
+
+
+def hair_topbun(col):                              # single topknot bun
+    hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
+    hpiece((0, 0.025, 0.30), (0.19, 0.19, 0.16), col, 'hair_topbun')
+    box((0, 0.025, 0.215), (0.13, 0.13, 0.03), DARK, 'hair_topbun_tie')
 
 
 def hair_curly(col):                               # shell + noise puff
@@ -268,6 +274,7 @@ PIECES = [
     ('hair-bob',   'hair', 'Bob',       hair_bob,   True),
     ('hair-pony',  'hair', 'Ponytail',  hair_pony,  True),
     ('hair-buns',  'hair', 'Twin Buns', hair_buns,  True),
+    ('hair-topbun', 'hair', 'Top Bun',  hair_topbun, True),
     ('hair-curly', 'hair', 'Curly',     hair_curly, True),
     ('face-glasses', 'face', 'Glasses', face_glasses, None),
     ('face-shades',  'face', 'Shades',  face_shades,  None),
