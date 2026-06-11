@@ -169,8 +169,8 @@ def hair_pony(col):                                # arc hairline + bun + thick 
 def hair_buns(col):                                # Kenney twin/space buns — BIG
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
     for sx in (-1, 1):
-        hpiece((sx * 0.138, 0.025, 0.262), (0.17, 0.17, 0.155), col, f'hair_bun_{sx}')
-        box((sx * 0.138, 0.025, 0.185), (0.115, 0.115, 0.028), DARK, f'hair_buntie_{sx}')
+        hpiece((sx * 0.138, 0.065, 0.262), (0.17, 0.17, 0.155), col, f'hair_bun_{sx}')
+        box((sx * 0.138, 0.065, 0.185), (0.115, 0.115, 0.028), DARK, f'hair_buntie_{sx}')
 
 
 def hair_topbun(col):                              # regulation bun — low at the BACK
