@@ -17,6 +17,7 @@ const PORT = 7077;
 const SCRIPTS = {
   player_tank: { hull: 'player_hull_base.py', turret: 'player_turret_base.py', gun: 'player_gun_90mm.py' },
   medium_tank: { hull: 'medium_hull_standard.py', turret: 'medium_turret_angular.py', gun: 'medium_gun_50mm.py' },
+  light_tank:  { hull: 'light_hull_scout.py',    turret: 'light_turret_enclosed.py', gun: 'light_gun_75mm.py'  },
 };
 const paramsPath = tank => join(DIR, 'params', `${tank}.json`);
 const validTank = t => Object.hasOwn(SCRIPTS, t) ? t : 'player_tank';
