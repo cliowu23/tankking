@@ -21,6 +21,7 @@ import SalvageCrate from './SalvageCrate.js';
 import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
+import { buildWorld1 } from './zones/World1Builder.js';
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -85,8 +86,11 @@ export default class ArenaScene {
     ambient.diffuse     = new Color3(1.0, 0.97, 0.88);
     ambient.groundColor = new Color3(0.28, 0.52, 0.10);
 
-    this.dirLight = new DirectionalLight('dir', new Vector3(-0.5, -1.4, -0.5), this.scene);
-    this.dirLight.intensity = 1.1;
+    // Zone lighting matches the approved world1-mockup (high-noon, softer sun) —
+    // the old arena sun at 1.1 washes the dirt paths to white.
+    this.dirLight = new DirectionalLight('dir',
+      this.zone ? new Vector3(0.15, -1, 0.12) : new Vector3(-0.5, -1.4, -0.5), this.scene);
+    this.dirLight.intensity = this.zone ? 0.65 : 1.1;
     this.dirLight.position  = new Vector3(12, 20, 12);
 
     this.shadowGen = new ShadowGenerator(1024, this.dirLight);
@@ -100,17 +104,11 @@ export default class ArenaScene {
 
   _setupGround() {
     if (this.zone) {
-      // Zone ground: flat bright field, sized to the visual extent. The sculpted
-      // border hills + biome dressing arrive with the zone builder (M3); until
-      // then this is a plain green plane the clamps keep the player inside.
-      const size = this.zone.bounds.visual * 2;
-      const ground = MeshBuilder.CreateGround('ground', { width: size, height: size, subdivisions: 1 }, this.scene);
-      const [r, g, b] = this.zone.palette.grass;
-      const mat = new StandardMaterial('groundMat', this.scene);
-      mat.diffuseColor  = new Color3(r, g, b);
-      mat.specularColor = new Color3(0.02, 0.02, 0.02);
-      ground.material = mat;
-      ground.receiveShadows = true;
+      // The zone builder constructs the whole environment: sculpted terrain,
+      // biome dressing, POIs, the south tunnel + safe zone, the Keep vista.
+      // Its AABBs feed the existing obstacle collision system.
+      const built = buildWorld1(this.scene, this.zone);
+      this._obstacles.push(...built.obstacles);
       return;
     }
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
