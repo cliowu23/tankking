@@ -12,6 +12,32 @@ For the *reasoning* behind architectural choices, see `DECISIONS.md`. This file 
 
 ---
 
+## 2026-06-11 — World 1 "Green Fields" vertical slice
+- First real zone, built mockup-first (`world1-mockup.html`, user-approved layout gate) then ported.
+- **Zone system:** `world/zones/world1.js` data config (spawn, extraction, 3 depth bands, 16 fixed
+  enemy spawns, 13 depth-scaled loot drops, palette, dressing data) + `ArenaScene(engine, cb, zone)`.
+  Hardcoded ±48 bounds in Tank/Enemy/AIEnemy parameterized (`.bounds`; World 1 = ±140 of 300×300).
+- **The tunnel means something now:** deploy → Aqua-Arcade loading screen (`#deploy-loading`,
+  awaits `ArenaScene.ready`) → spawn just north of a south-berm tunnel mouth (hangar bore recipe,
+  portal headwall, grassy mounds) inside a sandbag+dragon-teeth safe zone; extraction = drive back
+  to the mouth and channel.
+- **`World1Builder.js`:** sculpted border hills (playable stays y=0), hard-edged dirt paths, 20
+  hedgerows + walls with chained AABB obstacles, chunked thin-instance tall grass (ambush hides
+  tinted), instanced trees/rocks, blob shadows, POIs (Clint's ruined store, outsider wreck,
+  farmstead, ruined watchtower, Tankford checkpoint, 3-cottage village + well), Iron Keep vista
+  on the unreachable north hill.
+- **Chaffee enemies:** `LightTankEnemy` = light modular parts assembled per enemy onto the AIEnemy
+  rig (same path as the player tank), Tankford red; AIEnemy gained opts tuning, AMBUSH state +
+  `hearNoise` (player gunfire within 30u springs hidden ambushers), death-tint/revive hooks.
+  ArenaScene unified to one enemies array; ALL enemy shell pools now hit-checked (per-enemy damage).
+- Verified end-to-end via Playwright: deploy → drive out of safe zone → kill → loot → extract →
+  redeploy; 120 FPS spawn / 70 FPS village; no GL errors (fixed thin-instance clones sharing
+  geometry corrupting buffers; fixed ArcRotate double-click state restore in the mockup).
+- **Known follow-ups:** distant Keep can't enter the fixed top-down frustum (reads as the north
+  hill in-game — consider camera ease or HUD marker); modelgen GLBs are mesh-heavy → ~1100 active
+  meshes / 324 materials at the deep band (merge meshes in the generator); fences invisible from
+  top-down; enemy AI has no obstacle avoidance (hedgerows can snag chasers).
+
 ## 2026-06-08 — Extraction loop Slice 1
 - Salvage crates (drive-over) + extraction pad with a 3s timed channel
 - Extract banks run salvage (persisted via `runState.js`); death loses it (tank kept)
