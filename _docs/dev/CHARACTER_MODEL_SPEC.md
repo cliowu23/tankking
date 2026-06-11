@@ -129,3 +129,9 @@ commit canon + GLB.
   not an asset issue. Verify with FRESH loads.
 - Exporter pads AnimationGroup frame ranges (idle authored 1–58 reported as 0–145) —
   harmless, clips still loop correctly; don't chase it.
+- **SUBSURF SHRINKS** boxes toward their centers — fitted multi-piece forms (hair!)
+  contract into floating "pancakes" with gaps. For the Kenney-organic look on fitted
+  pieces: BEVEL (3 segments) + smooth shading (no shrink) + ≥0.02 geometric overlap
+  between pieces so masses read as one connected form.
+- Hair/hat/face color VARIANTS are one model + color dots in the UI (registry emits
+  `{model, label, variants:[{id, cw, hex}]}`) — never N near-identical buttons.
