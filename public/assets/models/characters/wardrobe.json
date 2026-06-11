@@ -53,45 +53,250 @@
       "label": "F6"
     }
   ],
+  "heads": [
+    {
+      "id": "char-skin-a",
+      "label": "Skin A"
+    },
+    {
+      "id": "char-skin-b",
+      "label": "Skin B"
+    },
+    {
+      "id": "char-skin-c",
+      "label": "Skin C"
+    },
+    {
+      "id": "char-skin-d",
+      "label": "Skin D"
+    }
+  ],
+  "bodies": [
+    {
+      "id": "body-jacket-tan",
+      "label": "Driver Jacket (tan)"
+    },
+    {
+      "id": "body-jacket-blue",
+      "label": "Driver Jacket (blue)"
+    },
+    {
+      "id": "body-overalls-navy",
+      "label": "Mechanic Overalls (navy)"
+    },
+    {
+      "id": "body-overalls-olive",
+      "label": "Mechanic Overalls (olive)"
+    },
+    {
+      "id": "body-vest-brown",
+      "label": "Merchant Vest (brown)"
+    },
+    {
+      "id": "body-medic-cream",
+      "label": "Medic Coat (cream)"
+    },
+    {
+      "id": "body-telogreika-khaki",
+      "label": "Padded Jacket (khaki)"
+    },
+    {
+      "id": "body-telogreika-grey",
+      "label": "Padded Jacket (grey)"
+    },
+    {
+      "id": "body-workshirt-sand",
+      "label": "Work Shirt (sand)"
+    },
+    {
+      "id": "body-workshirt-red",
+      "label": "Work Shirt (red)"
+    }
+  ],
   "slots": {
     "hair": [
       {
         "id": "hair-short-brown",
-        "label": "Short Crop (brown)"
+        "label": "Short (brown)"
       },
       {
         "id": "hair-short-black",
-        "label": "Short Crop (black)"
+        "label": "Short (black)"
       },
       {
         "id": "hair-short-blond",
-        "label": "Short Crop (blond)"
+        "label": "Short (blond)"
       },
       {
         "id": "hair-short-grey",
-        "label": "Short Crop (grey)"
+        "label": "Short (grey)"
+      },
+      {
+        "id": "hair-side-brown",
+        "label": "Side Part (brown)"
+      },
+      {
+        "id": "hair-side-black",
+        "label": "Side Part (black)"
+      },
+      {
+        "id": "hair-side-blond",
+        "label": "Side Part (blond)"
+      },
+      {
+        "id": "hair-side-grey",
+        "label": "Side Part (grey)"
+      },
+      {
+        "id": "hair-buzz-brown",
+        "label": "Buzz (brown)"
+      },
+      {
+        "id": "hair-buzz-black",
+        "label": "Buzz (black)"
+      },
+      {
+        "id": "hair-buzz-blond",
+        "label": "Buzz (blond)"
+      },
+      {
+        "id": "hair-buzz-grey",
+        "label": "Buzz (grey)"
+      },
+      {
+        "id": "hair-bob-brown",
+        "label": "Bob (brown)"
+      },
+      {
+        "id": "hair-bob-black",
+        "label": "Bob (black)"
+      },
+      {
+        "id": "hair-bob-blond",
+        "label": "Bob (blond)"
+      },
+      {
+        "id": "hair-bob-grey",
+        "label": "Bob (grey)"
+      },
+      {
+        "id": "hair-pony-brown",
+        "label": "Ponytail (brown)"
+      },
+      {
+        "id": "hair-pony-black",
+        "label": "Ponytail (black)"
+      },
+      {
+        "id": "hair-pony-blond",
+        "label": "Ponytail (blond)"
+      },
+      {
+        "id": "hair-pony-grey",
+        "label": "Ponytail (grey)"
+      },
+      {
+        "id": "hair-curly-brown",
+        "label": "Curly (brown)"
+      },
+      {
+        "id": "hair-curly-black",
+        "label": "Curly (black)"
+      },
+      {
+        "id": "hair-curly-blond",
+        "label": "Curly (blond)"
+      },
+      {
+        "id": "hair-curly-grey",
+        "label": "Curly (grey)"
       }
     ],
     "headwear": [
       {
         "id": "hw-tanker-cap",
         "label": "Tanker Cap"
+      },
+      {
+        "id": "hw-helmet",
+        "label": "Helmet"
+      },
+      {
+        "id": "hw-beanie",
+        "label": "Beanie"
+      },
+      {
+        "id": "hw-headset",
+        "label": "Headset"
+      },
+      {
+        "id": "hw-goggles",
+        "label": "Goggles"
+      },
+      {
+        "id": "hw-ushanka",
+        "label": "Ushanka"
       }
     ],
     "face": [
       {
-        "id": "aid-glasses",
+        "id": "face-glasses",
         "label": "Glasses"
       },
       {
-        "id": "aid-sunglasses",
+        "id": "face-shades",
         "label": "Shades"
       },
       {
-        "id": "aid-mask",
+        "id": "face-mask",
         "label": "Mask"
+      },
+      {
+        "id": "face-beard-brown",
+        "label": "Beard (brown)"
+      },
+      {
+        "id": "face-beard-black",
+        "label": "Beard (black)"
+      },
+      {
+        "id": "face-beard-blond",
+        "label": "Beard (blond)"
+      },
+      {
+        "id": "face-beard-grey",
+        "label": "Beard (grey)"
+      },
+      {
+        "id": "face-stache-brown",
+        "label": "Stache (brown)"
+      },
+      {
+        "id": "face-stache-black",
+        "label": "Stache (black)"
+      },
+      {
+        "id": "face-stache-blond",
+        "label": "Stache (blond)"
+      },
+      {
+        "id": "face-stache-grey",
+        "label": "Stache (grey)"
       }
     ],
-    "back": []
+    "back": [
+      {
+        "id": "back-toolpack",
+        "label": "Toolpack"
+      },
+      {
+        "id": "back-satchel",
+        "label": "Satchel"
+      },
+      {
+        "id": "back-bedroll",
+        "label": "Bedroll"
+      }
+    ]
   }
 }

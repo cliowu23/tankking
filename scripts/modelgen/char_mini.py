@@ -1,39 +1,44 @@
-# char_mini — THE parametric mini-character generator (Batch C1+).
-# One script, one params JSON per character: scripts/modelgen/params/char_<id>.json
-#   blender --background --python scripts/modelgen/char_mini.py -- char_driver_a
-# Detail Doctrine (character edition): hair/cap silhouette, geometric face,
-# jacket/belt/boots color blocking, cuffs, pockets, buckle. ≤3k verts.
-# Axes: Z up, character faces -Y (= game +Z). NEVER transform_apply (armature!).
+# char_mini — THE parametric mini-character generator (W1 wardrobe era).
+# Full characters = rig + body-mesh (OUTFIT, bald of skin) + head-mesh (the SKIN
+# unit: head + ears + face + HANDS bound to arm bones — so skin tone swaps as one
+# graft and outfits stay skin-agnostic with bare hands; no gloves per user).
+# Hair/headwear/face/back are wardrobe attachments (char_wardrobe.py), NOT baked.
+#   blender --background --python scripts/modelgen/char_mini.py -- all|driver|skins|bodies
+# Axes: Z up, faces -Y. NEVER transform_apply (armature!).
 import sys, os, json, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _charlib import (clear_scene, make_armature, tint, bind_part, finish_mesh,
                       idle_action, walk_action, export_char)
 import bpy
 
-# ── Params ───────────────────────────────────────────────────────────────────
-argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-PARAM_FILE = (argv[0] if argv else 'char_driver_a')
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'params', f'{PARAM_FILE}.json')) as f:
-    P = json.load(f)
+DARK  = (0.09, 0.08, 0.08, 1.0)
+BOOTS = (0.16, 0.13, 0.10, 1.0)
+BELT  = (0.20, 0.16, 0.12, 1.0)
+SHIRT = (0.82, 0.78, 0.68, 1.0)
+PANTS = (0.30, 0.27, 0.22, 1.0)
 
-CHAR_ID = P['id']
-W = P.get('build', {}).get('width', 1.0)
-H = P.get('build', {}).get('height', 1.0)
-rgba = lambda c: (c[0], c[1], c[2], 1.0)
-SKIN, HAIR, CAP = rgba(P['skinTone']), rgba(P['hairColor']), rgba(P.get('capColor', P['hairColor']))
-JACKET, SHIRT = rgba(P['jacketColor']), rgba(P.get('shirtColor', P['jacketColor']))
-PANTS, BOOTS, BELT = rgba(P['pantsColor']), rgba(P['bootColor']), rgba(P.get('beltColor', [0.2, 0.16, 0.12]))
-DARK = (0.09, 0.08, 0.08, 1.0)
+# USER-APPROVED outfit list (plan 2026-06-11) — 6 styles, curated colorways
+OUTFITS = {
+    'jacket':     { 'label': 'Driver Jacket',     'colorways': { 'tan': (0.55, 0.48, 0.34, 1), 'blue': (0.25, 0.32, 0.45, 1) } },
+    'overalls':   { 'label': 'Mechanic Overalls', 'colorways': { 'navy': (0.22, 0.26, 0.34, 1), 'olive': (0.36, 0.38, 0.26, 1) } },
+    'vest':       { 'label': 'Merchant Vest',     'colorways': { 'brown': (0.40, 0.28, 0.18, 1) } },
+    'medic':      { 'label': 'Medic Coat',        'colorways': { 'cream': (0.88, 0.85, 0.78, 1) } },
+    'telogreika': { 'label': 'Padded Jacket',     'colorways': { 'khaki': (0.50, 0.46, 0.36, 1), 'grey': (0.45, 0.45, 0.47, 1) } },
+    'workshirt':  { 'label': 'Work Shirt',        'colorways': { 'sand': (0.72, 0.62, 0.45, 1), 'red': (0.55, 0.25, 0.20, 1) } },
+}
+SKINS = {
+    'a': (0.87, 0.65, 0.50, 1), 'b': (0.72, 0.50, 0.36, 1),
+    'c': (0.55, 0.38, 0.26, 1), 'd': (0.38, 0.27, 0.20, 1),
+}
 
-clear_scene()
-arm = make_armature()
+W = H = 1.12  # the plump-toyish house build (locked at the C1 gate)
 
 
 def box(c, s, bev=0.0):
     bpy.ops.mesh.primitive_cube_add(location=(c[0] * W, c[1], c[2] * H))
     o = bpy.context.object
     o.scale = (s[0] / 2 * W, s[1] / 2, s[2] / 2 * H)
-    bpy.ops.object.transform_apply(scale=True)   # mesh-only scale apply (no armature yet)
+    bpy.ops.object.transform_apply(scale=True)
     if bev > 0:
         m = o.modifiers.new('bvl', 'BEVEL')
         m.width, m.segments, m.limit_method = bev, 2, 'ANGLE'
@@ -59,64 +64,106 @@ def mk(obj, color, bone):
     return obj
 
 
-# ── BODY parts — PLUMP toyish silhouette (C1 gate feedback: "plump fun toyish") ─
-body = []
-# hips + belt + buckle (root bone) — wide pear base
-body.append(mk(box((0, 0, 0.247), (0.285, 0.195, 0.055), bev=0.018), PANTS, 'root'))
-body.append(mk(box((0, 0, 0.277), (0.295, 0.205, 0.034), bev=0.01), BELT, 'root'))
-body.append(mk(box((0, -0.106, 0.277), (0.05, 0.012, 0.028)), DARK, 'root'))     # buckle
-# torso: pear — wide round belly + narrower chest + collar + zip + chest pockets
-body.append(mk(box((0, 0, 0.327), (0.30, 0.205, 0.105), bev=0.034), JACKET, 'torso'))  # belly
-body.append(mk(box((0, 0, 0.398), (0.25, 0.17, 0.085), bev=0.024), JACKET, 'torso'))   # chest
-body.append(mk(box((0, -0.081, 0.413), (0.075, 0.014, 0.04)), SHIRT, 'torso'))   # shirt v
-body.append(mk(box((0, 0, 0.439), (0.215, 0.15, 0.026), bev=0.008), JACKET, 'torso'))  # collar
-body.append(mk(box((0, -0.099, 0.355), (0.012, 0.012, 0.125)), DARK, 'torso'))    # zip line
-for sx in (-1, 1):                                                               # chest pockets
-    body.append(mk(box((sx * 0.068, -0.099, 0.355), (0.055, 0.012, 0.04)), JACKET, 'torso'))
-    body.append(mk(box((sx * 0.068, -0.102, 0.373), (0.055, 0.01, 0.012)), BELT, 'torso'))
-# legs + boots (leg bones) — chunky stubby legs, big toy boots
-for side, sx in (('leg-left', 1), ('leg-right', -1)):
-    leg = cyl((sx * 0.088, 0, 0.155), 0.062, 0.175); mk(leg, PANTS, side)
-    cuffp = cyl((sx * 0.088, 0, 0.085), 0.067, 0.035); mk(cuffp, PANTS, side)    # pant cuff
-    boot = box((sx * 0.088, -0.025, 0.038), (0.13, 0.20, 0.076), bev=0.018); mk(boot, BOOTS, side)
-# arms — flared slightly outward (toy A-pose), cuffs + mitten hands
-ARM_TILT = 0.12
-for side, sx in (('arm-left', 1), ('arm-right', -1)):
-    armp = cyl((sx * 0.193, 0, 0.30), 0.048, 0.17)
-    armp.rotation_euler.y = -sx * ARM_TILT
-    mk(armp, JACKET, side)
-    cuff = cyl((sx * 0.204, 0, 0.213), 0.054, 0.036); mk(cuff, BELT, side)       # sleeve cuff
-    hand = sph((sx * 0.208, 0, 0.17), 0.052); mk(hand, SKIN, side)
-# shoulders (sphere caps inside the joint so rigid arm swings don't open gaps)
-for sx in (-1, 1):
-    body.append(mk(sph((sx * 0.182, 0, 0.403), 0.056), JACKET, 'torso'))
-body += []  # legs/arms appended via mk() returns below
-parts_body = [o for o in bpy.context.scene.objects if o.type == 'MESH']
-finish_mesh(parts_body, 'body-mesh', arm)
+def build_character(char_id, skin, outfit_style, outfit_col):
+    clear_scene()
+    arm = make_armature()
+    OUT = outfit_col
+    torso_col = SHIRT if outfit_style in ('overalls', 'vest', 'workshirt') else OUT
+    if outfit_style == 'workshirt':
+        torso_col = OUT
+    pants_col = OUT if outfit_style == 'overalls' else PANTS
 
-# ── HEAD parts — bigger, rounder (plump pass) ────────────────────────────────
-head_parts = []
-head_parts.append(mk(box((0, 0, 0.527), (0.26, 0.225, 0.215), bev=0.035), SKIN, 'head'))
-# geometric face (front = -Y): eyes, brows
-for sx in (-1, 1):
-    head_parts.append(mk(box((sx * 0.056, -0.114, 0.54), (0.03, 0.012, 0.038)), DARK, 'head'))
-    head_parts.append(mk(box((sx * 0.056, -0.114, 0.572), (0.038, 0.01, 0.013)), HAIR, 'head'))
-# ears
-for sx in (-1, 1):
-    head_parts.append(mk(box((sx * 0.136, 0, 0.523), (0.02, 0.045, 0.055)), SKIN, 'head'))
-# hair: back + sides under the cap (or full hair if no cap)
-head_parts.append(mk(box((0, 0.10, 0.537), (0.27, 0.038, 0.185)), HAIR, 'head'))
-if P.get('hairStyle') == 'cap':
-    head_parts.append(mk(box((0, 0.01, 0.643), (0.285, 0.255, 0.05), bev=0.016), CAP, 'head'))
-    head_parts.append(mk(box((0, -0.155, 0.627), (0.225, 0.095, 0.02)), CAP, 'head'))  # brim
-    head_parts.append(mk(box((0, -0.045, 0.67), (0.08, 0.11, 0.013)), CAP, 'head'))   # crown seam
-else:
-    head_parts.append(mk(box((0, 0, 0.643), (0.275, 0.24, 0.055), bev=0.018), HAIR, 'head'))
-    head_parts.append(mk(box((0, -0.103, 0.629), (0.265, 0.032, 0.038)), HAIR, 'head'))  # fringe
+    # ── BODY (outfit, no skin parts) ──────────────────────────────────────────
+    mk(box((0, 0, 0.247), (0.285, 0.195, 0.055), bev=0.018), pants_col, 'root')
+    mk(box((0, 0, 0.277), (0.295, 0.205, 0.034), bev=0.01), BELT, 'root')
+    mk(box((0, -0.106, 0.277), (0.05, 0.012, 0.028)), DARK, 'root')                  # buckle
+    mk(box((0, 0, 0.327), (0.30, 0.205, 0.105), bev=0.034), torso_col, 'torso')      # belly
+    mk(box((0, 0, 0.398), (0.25, 0.17, 0.085), bev=0.024), torso_col, 'torso')       # chest
 
-new_meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.name != 'body-mesh']
-finish_mesh(new_meshes, 'head-mesh', arm)
+    if outfit_style == 'jacket':
+        mk(box((0, -0.081, 0.413), (0.075, 0.014, 0.04)), SHIRT, 'torso')            # shirt v
+        mk(box((0, 0, 0.439), (0.215, 0.15, 0.026), bev=0.008), OUT, 'torso')        # collar
+        mk(box((0, -0.099, 0.355), (0.012, 0.012, 0.125)), DARK, 'torso')            # zip
+        for sx in (-1, 1):
+            mk(box((sx * 0.068, -0.099, 0.355), (0.055, 0.012, 0.04)), OUT, 'torso')
+            mk(box((sx * 0.068, -0.102, 0.373), (0.055, 0.01, 0.012)), BELT, 'torso')
+    elif outfit_style == 'overalls':
+        mk(box((0, -0.103, 0.40), (0.165, 0.014, 0.13), bev=0.01), OUT, 'torso')     # bib
+        mk(box((0, -0.107, 0.415), (0.075, 0.012, 0.05)), OUT, 'torso')              # bib pocket
+        for sx in (-1, 1):                                                            # straps
+            mk(box((sx * 0.07, -0.10, 0.455), (0.04, 0.014, 0.06)), OUT, 'torso')
+            mk(box((sx * 0.07, 0.0, 0.468), (0.04, 0.20, 0.014)), OUT, 'torso')
+    elif outfit_style == 'vest':
+        for sx in (-1, 1):                                                            # front panels
+            mk(box((sx * 0.078, -0.102, 0.385), (0.085, 0.014, 0.135), bev=0.01), OUT, 'torso')
+        mk(box((0, 0.10, 0.385), (0.24, 0.016, 0.14), bev=0.01), OUT, 'torso')        # back panel
+    elif outfit_style == 'medic':
+        mk(box((0, -0.081, 0.413), (0.075, 0.014, 0.04)), SHIRT, 'torso')
+        mk(box((0, 0, 0.439), (0.215, 0.15, 0.026), bev=0.008), OUT, 'torso')
+        mk(box((0, 0, 0.245), (0.30, 0.21, 0.06), bev=0.015), OUT, 'root')            # coat hem
+        mk(box((0.07, -0.103, 0.41), (0.035, 0.012, 0.012)), (0.8, 0.15, 0.12, 1), 'torso')  # red cross
+        mk(box((0.07, -0.103, 0.41), (0.012, 0.012, 0.035)), (0.8, 0.15, 0.12, 1), 'torso')
+    elif outfit_style == 'telogreika':
+        for i, z in enumerate((0.305, 0.345, 0.385, 0.425)):                          # quilt ridges
+            mk(box((0, -0.10, z), (0.235, 0.014, 0.016)), OUT, 'torso')
+            mk(box((0, 0.10, z), (0.235, 0.014, 0.016)), OUT, 'torso')
+        mk(box((0, 0, 0.445), (0.20, 0.155, 0.038), bev=0.01), OUT, 'torso')          # stand collar
+    elif outfit_style == 'workshirt':
+        for sx in (-1, 1):                                                            # suspenders
+            mk(box((sx * 0.065, -0.102, 0.40), (0.032, 0.012, 0.14)), DARK, 'torso')
+            mk(box((sx * 0.065, 0.102, 0.40), (0.032, 0.012, 0.14)), DARK, 'torso')
+        for sx in (-1, 1):                                                            # chest buttons
+            mk(box((0, -0.104, 0.36 + (sx + 1) * 0.02), (0.012, 0.01, 0.012)), DARK, 'torso')
 
-idle_action(arm)
-walk_action(arm)
-export_char(CHAR_ID)
+    for side, sx in (('leg-left', 1), ('leg-right', -1)):
+        mk(cyl((sx * 0.088, 0, 0.155), 0.062, 0.175), pants_col, side)
+        mk(cyl((sx * 0.088, 0, 0.085), 0.067, 0.035), pants_col, side)
+        mk(box((sx * 0.088, -0.025, 0.038), (0.13, 0.20, 0.076), bev=0.018), BOOTS, side)
+    ARM_TILT = 0.12
+    sleeve_col = OUT if outfit_style != 'vest' else SHIRT
+    for side, sx in (('arm-left', 1), ('arm-right', -1)):
+        a = cyl((sx * 0.193, 0, 0.30), 0.048, 0.17)
+        a.rotation_euler.y = -sx * ARM_TILT
+        mk(a, sleeve_col, side)
+        mk(cyl((sx * 0.204, 0, 0.213), 0.054, 0.036), BELT, side)                     # cuff
+    for sx in (-1, 1):
+        mk(sph((sx * 0.182, 0, 0.403), 0.056), sleeve_col, 'torso')                   # shoulders
+    finish_mesh([o for o in bpy.context.scene.objects if o.type == 'MESH'], 'body-mesh', arm)
+
+    # ── SKIN unit (head-mesh): bald head + face + ears + HANDS ────────────────
+    mk(box((0, 0, 0.527), (0.26, 0.225, 0.215), bev=0.035), skin, 'head')
+    for sx in (-1, 1):
+        mk(box((sx * 0.056, -0.114, 0.54), (0.03, 0.012, 0.038)), DARK, 'head')       # eyes
+        mk(box((sx * 0.056, -0.114, 0.572), (0.038, 0.01, 0.013)), DARK, 'head')      # brows
+        mk(box((sx * 0.136, 0, 0.523), (0.02, 0.045, 0.055)), skin, 'head')           # ears
+    for side, sx in (('arm-left', 1), ('arm-right', -1)):                             # bare hands
+        mk(sph((sx * 0.208, 0, 0.17), 0.052), skin, side)
+    finish_mesh([o for o in bpy.context.scene.objects
+                 if o.type == 'MESH' and o.name != 'body-mesh'], 'head-mesh', arm)
+
+    idle_action(arm)
+    walk_action(arm)
+    export_char(char_id)
+
+
+def gen_driver():
+    build_character('char-driver-a', SKINS['a'], 'jacket', OUTFITS['jacket']['colorways']['tan'])
+
+
+def gen_skins():
+    for sid, col in SKINS.items():
+        build_character(f'char-skin-{sid}', col, 'jacket', OUTFITS['jacket']['colorways']['tan'])
+
+
+def gen_bodies():
+    for style, d in OUTFITS.items():
+        for cw, col in d['colorways'].items():
+            build_character(f'body-{style}-{cw}', SKINS['a'], style, col)
+
+
+if __name__ == '__main__':
+    argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['all']
+    mode = argv[0] if argv else 'all'
+    if mode in ('driver', 'all'): gen_driver()
+    if mode in ('skins', 'all'):  gen_skins()
+    if mode in ('bodies', 'all'): gen_bodies()
