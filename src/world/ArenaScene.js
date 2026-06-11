@@ -14,6 +14,7 @@ import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.
 import Tank from '../tank/Tank.js';
 import Enemy from './Enemy.js';
 import AIEnemy from './AIEnemy.js';
+import LightTankEnemy from './LightTankEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -311,34 +312,42 @@ export default class ArenaScene {
     this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 
-    // Placeholder enemies until the Chaffee light tanks land (M5). In a zone
-    // they occupy the config's patrol spots so combat happens where it will
-    // ship; ambush spots stay empty for now.
+    // One unified enemy array. Zone: every spawn in the config becomes a
+    // Chaffee-style light tank with its band's tuning (ambushers start hidden
+    // in the tall grass). Legacy arena: the old 5 statics + orange AI.
     if (this.zone) {
-      const patrols = this.zone.enemies.filter(e => e.mode === 'patrol');
-      this._enemySpawns = patrols.slice(0, patrols.length - 1).map(e => [e.x, e.z]);
-      const last = patrols[patrols.length - 1];
-      this._aiSpawn = [last.x, last.z];
+      const tuning = this.zone.bandTuning;
+      this._spawnDefs = this.zone.enemies.map(e => [e.x, e.z]);
+      this.enemies = this.zone.enemies.map(e => {
+        const t = tuning[e.band];
+        return new LightTankEnemy(this.scene, e.x, e.z, {
+          hp: t.hp, damage: t.dmg, cooldown: t.cooldown,
+          ambush: e.mode === 'ambush',
+          bounds,
+        });
+      });
+      // The loading screen waits for the player AND the composed enemies.
+      this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
-      this._enemySpawns = [
+      this._spawnDefs = [
         [  0.0, -25.5],
         [-21.9, -10.3],
         [ 19.2, -13.9],
         [-13.6,  16.7],
         [ 16.2,  14.7],
       ];
-      this._aiSpawn = [0, 42];
+      this.enemies = this._spawnDefs.map(([x, z]) => {
+        const e = new Enemy(this.scene, x, z);
+        e.bounds = bounds;
+        e.addShadows(this.shadowGen);
+        return e;
+      });
+      const ai = new AIEnemy(this.scene, 0, 42);
+      ai.bounds = bounds;
+      ai.addShadows(this.shadowGen);
+      this.enemies.push(ai);
+      this._spawnDefs.push([0, 42]);
     }
-    this.enemies = this._enemySpawns.map(([x, z]) => {
-      const e = new Enemy(this.scene, x, z);
-      e.bounds = bounds;
-      e.addShadows(this.shadowGen);
-      return e;
-    });
-
-    this.aiEnemy = new AIEnemy(this.scene, this._aiSpawn[0], this._aiSpawn[1]);
-    this.aiEnemy.bounds = bounds;
-    this.aiEnemy.addShadows(this.shadowGen);
 
 
     // Pause / restart
@@ -673,8 +682,7 @@ export default class ArenaScene {
       cz = ray.origin.z + t * ray.direction.z;
     }
     let nearest = null, bestDist = Infinity;
-    const candidates = [...this.enemies, this.aiEnemy];
-    for (const enemy of candidates) {
+    for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
       const d = Math.hypot(enemy.position.x - cx, enemy.position.z - cz);
       if (d < bestDist) { bestDist = d; nearest = enemy; }
@@ -739,10 +747,9 @@ export default class ArenaScene {
       this.tank.update(dt);
 
       for (const enemy of this.enemies) {
-        enemy.update(dt);
+        enemy.update(dt, this.tank.position);
+        if (enemy.shells) for (const s of enemy.shells) s.update(dt);
       }
-      this.aiEnemy.update(dt, this.tank.position);
-      for (const s of this.aiEnemy.shells) s.update(dt);
 
       // Barrel elevation disabled for flat-shot mode — re-enable with _elevationForHeight when arc shots return
       this.tank.barrelElevation = 0;
@@ -953,10 +960,9 @@ export default class ArenaScene {
 
   _restart() {
     for (let i = 0; i < this.enemies.length; i++) {
-      const [x, z] = this._enemySpawns[i];
+      const [x, z] = this._spawnDefs[i];
       this.enemies[i].reset(x, z);
     }
-    this.aiEnemy.reset(this._aiSpawn[0], this._aiSpawn[1]);
     this.tank.reset();
     this.lockedEnemy      = null;
     this._prevLockedEnemy = null;
@@ -1034,7 +1040,7 @@ export default class ArenaScene {
   _checkCollisions() {
     const t = this.tank;
 
-    for (const enemy of [...this.enemies, this.aiEnemy]) {
+    for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
       const dx = t.position.x - enemy.position.x;
       const dz = t.position.z - enemy.position.z;
@@ -1204,26 +1210,33 @@ export default class ArenaScene {
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;
     this.tank._recoil = 1.0;
+
+    // Gunfire is loud — wake any ambusher within earshot.
+    for (const e of this.enemies) e.hearNoise?.(this.tank.position, 30);
   }
 
 
   _checkShellHits() {
-    // AI shells hitting the player
-    for (const shell of this.aiEnemy.shells) {
-      if (!shell.active) continue;
-      if (shell.position.y < 0 || shell.position.y > 1.6) continue;
-      const dx = shell.position.x - this.tank.position.x;
-      const dz = shell.position.z - this.tank.position.z;
-      if (Math.abs(dx) < 0.25 + this.tank.halfW && Math.abs(dz) < 0.25 + this.tank.halfD) {
-        shell.deactivate();
-        this.tank.takeDamage(34);
-        this._triggerShake(0.18, 0.55);
-        if (!this.tank.alive) this._showDeath();
-        break;
+    // Enemy shells hitting the player — every enemy's pool, per-enemy damage
+    outer:
+    for (const enemy of this.enemies) {
+      if (!enemy.shells) continue;
+      for (const shell of enemy.shells) {
+        if (!shell.active) continue;
+        if (shell.position.y < 0 || shell.position.y > 1.6) continue;
+        const dx = shell.position.x - this.tank.position.x;
+        const dz = shell.position.z - this.tank.position.z;
+        if (Math.abs(dx) < 0.25 + this.tank.halfW && Math.abs(dz) < 0.25 + this.tank.halfD) {
+          shell.deactivate();
+          this.tank.takeDamage(enemy.shellDamage ?? 34);
+          this._triggerShake(0.18, 0.55);
+          if (!this.tank.alive) this._showDeath();
+          break outer;
+        }
       }
     }
 
-    const allTargets = [...this.enemies, this.aiEnemy];
+    const allTargets = this.enemies;
 
     for (const shell of this.shells) {
       if (!shell.active) continue;
