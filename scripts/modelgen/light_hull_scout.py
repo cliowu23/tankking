@@ -276,7 +276,7 @@ for sx in (-1, 1):
 
 # Turret-ring pedestal — fills the gap under the ring where it overhangs the
 # glacis (ring sits forward at ringY; the deck slopes away beneath it).
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=1.04, radius2=0.96,
+bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.99, radius2=0.92,
                                 depth=Z_TOP - 1.02,
                                 location=(0, P['ringY'], (Z_TOP + 1.02) / 2))
 ped = bpy.context.object

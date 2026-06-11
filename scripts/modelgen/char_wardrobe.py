@@ -84,6 +84,18 @@ def fuse_hair(col, except_names=()):
     d = o.modifiers.new('dec', 'DECIMATE')
     d.ratio = ratio
     bpy.ops.object.modifier_apply(modifier=d.name)
+    # de-lump (discovered in the live Blender MCP sculpt session 2026-06-11)
+    sm = o.modifiers.new('smooth', 'SMOOTH')
+    sm.factor = 0.6
+    sm.iterations = 6
+    bpy.ops.object.modifier_apply(modifier=sm.name)
+    # face-clearance: nothing hangs into the eye line (front verts below z=0.16
+    # get lifted and tucked back — the 'fringe over the eyes' fix)
+    for v in o.data.vertices:
+        if v.co.y < -0.10 and v.co.z < 0.16:
+            f = 0.16 - v.co.z
+            v.co.z += f * 0.55
+            v.co.y += f * 0.35
     bpy.ops.object.shade_smooth()
     o.name = 'hair_fused'
     tint(o, col)
