@@ -65,143 +65,249 @@
   ],
   "bodies": [
     {
-      "id": "body-jacket-blue",
-      "label": "Driver Jacket (blue)"
+      "model": "body-jacket",
+      "label": "Driver Jacket",
+      "variants": [
+        {
+          "id": "body-jacket-blue",
+          "cw": "blue",
+          "hex": "#2d75e0"
+        },
+        {
+          "id": "body-jacket-orange",
+          "cw": "orange",
+          "hex": "#f27f1e"
+        }
+      ]
     },
     {
-      "id": "body-jacket-orange",
-      "label": "Driver Jacket (orange)"
+      "model": "body-overalls",
+      "label": "Mechanic Overalls",
+      "variants": [
+        {
+          "id": "body-overalls-denim",
+          "cw": "denim",
+          "hex": "#386bc6"
+        },
+        {
+          "id": "body-overalls-green",
+          "cw": "green",
+          "hex": "#3da84c"
+        }
+      ]
     },
     {
-      "id": "body-overalls-denim",
-      "label": "Mechanic Overalls (denim)"
+      "model": "body-vest",
+      "label": "Merchant Vest",
+      "variants": [
+        {
+          "id": "body-vest-rust",
+          "cw": "rust",
+          "hex": "#d86b26"
+        }
+      ]
     },
     {
-      "id": "body-overalls-green",
-      "label": "Mechanic Overalls (green)"
+      "model": "body-medic",
+      "label": "Medic Coat",
+      "variants": [
+        {
+          "id": "body-medic-white",
+          "cw": "white",
+          "hex": "#f2f2ed"
+        }
+      ]
     },
     {
-      "id": "body-vest-rust",
-      "label": "Merchant Vest (rust)"
+      "model": "body-telogreika",
+      "label": "Padded Jacket",
+      "variants": [
+        {
+          "id": "body-telogreika-teal",
+          "cw": "teal",
+          "hex": "#1e9e93"
+        },
+        {
+          "id": "body-telogreika-mustard",
+          "cw": "mustard",
+          "hex": "#e5ad23"
+        }
+      ]
     },
     {
-      "id": "body-medic-white",
-      "label": "Medic Coat (white)"
-    },
-    {
-      "id": "body-telogreika-teal",
-      "label": "Padded Jacket (teal)"
-    },
-    {
-      "id": "body-telogreika-mustard",
-      "label": "Padded Jacket (mustard)"
-    },
-    {
-      "id": "body-workshirt-red",
-      "label": "Work Shirt (red)"
-    },
-    {
-      "id": "body-workshirt-yellow",
-      "label": "Work Shirt (yellow)"
+      "model": "body-workshirt",
+      "label": "Work Shirt",
+      "variants": [
+        {
+          "id": "body-workshirt-red",
+          "cw": "red",
+          "hex": "#e0382d"
+        },
+        {
+          "id": "body-workshirt-yellow",
+          "cw": "yellow",
+          "hex": "#efc633"
+        }
+      ]
     }
   ],
   "slots": {
     "hair": [
       {
-        "id": "hair-short-brown",
-        "label": "Short (brown)"
+        "model": "hair-short",
+        "label": "Short",
+        "variants": [
+          {
+            "id": "hair-short-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-short-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-short-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-short-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "hair-short-black",
-        "label": "Short (black)"
+        "model": "hair-side",
+        "label": "Side Part",
+        "variants": [
+          {
+            "id": "hair-side-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-side-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-side-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-side-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "hair-short-blond",
-        "label": "Short (blond)"
+        "model": "hair-buzz",
+        "label": "Buzz",
+        "variants": [
+          {
+            "id": "hair-buzz-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-buzz-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-buzz-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-buzz-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "hair-short-red",
-        "label": "Short (red)"
+        "model": "hair-bob",
+        "label": "Bob",
+        "variants": [
+          {
+            "id": "hair-bob-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-bob-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-bob-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-bob-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "hair-side-brown",
-        "label": "Side Part (brown)"
+        "model": "hair-pony",
+        "label": "Ponytail",
+        "variants": [
+          {
+            "id": "hair-pony-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-pony-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-pony-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-pony-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "hair-side-black",
-        "label": "Side Part (black)"
-      },
-      {
-        "id": "hair-side-blond",
-        "label": "Side Part (blond)"
-      },
-      {
-        "id": "hair-side-red",
-        "label": "Side Part (red)"
-      },
-      {
-        "id": "hair-buzz-brown",
-        "label": "Buzz (brown)"
-      },
-      {
-        "id": "hair-buzz-black",
-        "label": "Buzz (black)"
-      },
-      {
-        "id": "hair-buzz-blond",
-        "label": "Buzz (blond)"
-      },
-      {
-        "id": "hair-buzz-red",
-        "label": "Buzz (red)"
-      },
-      {
-        "id": "hair-bob-brown",
-        "label": "Bob (brown)"
-      },
-      {
-        "id": "hair-bob-black",
-        "label": "Bob (black)"
-      },
-      {
-        "id": "hair-bob-blond",
-        "label": "Bob (blond)"
-      },
-      {
-        "id": "hair-bob-red",
-        "label": "Bob (red)"
-      },
-      {
-        "id": "hair-pony-brown",
-        "label": "Ponytail (brown)"
-      },
-      {
-        "id": "hair-pony-black",
-        "label": "Ponytail (black)"
-      },
-      {
-        "id": "hair-pony-blond",
-        "label": "Ponytail (blond)"
-      },
-      {
-        "id": "hair-pony-red",
-        "label": "Ponytail (red)"
-      },
-      {
-        "id": "hair-curly-brown",
-        "label": "Curly (brown)"
-      },
-      {
-        "id": "hair-curly-black",
-        "label": "Curly (black)"
-      },
-      {
-        "id": "hair-curly-blond",
-        "label": "Curly (blond)"
-      },
-      {
-        "id": "hair-curly-red",
-        "label": "Curly (red)"
+        "model": "hair-curly",
+        "label": "Curly",
+        "variants": [
+          {
+            "id": "hair-curly-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-curly-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-curly-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-curly-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       }
     ],
     "headwear": [
@@ -244,36 +350,56 @@
         "label": "Mask"
       },
       {
-        "id": "face-beard-brown",
-        "label": "Beard (brown)"
+        "model": "face-beard",
+        "label": "Beard",
+        "variants": [
+          {
+            "id": "face-beard-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "face-beard-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "face-beard-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "face-beard-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       },
       {
-        "id": "face-beard-black",
-        "label": "Beard (black)"
-      },
-      {
-        "id": "face-beard-blond",
-        "label": "Beard (blond)"
-      },
-      {
-        "id": "face-beard-red",
-        "label": "Beard (red)"
-      },
-      {
-        "id": "face-stache-brown",
-        "label": "Stache (brown)"
-      },
-      {
-        "id": "face-stache-black",
-        "label": "Stache (black)"
-      },
-      {
-        "id": "face-stache-blond",
-        "label": "Stache (blond)"
-      },
-      {
-        "id": "face-stache-red",
-        "label": "Stache (red)"
+        "model": "face-stache",
+        "label": "Stache",
+        "variants": [
+          {
+            "id": "face-stache-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "face-stache-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "face-stache-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "face-stache-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
       }
     ],
     "back": [

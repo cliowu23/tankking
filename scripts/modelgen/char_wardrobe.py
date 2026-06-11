@@ -22,6 +22,15 @@ SKIN_TONES = ['#f6d7b8', '#eebb94', '#dd9d6b', '#c08152', '#9c6240', '#7a4a30', 
 HW, HD, HTOP, HBOT = 0.146, 0.126, 0.250, 0.010
 
 
+def soften(obj, levels=2):
+    """Kenney-organic: box proportions + subdivision + smooth shading."""
+    m = obj.modifiers.new('sub', 'SUBSURF')
+    m.levels = m.render_levels = levels
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    bpy.ops.object.shade_smooth()
+    return obj
+
+
 def box(c, s, col, name, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cube_add(location=c, rotation=rot)
     o = bpy.context.object
@@ -33,55 +42,83 @@ def box(c, s, col, name, rot=(0, 0, 0)):
     return o
 
 
-# ── HAIR (6, x4 colors) — box shells, Kenney/Minecraft style ────────────────
+# ── HAIR (6, x4 colors) — Kenney-organic: box-fitted masses, subsurf-rounded ─
 HX, HY = HW + 0.012, HD + 0.012          # hair shell half-extents
 
+def _crown(col, grow=0.0, thick=0.09):
+    """Rounded crown mass hugging the head top."""
+    o = box((0, 0.012, HTOP + thick / 2 - 0.015), (2 * HX + grow, 2 * HY + grow, thick + 0.04), col, 'hair_crown')
+    soften(o)
+    return o
+
+
+def _fringe(col, w=0.26, drop=0.07, sweep=0.0):
+    o = box((sweep, -HY - 0.004, HTOP - drop / 2 + 0.01), (w, 0.05, drop + 0.05), col, 'hair_fringe')
+    for v in o.data.vertices:                     # taper bottom inward -> swoop
+        if v.co.z < HTOP - 0.01:
+            v.co.x = sweep + (v.co.x - sweep) * 0.82
+            v.co.y *= 0.7
+    soften(o)
+    return o
+
+
+def _back(col, drop=0.16):
+    o = box((0, HY + 0.005, HTOP - drop / 2 - 0.02), (2 * HX - 0.01, 0.07, drop + 0.06), col, 'hair_back')
+    soften(o)
+    return o
+
+
 def hair_short(col):
-    box((0, 0.01, HTOP + 0.028), (2 * HX, 2 * HY, 0.06), col, 'hair_top')
-    box((0, -HY - 0.005, 0.215), (2 * HX, 0.028, 0.065), col, 'hair_fringe')
-    box((0, HY + 0.006, 0.16), (2 * HX, 0.032, 0.19), col, 'hair_back')
-    for sx in (-1, 1):
-        box((sx * (HX + 0.008), 0.012, 0.20), (0.022, 2 * HY, 0.10), col, f'hair_side_{sx}')
+    _crown(col)
+    _fringe(col)
+    _back(col, drop=0.13)
 
 
 def hair_side(col):
-    box((0, 0.01, HTOP + 0.028), (2 * HX, 2 * HY, 0.06), col, 'hair_top')
-    box((0.045, -HY - 0.005, 0.21), (0.17, 0.028, 0.075), col, 'hair_fringe_main')
-    box((-0.105, -HY - 0.005, 0.232), (0.08, 0.028, 0.032), col, 'hair_fringe_side')
-    box((0, HY + 0.006, 0.16), (2 * HX, 0.032, 0.19), col, 'hair_back')
-    for sx in (-1, 1):
-        box((sx * (HX + 0.008), 0.012, 0.20), (0.022, 2 * HY, 0.10), col, f'hair_side_{sx}')
+    _crown(col)
+    _fringe(col, w=0.20, drop=0.085, sweep=0.045)
+    _back(col, drop=0.13)
 
 
 def hair_buzz(col):
-    box((0, 0.01, HTOP + 0.016), (2 * HX - 0.01, 2 * HY - 0.01, 0.035), col, 'hair_buzz_top')
-    box((0, HY, 0.19), (2 * HX - 0.01, 0.022, 0.13), col, 'hair_buzz_back')
+    _crown(col, grow=-0.02, thick=0.055)
 
 
 def hair_bob(col):
-    box((0, 0.01, HTOP + 0.03), (2 * HX + 0.01, 2 * HY + 0.01, 0.065), col, 'hair_top')
-    box((0, -HY - 0.005, 0.222), (2 * HX + 0.01, 0.03, 0.055), col, 'hair_fringe')
+    _crown(col, grow=0.015, thick=0.10)
+    _fringe(col, w=0.28, drop=0.075)
     for sx in (-1, 1):
-        box((sx * (HX + 0.012), 0.012, 0.11), (0.03, 2 * HY, 0.29), col, f'hair_curtain_{sx}')
-    box((0, HY + 0.012, 0.10), (2 * HX + 0.01, 0.045, 0.31), col, 'hair_back')
+        c = box((sx * (HX + 0.014), 0.015, 0.115), (0.055, 2 * HY - 0.02, 0.30), col, f'hair_curtain_{sx}')
+        for v in c.data.vertices:                 # flare slightly outward at the bottom
+            if v.co.z < 0.10:
+                v.co.x += sx * 0.012
+        soften(c)
+    _back(col, drop=0.30)
 
 
 def hair_pony(col):
-    box((0, 0.01, HTOP + 0.024), (2 * HX - 0.005, 2 * HY - 0.005, 0.05), col, 'hair_top')
-    box((0, -HY - 0.005, 0.225), (0.21, 0.026, 0.04), col, 'hair_fringe')
-    box((0, HY + 0.005, 0.17), (2 * HX - 0.01, 0.028, 0.16), col, 'hair_back')
-    box((0, HY + 0.035, 0.255), (0.07, 0.07, 0.055), col, 'hair_bun')
-    box((0, HY + 0.045, 0.10), (0.06, 0.05, 0.25), col, 'hair_tail')
-    box((0, HY + 0.044, 0.215), (0.075, 0.062, 0.03), DARK, 'hair_tie')
+    _crown(col, thick=0.07)
+    _fringe(col, w=0.22, drop=0.055)
+    b = box((0, HY + 0.035, 0.255), (0.085, 0.085, 0.07), col, 'hair_bun')
+    soften(b)
+    t = box((0, HY + 0.05, 0.10), (0.065, 0.06, 0.27), col, 'hair_tail')
+    for v in t.data.vertices:                     # taper the tail toward the tip
+        if v.co.z < 0.10:
+            v.co.x *= 0.6
+            v.co.y = (HY + 0.05) + (v.co.y - (HY + 0.05)) * 0.6
+    soften(t)
+    box((0, HY + 0.044, 0.218), (0.08, 0.068, 0.026), DARK, 'hair_tie')
 
 
 def hair_curly(col):
-    box((0, 0.01, HTOP + 0.045), (2 * HX + 0.02, 2 * HY + 0.02, 0.095), col, 'hair_puff_main')
-    box((0, 0.01, HTOP + 0.105), (2 * HX - 0.05, 2 * HY - 0.05, 0.05), col, 'hair_puff_top')
-    box((0, -HY - 0.008, 0.215), (2 * HX - 0.02, 0.035, 0.07), col, 'hair_puff_front')
-    for sx in (-1, 1):
-        box((sx * (HX + 0.014), 0.012, 0.195), (0.035, 2 * HY - 0.02, 0.115), col, f'hair_puff_{sx}')
-    box((0, HY + 0.012, 0.17), (2 * HX - 0.02, 0.04, 0.16), col, 'hair_puff_back')
+    for (x, y, z, sx, sy, sz) in (
+        (0, 0.01, HTOP + 0.055, 0.30, 0.27, 0.13),
+        (0.10, -0.06, HTOP + 0.02, 0.13, 0.12, 0.10), (-0.10, -0.06, HTOP + 0.02, 0.13, 0.12, 0.10),
+        (0.105, 0.085, HTOP + 0.01, 0.13, 0.13, 0.11), (-0.105, 0.085, HTOP + 0.01, 0.13, 0.13, 0.11),
+        (0, -0.105, HTOP - 0.005, 0.16, 0.10, 0.10), (0, 0.125, HTOP - 0.02, 0.18, 0.10, 0.12),
+    ):
+        o = box((x, y, z), (sx, sy, sz), col, f'hair_puff_{x}_{y}')
+        soften(o)
 
 
 # ── HEADWEAR (6) — box shells over the hair envelope ────────────────────────
@@ -93,7 +130,7 @@ def hw_tanker_cap(col=(0.62, 0.40, 0.18, 1)):
     for i, x in ((0, -0.075), (1, 0.0), (2, 0.075)):
         box((x, 0.005, 0.378), (0.035, 2 * WY - 0.02, 0.024), col, f'hat_rib_{i}')
     for sx in (-1, 1):
-        box((sx * (WX + 0.012), 0.015, 0.115), (0.028, 0.12, 0.15), col, f'hat_earflap_{sx}')
+        box((sx * (WX + 0.012), 0.015, 0.15), (0.028, 0.12, 0.16), col, f'hat_earflap_{sx}')
 
 
 def hw_helmet(col=(0.42, 0.58, 0.30, 1)):
@@ -130,7 +167,7 @@ def hw_ushanka(col=(0.72, 0.46, 0.24, 1)):
     box((0, 0.005, 0.315), (2 * WX, 2 * WY, 0.11), col, 'ushanka_crown')
     box((0, 0.005, 0.245), (2 * WX + 0.025, 2 * WY + 0.025, 0.06), fur, 'ushanka_furband')
     for sx in (-1, 1):
-        box((sx * (WX + 0.02), 0.02, 0.10), (0.045, 0.13, 0.20), fur, f'ushanka_flap_{sx}')
+        box((sx * (WX + 0.02), 0.02, 0.135), (0.045, 0.13, 0.22), fur, f'ushanka_flap_{sx}')
     box((0, -WY - 0.02, 0.30), (0.16, 0.055, 0.03), fur, 'ushanka_frontflap')
 
 
@@ -223,18 +260,28 @@ registry = {
         *[{ 'id': f'character-female-{c}', 'label': f'F{i+1}' } for i, c in enumerate('abcdef')],
     ],
     'skinTones': SKIN_TONES,
-    'bodies': [{ 'id': f'body-{style}-{cw}', 'label': f"{d['label']} ({cw})" }
-               for style, d in OUTFITS.items() for cw in d['colorways']],
+    'bodies': [{ 'model': f'body-{style}', 'label': d['label'],
+                  'variants': [{ 'id': f'body-{style}-{cw}', 'cw': cw,
+                                 'hex': '#%02x%02x%02x' % tuple(int(c * 255) for c in col[:3]) }
+                               for cw, col in d['colorways'].items()] }
+               for style, d in OUTFITS.items()],
     'slots': { 'hair': [], 'headwear': [], 'face': [], 'back': [] },
 }
 
+def hexc(col):
+    return '#%02x%02x%02x' % tuple(int(max(0, min(1, c)) * 255) for c in col[:3])
+
+
 for pid, slot, label, fn, colorways in PIECES:
     if colorways:
+        variants = []
         for cname, col in HAIR_COLORS.items():
             clear_scene()
             fn(col)
             export_attachment(f'{pid}-{cname}')
-            registry['slots'][slot].append({ 'id': f'{pid}-{cname}', 'label': f'{label} ({cname})' })
+            variants.append({ 'id': f'{pid}-{cname}', 'cw': cname, 'hex': hexc(col) })
+        # ONE entry per MODEL with color variants (UI shows one button + color dots)
+        registry['slots'][slot].append({ 'model': pid, 'label': label, 'variants': variants })
     else:
         clear_scene()
         fn()

@@ -403,17 +403,36 @@ async function buildCrewPanel() {
     if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ skin: wheel.value }));
   });
   hr.appendChild(wheel);
+  // Grouped item: ONE button per model + small color dots for its variants
+  const addGrouped = (btns, it, apply) => {
+    if (!it.variants) {
+      mkBtn(btns, it.label, { gid: it.id }, () => apply(it.id));
+      return;
+    }
+    mkBtn(btns, it.label, { gmodel: it.model }, () => apply(it.variants[0].id));
+    for (const v of it.variants) {
+      const d = document.createElement('button');
+      d.dataset.gid = v.id;
+      d.title = v.cw;
+      d.style.cssText = `width:14px;height:14px;padding:0;border-radius:50%;background:${v.hex};`;
+      d.addEventListener('click', () => apply(v.id));
+      btns.appendChild(d);
+    }
+  };
   const br = row('Outfit');
   for (const it of _wardrobe.bodies ?? []) {
-    mkBtn(br, it.label, { bodyId: it.id }, () => {
-      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ body: it.id }));
+    addGrouped(br, it, id => {
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ body: id }));
     });
   }
   for (const [slot, items] of Object.entries(_wardrobe.slots)) {
     const btns = row(slot[0].toUpperCase() + slot.slice(1));
-    for (const it of [{ id: 'none', label: 'None' }, ...items]) {
-      mkBtn(btns, it.label, { slot, id: it.id }, () => {
-        if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: it.id }));
+    mkBtn(btns, 'None', { gid: 'none', slot }, () => {
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: 'none' }));
+    });
+    for (const it of items) {
+      addGrouped(btns, it, id => {
+        if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: id }));
       });
     }
   }
@@ -423,10 +442,12 @@ function syncCrewPanel(cfg) {
     b.classList.toggle('on', b.dataset.character === cfg.body));
   document.querySelectorAll('#lounge-slots [data-skin]').forEach(b =>
     b.classList.toggle('on', b.dataset.skin === cfg.skin));
-  document.querySelectorAll('#lounge-slots [data-body-id]').forEach(b =>
-    b.classList.toggle('on', b.dataset.bodyId === cfg.body));
-  document.querySelectorAll('#lounge-slots [data-slot]').forEach(b =>
-    b.classList.toggle('on', (cfg[b.dataset.slot] ?? 'none') === b.dataset.id));
+  const active = new Set(Object.values(cfg));
+  document.querySelectorAll('#lounge-slots [data-gid]').forEach(b =>
+    b.classList.toggle('on', active.has(b.dataset.gid)
+      || (b.dataset.gid === 'none' && b.dataset.slot && (cfg[b.dataset.slot] ?? 'none') === 'none')));
+  document.querySelectorAll('#lounge-slots [data-gmodel]').forEach(b =>
+    b.classList.toggle('on', [...active].some(v => typeof v === 'string' && v.startsWith(b.dataset.gmodel))));
 }
 
 window.addEventListener('resize', () => engine.resize());
