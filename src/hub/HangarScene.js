@@ -691,6 +691,7 @@ export default class HangarScene {
     }
     if (partial.head) this._driverConfig.head = partial.head;
     if (partial.body) this._driverConfig.body = partial.body;
+    if (partial.skin) this._driverConfig.skin = partial.skin;
     if (partial.accessory !== undefined) partial.face = partial.accessory; // legacy key
     for (const slot of Object.keys(ATTACH_SLOTS)) {
       if (partial[slot] !== undefined) this._driverConfig[slot] = partial[slot];

@@ -53,64 +53,56 @@
       "label": "F6"
     }
   ],
-  "heads": [
-    {
-      "id": "char-skin-a",
-      "label": "Skin A"
-    },
-    {
-      "id": "char-skin-b",
-      "label": "Skin B"
-    },
-    {
-      "id": "char-skin-c",
-      "label": "Skin C"
-    },
-    {
-      "id": "char-skin-d",
-      "label": "Skin D"
-    }
+  "skinTones": [
+    "#f6d7b8",
+    "#eebb94",
+    "#dd9d6b",
+    "#c08152",
+    "#9c6240",
+    "#7a4a30",
+    "#5d3a26",
+    "#43291b"
   ],
   "bodies": [
-    {
-      "id": "body-jacket-tan",
-      "label": "Driver Jacket (tan)"
-    },
     {
       "id": "body-jacket-blue",
       "label": "Driver Jacket (blue)"
     },
     {
-      "id": "body-overalls-navy",
-      "label": "Mechanic Overalls (navy)"
+      "id": "body-jacket-orange",
+      "label": "Driver Jacket (orange)"
     },
     {
-      "id": "body-overalls-olive",
-      "label": "Mechanic Overalls (olive)"
+      "id": "body-overalls-denim",
+      "label": "Mechanic Overalls (denim)"
     },
     {
-      "id": "body-vest-brown",
-      "label": "Merchant Vest (brown)"
+      "id": "body-overalls-green",
+      "label": "Mechanic Overalls (green)"
     },
     {
-      "id": "body-medic-cream",
-      "label": "Medic Coat (cream)"
+      "id": "body-vest-rust",
+      "label": "Merchant Vest (rust)"
     },
     {
-      "id": "body-telogreika-khaki",
-      "label": "Padded Jacket (khaki)"
+      "id": "body-medic-white",
+      "label": "Medic Coat (white)"
     },
     {
-      "id": "body-telogreika-grey",
-      "label": "Padded Jacket (grey)"
+      "id": "body-telogreika-teal",
+      "label": "Padded Jacket (teal)"
     },
     {
-      "id": "body-workshirt-sand",
-      "label": "Work Shirt (sand)"
+      "id": "body-telogreika-mustard",
+      "label": "Padded Jacket (mustard)"
     },
     {
       "id": "body-workshirt-red",
       "label": "Work Shirt (red)"
+    },
+    {
+      "id": "body-workshirt-yellow",
+      "label": "Work Shirt (yellow)"
     }
   ],
   "slots": {
@@ -128,8 +120,8 @@
         "label": "Short (blond)"
       },
       {
-        "id": "hair-short-grey",
-        "label": "Short (grey)"
+        "id": "hair-short-red",
+        "label": "Short (red)"
       },
       {
         "id": "hair-side-brown",
@@ -144,8 +136,8 @@
         "label": "Side Part (blond)"
       },
       {
-        "id": "hair-side-grey",
-        "label": "Side Part (grey)"
+        "id": "hair-side-red",
+        "label": "Side Part (red)"
       },
       {
         "id": "hair-buzz-brown",
@@ -160,8 +152,8 @@
         "label": "Buzz (blond)"
       },
       {
-        "id": "hair-buzz-grey",
-        "label": "Buzz (grey)"
+        "id": "hair-buzz-red",
+        "label": "Buzz (red)"
       },
       {
         "id": "hair-bob-brown",
@@ -176,8 +168,8 @@
         "label": "Bob (blond)"
       },
       {
-        "id": "hair-bob-grey",
-        "label": "Bob (grey)"
+        "id": "hair-bob-red",
+        "label": "Bob (red)"
       },
       {
         "id": "hair-pony-brown",
@@ -192,8 +184,8 @@
         "label": "Ponytail (blond)"
       },
       {
-        "id": "hair-pony-grey",
-        "label": "Ponytail (grey)"
+        "id": "hair-pony-red",
+        "label": "Ponytail (red)"
       },
       {
         "id": "hair-curly-brown",
@@ -208,8 +200,8 @@
         "label": "Curly (blond)"
       },
       {
-        "id": "hair-curly-grey",
-        "label": "Curly (grey)"
+        "id": "hair-curly-red",
+        "label": "Curly (red)"
       }
     ],
     "headwear": [
@@ -264,8 +256,8 @@
         "label": "Beard (blond)"
       },
       {
-        "id": "face-beard-grey",
-        "label": "Beard (grey)"
+        "id": "face-beard-red",
+        "label": "Beard (red)"
       },
       {
         "id": "face-stache-brown",
@@ -280,8 +272,8 @@
         "label": "Stache (blond)"
       },
       {
-        "id": "face-stache-grey",
-        "label": "Stache (grey)"
+        "id": "face-stache-red",
+        "label": "Stache (red)"
       }
     ],
     "back": [

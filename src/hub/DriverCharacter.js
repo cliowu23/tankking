@@ -1,5 +1,5 @@
 import {
-  MeshBuilder, ArcRotateCamera, SceneLoader, Vector3,
+  MeshBuilder, ArcRotateCamera, SceneLoader, Vector3, Color3,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 
@@ -41,6 +41,7 @@ export const DRIVER_OPTIONS = {
 export const DRIVER_DEFAULT = {
   head: 'char-driver-a', body: 'char-driver-a',
   hair: 'none', headwear: 'none', face: 'none', back: 'none',
+  skin: '#eebb94',   // tints the skinMat material (skin verts authored white)
 };
 
 // Stale/legacy config guard: maps the old `accessory` key to the `face` slot and
@@ -105,7 +106,15 @@ export default class DriverCharacter {
 
   // ── model loading ───────────────────────────────────────────────────────────
   async _loadBase(bodyId) {
-    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, `${bodyId}.glb`, this.scene);
+    let res;
+    try {
+      res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, `${bodyId}.glb`, this.scene);
+    } catch (e) {
+      console.warn(`[DriverCharacter] body '${bodyId}' failed to load — falling back to default`, e);
+      this._config.body = DRIVER_DEFAULT.body;
+      if (bodyId === DRIVER_DEFAULT.body) return;     // default itself missing: keep current
+      return this._loadBase(DRIVER_DEFAULT.body);
+    }
     this._disposeBase();
 
     const root = res.meshes[0]; // glTF __root__
@@ -140,7 +149,15 @@ export default class DriverCharacter {
       return;
     }
     this._base.headMesh?.setEnabled(false);
-    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, `${headId}.glb`, this.scene);
+    let res;
+    try {
+      res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, `${headId}.glb`, this.scene);
+    } catch (e) {
+      console.warn(`[DriverCharacter] head '${headId}' failed to load — using native head`, e);
+      this._config.head = this._base.charId;
+      this._base.headMesh?.setEnabled(true);
+      return;
+    }
     const newHead = res.meshes.find(m => /head-mesh/i.test(m.name));
     if (newHead) {
       newHead.parent   = this._base.root;
@@ -173,6 +190,19 @@ export default class DriverCharacter {
       root.parent = this.modelRoot;
     }
     root.setEnabled(this._visible);
+  }
+
+  // Color-wheel skin: skin verts are WHITE on a dedicated 'skinMat' — tinting the
+  // material albedo IS the skin tone (dark verts like eyes multiply to stay dark).
+  // Kenney heads (textured, no skinMat) are left untouched.
+  _applySkin(hex) {
+    if (!hex) return;
+    const head = this._swappedHead ?? this._base?.headMesh;
+    const mat = head?.material;
+    if (!mat || !/skinMat/i.test(mat.name)) return;
+    const c = Color3.FromHexString(hex).toLinearSpace();
+    if (mat.albedoColor !== undefined) mat.albedoColor = c;
+    else if (mat.diffuseColor !== undefined) mat.diffuseColor = c;
   }
 
   _playAnim(clip, loop = true) {
@@ -220,6 +250,7 @@ export default class DriverCharacter {
     for (const slot of Object.keys(ATTACH_SLOTS)) {
       if (changed('body') || changed(slot)) await this._setAttachment(slot, next[slot]);
     }
+    if (changed('skin') || changed('head') || changed('body')) this._applySkin(next.skin);
     return { ...this._config };
   }
 

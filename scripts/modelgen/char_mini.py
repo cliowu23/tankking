@@ -12,23 +12,20 @@ from _charlib import (clear_scene, make_armature, tint, bind_part, finish_mesh,
 import bpy
 
 DARK  = (0.09, 0.08, 0.08, 1.0)
-BOOTS = (0.16, 0.13, 0.10, 1.0)
-BELT  = (0.20, 0.16, 0.12, 1.0)
-SHIRT = (0.82, 0.78, 0.68, 1.0)
-PANTS = (0.30, 0.27, 0.22, 1.0)
+BOOTS = (0.30, 0.18, 0.10, 1.0)   # warm leather brown
+BELT  = (0.36, 0.22, 0.12, 1.0)
+SHIRT = (0.96, 0.92, 0.80, 1.0)   # bright cream
+PANTS = (0.30, 0.34, 0.48, 1.0)   # lively slate blue
+WHITE = (1.0, 1.0, 1.0, 1.0)      # skin parts: WHITE -> runtime tint = the color wheel
 
 # USER-APPROVED outfit list (plan 2026-06-11) — 6 styles, curated colorways
 OUTFITS = {
-    'jacket':     { 'label': 'Driver Jacket',     'colorways': { 'tan': (0.55, 0.48, 0.34, 1), 'blue': (0.25, 0.32, 0.45, 1) } },
-    'overalls':   { 'label': 'Mechanic Overalls', 'colorways': { 'navy': (0.22, 0.26, 0.34, 1), 'olive': (0.36, 0.38, 0.26, 1) } },
-    'vest':       { 'label': 'Merchant Vest',     'colorways': { 'brown': (0.40, 0.28, 0.18, 1) } },
-    'medic':      { 'label': 'Medic Coat',        'colorways': { 'cream': (0.88, 0.85, 0.78, 1) } },
-    'telogreika': { 'label': 'Padded Jacket',     'colorways': { 'khaki': (0.50, 0.46, 0.36, 1), 'grey': (0.45, 0.45, 0.47, 1) } },
-    'workshirt':  { 'label': 'Work Shirt',        'colorways': { 'sand': (0.72, 0.62, 0.45, 1), 'red': (0.55, 0.25, 0.20, 1) } },
-}
-SKINS = {
-    'a': (0.87, 0.65, 0.50, 1), 'b': (0.72, 0.50, 0.36, 1),
-    'c': (0.55, 0.38, 0.26, 1), 'd': (0.38, 0.27, 0.20, 1),
+    'jacket':     { 'label': 'Driver Jacket',     'colorways': { 'blue': (0.18, 0.46, 0.88, 1), 'orange': (0.95, 0.50, 0.12, 1) } },
+    'overalls':   { 'label': 'Mechanic Overalls', 'colorways': { 'denim': (0.22, 0.42, 0.78, 1), 'green': (0.24, 0.66, 0.30, 1) } },
+    'vest':       { 'label': 'Merchant Vest',     'colorways': { 'rust': (0.85, 0.42, 0.15, 1) } },
+    'medic':      { 'label': 'Medic Coat',        'colorways': { 'white': (0.95, 0.95, 0.93, 1) } },
+    'telogreika': { 'label': 'Padded Jacket',     'colorways': { 'teal': (0.12, 0.62, 0.58, 1), 'mustard': (0.90, 0.68, 0.14, 1) } },
+    'workshirt':  { 'label': 'Work Shirt',        'colorways': { 'red': (0.88, 0.22, 0.18, 1), 'yellow': (0.94, 0.78, 0.20, 1) } },
 }
 
 W = H = 1.12  # the plump-toyish house build (locked at the C1 gate)
@@ -64,7 +61,7 @@ def mk(obj, color, bone):
     return obj
 
 
-def build_character(char_id, skin, outfit_style, outfit_col):
+def build_character(char_id, outfit_style, outfit_col):
     clear_scene()
     arm = make_armature()
     OUT = outfit_col
@@ -131,15 +128,18 @@ def build_character(char_id, skin, outfit_style, outfit_col):
     finish_mesh([o for o in bpy.context.scene.objects if o.type == 'MESH'], 'body-mesh', arm)
 
     # ── SKIN unit (head-mesh): bald head + face + ears + HANDS ────────────────
-    mk(box((0, 0, 0.527), (0.26, 0.225, 0.215), bev=0.035), skin, 'head')
+    # Skin parts WHITE on 'skinMat' -> the game tints the material = COLOR WHEEL
+    from _charlib import char_material
+    mk(box((0, 0, 0.527), (0.26, 0.225, 0.215), bev=0.035), WHITE, 'head')
     for sx in (-1, 1):
         mk(box((sx * 0.056, -0.114, 0.54), (0.03, 0.012, 0.038)), DARK, 'head')       # eyes
         mk(box((sx * 0.056, -0.114, 0.572), (0.038, 0.01, 0.013)), DARK, 'head')      # brows
-        mk(box((sx * 0.136, 0, 0.523), (0.02, 0.045, 0.055)), skin, 'head')           # ears
+        mk(box((sx * 0.136, 0, 0.523), (0.02, 0.045, 0.055)), WHITE, 'head')          # ears
     for side, sx in (('arm-left', 1), ('arm-right', -1)):                             # bare hands
-        mk(sph((sx * 0.208, 0, 0.17), 0.052), skin, side)
+        mk(sph((sx * 0.208, 0, 0.17), 0.052), WHITE, side)
     finish_mesh([o for o in bpy.context.scene.objects
-                 if o.type == 'MESH' and o.name != 'body-mesh'], 'head-mesh', arm)
+                 if o.type == 'MESH' and o.name != 'body-mesh'], 'head-mesh', arm,
+                material=char_material('skinMat'))
 
     idle_action(arm)
     walk_action(arm)
@@ -147,23 +147,17 @@ def build_character(char_id, skin, outfit_style, outfit_col):
 
 
 def gen_driver():
-    build_character('char-driver-a', SKINS['a'], 'jacket', OUTFITS['jacket']['colorways']['tan'])
-
-
-def gen_skins():
-    for sid, col in SKINS.items():
-        build_character(f'char-skin-{sid}', col, 'jacket', OUTFITS['jacket']['colorways']['tan'])
+    build_character('char-driver-a', 'jacket', OUTFITS['jacket']['colorways']['blue'])
 
 
 def gen_bodies():
     for style, d in OUTFITS.items():
         for cw, col in d['colorways'].items():
-            build_character(f'body-{style}-{cw}', SKINS['a'], style, col)
+            build_character(f'body-{style}-{cw}', style, col)
 
 
 if __name__ == '__main__':
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['all']
     mode = argv[0] if argv else 'all'
     if mode in ('driver', 'all'): gen_driver()
-    if mode in ('skins', 'all'):  gen_skins()
     if mode in ('bodies', 'all'): gen_bodies()

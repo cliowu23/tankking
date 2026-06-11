@@ -50,12 +50,15 @@ def make_armature():
     return arm
 
 
-def char_material():
-    """ONE material for the whole character — color comes from vertex colors
-    (multiple materials would split glTF primitives and break the 2-mesh contract)."""
-    mat = bpy.data.materials.get('charMat')
+def char_material(name='charMat'):
+    """ONE material per skinned mesh — color comes from vertex colors (multiple
+    materials would split glTF primitives and break the 2-mesh contract).
+    head-mesh uses 'skinMat': skin parts are authored WHITE so the runtime can
+    tint the material albedo = full color-wheel skin tones (dark parts like eyes
+    multiply to stay dark)."""
+    mat = bpy.data.materials.get(name)
     if mat is None:
-        mat = bpy.data.materials.new('charMat')
+        mat = bpy.data.materials.new(name)
         mat.use_nodes = True
         nodes, links = mat.node_tree.nodes, mat.node_tree.links
         bsdf = nodes['Principled BSDF']
@@ -79,7 +82,7 @@ def bind_part(obj, bone):
     vg.add(list(range(len(obj.data.vertices))), 1.0, 'REPLACE')
 
 
-def finish_mesh(parts, name, arm):
+def finish_mesh(parts, name, arm, material=None):
     """Join parts (vertex groups + colors survive) into ONE named skinned mesh."""
     bpy.ops.object.select_all(action='DESELECT')
     for o in parts:
@@ -90,7 +93,7 @@ def finish_mesh(parts, name, arm):
     obj.name = name
     obj.data.name = name
     obj.data.materials.clear()
-    obj.data.materials.append(char_material())
+    obj.data.materials.append(material or char_material())
     obj.parent = arm
     mod = obj.modifiers.new('Armature', 'ARMATURE')
     mod.object = arm
