@@ -123,8 +123,9 @@ const SCHEMA = {
     ['mountY','gun mount fwd',-1.4,-0.6,0.05], ['mountZ','gun mount height',0.15,0.6,0.02],
   ],
   gun: [
-    ['tubeL','barrel length',1.8,4.2,0.05], ['tubeR','barrel radius',0.05,0.13,0.005],
-    ['sleeveL','sleeve length',0.5,1.5,0.05], ['sleeveR','sleeve radius',0.08,0.18,0.005],
+    ['tubeL','barrel length',1.4,4.2,0.05], ['tubeR','barrel radius',0.05,0.13,0.005],
+    ['sleeveL','sleeve length',0.4,1.5,0.05], ['sleeveR','sleeve radius',0.07,0.18,0.005],
+    ['taper','muzzle taper',0.6,1.0,0.02],
     ['baffleR','brake radius',0.1,0.26,0.005], ['brakeLen','brake length',0.25,0.7,0.02],
   ],
 };
@@ -222,6 +223,7 @@ function buildSliders() {
     for (const [key, label, min, max, step] of defs) {
       const row = document.createElement('div'); row.className = 'row';
       const val = params[group][key];
+      if (val === undefined) continue;   // tank doesn't use this param (e.g. brakeless gun)
       row.innerHTML = `<label>${label}</label>
         <input type="range" min="${min}" max="${max}" step="${step}" value="${val}">
         <span class="val">${val}</span>`;

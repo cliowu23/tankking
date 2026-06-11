@@ -103,12 +103,11 @@
     ]
   },
   "gun": {
-    "tubeL": 2.1,
-    "tubeR": 0.062,
-    "sleeveL": 0.72,
-    "sleeveR": 0.088,
-    "baffleR": 0.148,
-    "brakeLen": 0.32
+    "tubeL": 1.85,
+    "tubeR": 0.066,
+    "sleeveL": 0.62,
+    "sleeveR": 0.095,
+    "taper": 0.8
   },
   "attachments": [],
   "pins": []
