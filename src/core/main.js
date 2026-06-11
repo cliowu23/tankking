@@ -379,12 +379,8 @@ async function buildCrewPanel() {
     b.addEventListener('click', onClick);
     btns.appendChild(b);
   };
-  const pr = row('Preset');
-  for (const p of _wardrobe.presets) {
-    mkBtn(pr, p.label, { character: p.id }, () => {
-      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: p.id }));
-    });
-  }
+  // (Preset row removed — character = Outfit + Skin + Hair + Headwear + Face + Back.
+  // The old presets loaded the retiring Kenney reference models.)
   const hr = row('Skin');
   for (const hex of _wardrobe.skinTones ?? []) {
     const b = document.createElement('button');
@@ -404,21 +400,25 @@ async function buildCrewPanel() {
     if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ skin: wheel.value }));
   });
   hr.appendChild(wheel);
-  // Grouped item: ONE button per model + small color dots for its variants
+  // Grouped item: ONE button per model + small color dots for its variants.
+  // Button + dots live in a single .lng-item so they never wrap apart.
   const addGrouped = (btns, it, apply) => {
     if (!it.variants) {
       mkBtn(btns, it.label, { gid: it.id }, () => apply(it.id));
       return;
     }
-    mkBtn(btns, it.label, { gmodel: it.model }, () => apply(it.variants[0].id));
+    const grp = document.createElement('div');
+    grp.className = 'lng-item';
+    mkBtn(grp, it.label, { gmodel: it.model }, () => apply(it.variants[0].id));
     for (const v of it.variants) {
       const d = document.createElement('button');
       d.dataset.gid = v.id;
       d.title = v.cw;
       d.style.cssText = `width:14px;height:14px;padding:0;border-radius:50%;background:${v.hex};`;
       d.addEventListener('click', () => apply(v.id));
-      btns.appendChild(d);
+      grp.appendChild(d);
     }
+    btns.appendChild(grp);
   };
   const br = row('Outfit');
   for (const it of _wardrobe.bodies ?? []) {
@@ -440,8 +440,6 @@ async function buildCrewPanel() {
   }
 }
 function syncCrewPanel(cfg) {
-  document.querySelectorAll('#lounge-slots [data-character]').forEach(b =>
-    b.classList.toggle('on', b.dataset.character === cfg.body));
   document.querySelectorAll('#lounge-slots [data-skin]').forEach(b =>
     b.classList.toggle('on', b.dataset.skin === cfg.skin));
   const wheel = document.getElementById('skin-wheel');
