@@ -149,62 +149,26 @@ def hair_side(col):                                # the proven diagonal sweep
     hair_shell(col, lambda x: 0.118 - 0.22 * x)
 
 
-def _long_curtain(col, bottom=-0.20, top=0.115):
-    # Continuous U-curtain (back + sides, open at the face) falling to ~mid-back.
-    # CRITICAL: bone-local z, and the engine scales the model x2.5 — so z=-0.20
-    # reaches mid-back, z=-0.35 reaches the SHINS. Tune by IN-GAME proportions,
-    # never by the unscaled Blender model (that hid the length the first pass).
-    CZ = (bottom + top) / 2
-    HZ = (top - bottom) / 2
-    bpy.ops.mesh.primitive_cube_add(location=(0, 0.02, CZ))
-    o = bpy.context.object
-    o.name = 'hair_curtain'
-    o.scale = (0.205, 0.155, HZ)
-    bpy.ops.object.transform_apply(scale=True)
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.subdivide(number_cuts=7)
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    def keep(c):
-        ly, lz = c.y - 0.02, c.z - CZ
-        if ly < -0.06 and lz > -0.5 * HZ:  # open the face (upper front), keep lower front
-            return False
-        if lz > 0.78 * HZ:                 # open the top (fitted cap covers the crown)
-            return False
-        return True
-
-    bm = _bmesh.new()
-    bm.from_mesh(o.data)
-    _bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep(f.calc_center_median())],
-                      context='FACES')
-    bm.to_mesh(o.data)
-    bm.free()
-    m = o.modifiers.new('sol', 'SOLIDIFY')
-    m.thickness, m.offset = 0.022, 0
-    bpy.ops.object.modifier_apply(modifier='sol')
-    m = o.modifiers.new('bvl', 'BEVEL')
-    m.width, m.segments, m.limit_method = 0.012, 1, 'ANGLE'
-    bpy.ops.object.modifier_apply(modifier='bvl')
-    # taper + gather toward the hem so it tucks behind the shoulders (less body clip)
-    for v in o.data.vertices:
-        t = max(0.0, min(1.0, (CZ + 0.6 * HZ - v.co.z) / (1.4 * HZ)))
-        v.co.x *= 1.0 - 0.30 * t
-        if v.co.y > 0.02:                  # pull the back wall forward as it falls
-            v.co.y = 0.02 + (v.co.y - 0.02) * (1.0 - 0.30 * t)
-    bpy.ops.object.select_all(action='DESELECT')
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.shade_smooth()
-    tint(o, col)
-    o.data.materials.append(char_material())
-    return o
-
-
-def hair_bob(col):                                 # LONG female cut: fitted cap + curtain
-    hair_shell(col, lambda x: 0.092, cz=0.055, hz=0.175,
-               side_cut=-0.095, nape_cut=-0.112, thick=0.032)
-    _long_curtain(col)
+def hair_long(col):
+    # Traditional long female cut — the Kenney female-f formula (measured live
+    # against the local GLB 2026-06-11): snug fringed crown + chunky ROUNDED
+    # side falls hanging IN FRONT of the shoulders (chest length, covering the
+    # ears) + a back panel gathered toward the nape (mid-back). Rounded slabs
+    # via hpiece — a single box envelope reads as a helmet/tent (two failed
+    # passes). Lengths are bone-local z; engine scales x2.5, judge IN-GAME.
+    hair_shell(col, lambda x: 0.095, cz=0.055, hz=0.175,
+               side_cut=-0.095, nape_cut=-0.112, thick=0.030)
+    for sx in (-1, 1):                             # side falls (Kenney-f lobes):
+        o = hpiece((sx * 0.185, 0.03, 0.0), (0.115, 0.32, 0.30), col,
+                   f'hair_fall_{sx}')              # cheek→FLUSH with panel back,
+        for v in o.data.vertices:                  # top inside the cap; hem flare
+            t = max(0.0, min(1.0, (0.06 - v.co.z) / 0.20))
+            v.co.x = sx * 0.185 + (v.co.x - sx * 0.185) * (1.0 + 0.18 * t) + sx * 0.012 * t
+    o = hpiece((0, 0.1325, -0.0325), (0.40, 0.115, 0.305), col, 'hair_back')
+    for v in o.data.vertices:                      # outer face FLUSH with the cap
+        t = max(0.0, min(1.0, (0.04 - v.co.z) / 0.22))   # back; gather to the nape
+        v.co.x *= 1.0 - 0.24 * t
+        v.co.y = 0.1325 + (v.co.y - 0.1325) * (1.0 - 0.25 * t) - 0.012 * t
 
 
 def hair_pony(col):                                # arc hairline + bun + thick tail
@@ -353,7 +317,7 @@ PIECES = [
     ('hw-goggles',    'headwear', 'Goggles',    hw_goggles_up, None),
     ('hw-ushanka',    'headwear', 'Ushanka',    hw_ushanka,    None),
     ('hair-short', 'hair', 'Short',     hair_short, True),
-    ('hair-bob',   'hair', 'Bob',       hair_bob,   True),
+    ('hair-bob',   'hair', 'Long',      hair_long,  True),  # id kept for saved configs
     ('hair-pony',  'hair', 'Ponytail',  hair_pony,  True),
     ('hair-buns',  'hair', 'Twin Buns', hair_buns,  True),
     ('hair-topbun', 'hair', 'Bun',      hair_topbun, True),
