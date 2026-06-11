@@ -8,7 +8,7 @@ import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, track_material,
                   assign, add_mount_empty, bevel, make_track_band,
-                  finalize_and_export, load_params, tuner_mode,
+                  make_hull_bmesh, finalize_and_export, load_params, tuner_mode,
                   game_to_blender, DOCTRINE_COLORS)
 from _greebles import GREEBLES
 from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope
@@ -20,43 +20,52 @@ P = {
     'groundClear': 0.42, 'beltZ': 0.62, 'hullTop': 1.55,
     'glacisPull': 1.05, 'lowerGlacisPull': 0.18, 'rearDeckPull': 0.28,
     'wheelR': 0.24, 'wheelCount': 5, 'ringY': -0.34,
+    'bowTaper': 0.10, 'bowTaperLen': 1.1,
+    'profile': [
+        [-2.40, 0.42], [-2.36, 0.74], [-1.61, 1.52],
+        [-0.70, 1.55], [ 0.10, 1.55], [ 0.50, 1.54],
+        [ 0.62, 1.34], [ 1.85, 1.30], [ 2.24, 0.66],
+        [ 2.40, 0.42],
+    ],
 }
 P.update(load_params('light_tank', 'hull'))
 
 HULL_LEN  = P['hullLen'];  BODY_W    = P['bodyW'];    TRACK_W   = P['trackW']
-LOWER_Z0  = P['groundClear']; BELT_Z = P['beltZ'];   HULL_TOP  = P['hullTop']
+LOWER_Z0  = P['groundClear']
 WHEEL_R   = P['wheelR'];   N_WHEELS  = int(P['wheelCount'])
 
-TRACK_GAP  = 0.04
-TRACK_CX   = BODY_W / 2 + TRACK_GAP + TRACK_W / 2
+TRACK_GAP   = 0.04
+TRACK_CX    = BODY_W / 2 + TRACK_GAP + TRACK_W / 2
 TRACK_R_OUT = WHEEL_R + 0.16
 TRACK_R_IN  = WHEEL_R + 0.02
-WHEEL_Z    = TRACK_R_OUT
-END_CY     = HULL_LEN / 2 - 0.38
-END_R      = TRACK_R_IN
-WHEEL_Y1   = END_CY - END_R - WHEEL_R - 0.05
-WHEEL_Y0   = -WHEEL_Y1
-FENDER_Z   = WHEEL_Z + TRACK_R_OUT + 0.10
+WHEEL_Z     = TRACK_R_OUT
+END_CY      = HULL_LEN / 2 - 0.38
+END_R       = TRACK_R_IN
+WHEEL_Y1    = END_CY - END_R - WHEEL_R - 0.05
+WHEEL_Y0    = -WHEEL_Y1
+FENDER_Z    = WHEEL_Z + TRACK_R_OUT + 0.10
 
-# ---- Chaffee silhouette key planes (all derived from tunables) -------------
-HF = -HULL_LEN / 2          # front Y (Blender -Y = front)
-HR =  HULL_LEN / 2          # rear Y
+# Key planes derived from the profile array (single source of truth)
+_prof         = P['profile']
+HF            = _prof[0][0]                    # -2.40  front Y
+HR            = _prof[-1][0]                   # +2.40  rear Y
+Z_FLOOR       = _prof[0][1]                    # 0.42
+Z_BELT        = _prof[1][1]                    # 0.74   lower-nose top
+Z_DECK        = _prof[2][1]                    # 1.52   glacis top
+Z_TOP         = max(z for _, z in _prof)       # 1.55   crew-deck peak
+HULL_TOP      = Z_TOP
+Z_EDECK       = _prof[6][1]                    # 1.34   engine deck
+Y_GLACIS_BASE = _prof[1][0]                    # -2.36
+Y_GLACIS_TOP  = _prof[2][0]                    # -1.61
+Y_DECK_END    = _prof[5][0]                    # +0.50
+Y_EDECK_START = _prof[6][0]                    # +0.62
+Y_REAR_SLOPE  = _prof[7][0]                    # +1.85
+Y_REAR_TIP    = HR
+REAR_BASE_Y   = _prof[8][0]                    # +2.24  rear plate base
+REAR_BASE_Z   = _prof[8][1]                    # +0.66
 
-Z_FLOOR = LOWER_Z0          # 0.42 — hull floor
-Z_BELT  = BELT_Z            # 0.62 — lower-nose top / glacis base / rear-plate base
-Z_TOP   = HULL_TOP          # 1.55 — crew-deck peak (hull top)
-Z_DECK  = HULL_TOP - 0.13   # 1.42 — crew deck at glacis junction
-Z_EDECK = HULL_TOP - 0.23   # 1.32 — engine deck (sits LOWER — the iconic step)
-
-Y_NOSE_TIP    = HF          # -2.40  lower-nose stub tip
-Y_GLACIS_BASE = HF + 0.25   # -2.15  lower nose meets glacis
-Y_GLACIS_TOP  = HF + 1.60   # -0.80  glacis tops out at crew deck
-Y_DECK_END    = HR - 2.00   # +0.40  crew deck ends, step down begins
-Y_EDECK_START = HR - 1.80   # +0.60  engine deck flat begins
-Y_REAR_SLOPE  = HR - 0.40   # +2.00  rear plate slope starts
-Y_REAR_TIP    = HR          # +2.40  rear stub
-
-GLACIS_ANG = math.atan2(Z_DECK - Z_BELT, Y_GLACIS_TOP - Y_GLACIS_BASE)  # ~31 deg
+GLACIS_ANG = math.atan2(Z_DECK - Z_BELT, Y_GLACIS_TOP - Y_GLACIS_BASE)
+BELT_Z     = Z_BELT                            # alias used by detail-pass bolt rows
 
 
 def glacis_z(y):
@@ -77,58 +86,8 @@ gear_mat = gear_material()
 trk_mat  = track_material()
 
 
-# ---- Hull body — single bmesh solid from the Chaffee side profile ----------
-def build_hull_body(name, mat):
-    # Side profile, front-bottom going up-over-and-back (open at the floor;
-    # closed by an explicit floor quad).
-    profile = [
-        (Y_NOSE_TIP,    Z_FLOOR),   # 0: floor front
-        (Y_NOSE_TIP,    Z_BELT),    # 1: top of lower nose stub
-        (Y_GLACIS_BASE, Z_BELT),    # 2: glacis base (small horizontal ledge)
-        (Y_GLACIS_TOP,  Z_DECK),    # 3: top of the steep glacis
-        (Y_DECK_END,    Z_TOP),     # 4: crew-deck peak (hull top)
-        (Y_EDECK_START, Z_EDECK),   # 5: engine-step landing (lower!)
-        (Y_REAR_SLOPE,  Z_EDECK),   # 6: engine deck rear edge
-        (Y_REAR_TIP,    Z_BELT),    # 7: rear plate base
-        (Y_REAR_TIP,    Z_FLOOR),   # 8: floor rear
-    ]
-
-    # Plan-view taper: the bow narrows ~8% over the front 1.0u.
-    TAPER_LEN, TAPER_MIN = 1.0, 0.92
-    def taper(y):
-        if y > HF + TAPER_LEN:
-            return 1.0
-        t = (y - HF) / TAPER_LEN
-        return TAPER_MIN + (1.0 - TAPER_MIN) * t
-
-    mesh = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    L = [bm.verts.new((-BODY_W / 2 * taper(y), y, z)) for y, z in profile]
-    R = [bm.verts.new(( BODY_W / 2 * taper(y), y, z)) for y, z in profile]
-    n = len(profile)
-    for i in range(n - 1):                       # wall quads (open along floor)
-        bm.faces.new((L[i], L[i + 1], R[i + 1], R[i]))
-    bm.faces.new(L)                              # left cap (n-gon)
-    bm.faces.new(list(reversed(R)))              # right cap
-    bm.faces.new((L[0], R[0], R[n - 1], L[n - 1]))  # floor quad → closed solid
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(mesh)
-    bm.free()
-    o = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(o)
-    assign(o, mat)
-    # Soften plate transitions (glacis base/top, engine step, all verticals).
-    bpy.ops.object.select_all(action='DESELECT')
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-    mod = o.modifiers.new('bvl', 'BEVEL')
-    mod.width, mod.segments, mod.limit_method = 0.06, 3, 'ANGLE'
-    mod.angle_limit = math.radians(20)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    return o
-
-
-build_hull_body('hull_body', body_mat)
+make_hull_bmesh('hull_body', body_mat, _prof, BODY_W,
+                bow_taper=P['bowTaper'], bow_taper_len=P['bowTaperLen'])
 
 # Nose cap — angled transmission-cover wedge across the lower bow. Leans
 # forward ~10 deg at the top so the bow reads as a plate, not an open edge.
@@ -141,14 +100,14 @@ bpy.ops.object.transform_apply(rotation=True, scale=True)
 bevel(nose, width=0.04, segments=2)
 assign(nose, body_mat)
 
-# Rear armor plate — thin slab lying flush on the sloped rear face for visual
-# plate thickness (rotated to match the ~60 deg rear slope).
-REAR_ANG = math.atan2(Z_EDECK - Z_BELT, Y_REAR_TIP - Y_REAR_SLOPE)  # from horiz
+# Rear armor plate — spans the main slope from profile[7] to profile[8]
+REAR_ANG = math.atan2(REAR_BASE_Z - Z_EDECK, REAR_BASE_Y - Y_REAR_SLOPE)
 bpy.ops.mesh.primitive_cube_add(
-    location=(0, (Y_REAR_SLOPE + Y_REAR_TIP) / 2 + 0.02, (Z_EDECK + Z_BELT) / 2 + 0.02))
+    location=(0, (Y_REAR_SLOPE + REAR_BASE_Y) / 2 + 0.02,
+              (Z_EDECK + REAR_BASE_Z) / 2 + 0.02))
 rear_plate = bpy.context.object
 rear_plate.name = 'hull_rear_plate'
-REAR_RUN = math.hypot(Y_REAR_TIP - Y_REAR_SLOPE, Z_EDECK - Z_BELT)
+REAR_RUN = math.hypot(REAR_BASE_Y - Y_REAR_SLOPE, Z_EDECK - REAR_BASE_Z)
 rear_plate.scale = (BODY_W * 0.94 / 2, REAR_RUN / 2 * 0.92, 0.045)
 rear_plate.rotation_euler.x = math.radians(90) - REAR_ANG
 bpy.ops.object.transform_apply(rotation=True, scale=True)
@@ -194,7 +153,7 @@ for i, x in enumerate((-0.55, 0.55)):
 
 # Driver + co-driver hatches — set INTO the steep glacis, tilted to match it
 # (the Chaffee crew hatches ride the sloped front roof).
-HATCH_Y = -1.30
+HATCH_Y = -2.00
 HATCH_N = (0, -math.sin(GLACIS_ANG), math.cos(GLACIS_ANG))   # glacis normal
 for name, x in (('hatch_driver', BODY_W * 0.27), ('hatch_codriver', -BODY_W * 0.27)):
     sz = glacis_z(HATCH_Y)
@@ -205,7 +164,7 @@ for name, x in (('hatch_driver', BODY_W * 0.27), ('hatch_codriver', -BODY_W * 0.
     o = bpy.context.object; o.name = name; assign(o, body_mat)
 
 # Driver periscope at the glacis top edge ('periscope' = UNPAINTABLE)
-periscope('driver', gear_mat, (BODY_W * 0.27, -0.88, glacis_z(-0.88) + 0.055))
+periscope('driver', gear_mat, (BODY_W * 0.27, -0.88, deck_z(-0.88) + 0.055))
 
 # Hull MG ball mount in the glacis ('mg' keyword = UNPAINTABLE)
 MG_Y = -1.90

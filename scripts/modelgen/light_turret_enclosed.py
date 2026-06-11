@@ -6,8 +6,8 @@
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_empty,
-                  bevel, finalize_and_export, load_params, STANDARD_RING_DIAMETER,
-                  DOCTRINE_COLORS)
+                  bevel, make_lofted_turret, finalize_and_export, load_params,
+                  STANDARD_RING_DIAMETER, DOCTRINE_COLORS)
 from _details import bolt_row, weld_seam, lifting_eye, periscope, grab_handle
 import bpy
 import bmesh
@@ -19,6 +19,12 @@ P = {
     'mountY': -0.80, 'mountZ': 0.30,
     'mant_shieldH': 0.52, 'mant_shieldW': 0.86,
     'mant_bowlR': 0.25,   'mant_collarR': 0.12, 'mant_protrude': 0.16,
+    'crossSections': [
+        {'z': 0.07, 'hw': 0.70, 'tf': 0.80, 'tr': 0.66},
+        {'z': 0.25, 'hw': 0.69, 'tf': 0.74, 'tr': 0.64},
+        {'z': 0.48, 'hw': 0.58, 'tf': 0.61, 'tr': 0.56},
+        {'z': 0.67, 'hw': 0.45, 'tf': 0.51, 'tr': 0.46},
+    ],
 }
 P.update(load_params('light_tank', 'turret'))
 
@@ -26,11 +32,12 @@ clear_scene()
 body_mat = flat_material('light_body', DOCTRINE_COLORS['light'])
 gear_mat = gear_material()
 
-RING_R    = STANDARD_RING_DIAMETER / 2
-SHELL_Z0  = 0.07
-SHELL_H   = P['shellH']
-TURRET_TOP = SHELL_Z0 + SHELL_H
-MOUNT     = (0, P['mountY'], P['mountZ'])
+RING_R     = STANDARD_RING_DIAMETER / 2
+SHELL_Z0   = 0.07
+_cs        = P['crossSections']
+TURRET_TOP = max(cs['z'] for cs in _cs)
+SHELL_H    = TURRET_TOP - SHELL_Z0
+MOUNT      = (0, P['mountY'], P['mountZ'])
 
 # Ring collar — measureBase() reads this as the seat diameter
 bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=RING_R, depth=SHELL_Z0,
@@ -38,65 +45,7 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=RING_R, depth=SHELL_Z0,
 ring = bpy.context.object; ring.name = 'turret_ring'; assign(ring, body_mat)
 
 
-# ---- Cast shell — bmesh loft through three octagonal cross-sections --------
-def build_turret_shell(name, mat):
-    TF = 0.80              # forward half-depth (ring center → front face, -Y)
-    TR = 0.65              # rear half-depth of the main body (+Y, bustle adds more)
-
-    def ring_pts(hw, tf, tr):
-        """Octagonal turret outline (CCW from above). hw=half-width,
-        tf=front depth, tr=rear depth."""
-        return [
-            (-hw * 0.55, -tf),         # front-left corner
-            ( hw * 0.55, -tf),         # front-right corner
-            ( hw,        -tf * 0.45),  # right-front
-            ( hw,         tr * 0.45),  # right-rear
-            ( hw * 0.60,  tr),         # rear-right corner
-            (-hw * 0.60,  tr),         # rear-left corner
-            (-hw,         tr * 0.45),  # left-rear
-            (-hw,        -tf * 0.45),  # left-front
-        ]
-
-    Z0 = SHELL_Z0
-    Z1 = SHELL_Z0 + SHELL_H * 0.55
-    Z2 = SHELL_Z0 + SHELL_H
-
-    # Three levels: base widest; mid pulls in slightly; top narrower with the
-    # front face raked back hardest (high-glacis cast front).
-    pts_bot = ring_pts(0.69, TF,        TR)
-    pts_mid = ring_pts(0.64, TF * 0.90, TR)
-    pts_top = ring_pts(0.55, TF * 0.78, TR * 0.90)
-
-    mesh = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    v_bot = [bm.verts.new((x, y, Z0)) for x, y in pts_bot]
-    v_mid = [bm.verts.new((x, y, Z1)) for x, y in pts_mid]
-    v_top = [bm.verts.new((x, y, Z2)) for x, y in pts_top]
-    n = len(pts_bot)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new((v_bot[i], v_bot[j], v_mid[j], v_mid[i]))
-        bm.faces.new((v_mid[i], v_mid[j], v_top[j], v_top[i]))
-    bm.faces.new(list(reversed(v_top)))   # roof plate
-    bm.faces.new(v_bot)                   # base (ring collar hides it)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(mesh)
-    bm.free()
-    o = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(o)
-    assign(o, mat)
-    # Generous bevel = cast-steel rounding on every corner
-    bpy.ops.object.select_all(action='DESELECT')
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-    mod = o.modifiers.new('bvl', 'BEVEL')
-    mod.width, mod.segments, mod.limit_method = 0.06, 3, 'ANGLE'
-    mod.angle_limit = math.radians(35)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    return o
-
-
-build_turret_shell('turret_shell', body_mat)
+make_lofted_turret('turret_shell', body_mat, _cs)
 
 # Turret roof — nearly flat plate, tilted ~3 deg so the front edge sits higher
 # (continues the raked front), NOT a dome.

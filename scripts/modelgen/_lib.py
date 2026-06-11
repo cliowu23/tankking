@@ -196,6 +196,98 @@ def bevel(obj, width=0.05, segments=2):
     return obj
 
 
+def make_hull_bmesh(name, mat, profile, width,
+                    bow_taper=0.0, bow_taper_len=1.0,
+                    bevel_width=0.06, bevel_segs=3, bevel_angle=20):
+    """Solid hull body from a Blender-space side profile.
+    profile: list of [y, z] pairs from front-bottom to rear-bottom (open chain,
+    NOT closed). width: full hull width split ±X. bow_taper: fraction to narrow
+    at the front tip (0 = no taper, 0.08 = 8% narrower). bow_taper_len: Y-distance
+    from profile[0] over which the taper ramps up to full width.
+    Applies an angle-limited bevel; returns the object."""
+    front_y = profile[0][0]
+
+    def half_w(y):
+        if bow_taper <= 0:
+            return width / 2
+        t = max(0.0, min(1.0, (y - front_y) / bow_taper_len))
+        return width / 2 * ((1.0 - bow_taper) + bow_taper * t)
+
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    L = [bm.verts.new((-half_w(y), y, z)) for y, z in profile]
+    R = [bm.verts.new(( half_w(y), y, z)) for y, z in profile]
+    n = len(profile)
+    for i in range(n - 1):
+        bm.faces.new((L[i], L[i + 1], R[i + 1], R[i]))
+    bm.faces.new(L)
+    bm.faces.new(list(reversed(R)))
+    bm.faces.new((L[0], R[0], R[n - 1], L[n - 1]))     # floor quad closes the solid
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    assign(o, mat)
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    mod = o.modifiers.new('bvl', 'BEVEL')
+    mod.width, mod.segments, mod.limit_method = bevel_width, bevel_segs, 'ANGLE'
+    mod.angle_limit = math.radians(bevel_angle)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return o
+
+
+def make_lofted_turret(name, mat, cross_sections,
+                       bevel_width=0.06, bevel_segs=3, bevel_angle=35):
+    """Turret body via bmesh loft through octagonal cross-sections.
+    cross_sections: list of dicts — each must have: z (Blender Z height),
+    hw (half-width X), tf (front half-depth toward -Y), tr (rear half-depth +Y).
+    Requires at least 2 entries. Closes the top with a cap; bottom is left open
+    (the ring collar covers it). Applies bevel for cast-steel rounding."""
+
+    def ring_pts(hw, tf, tr):
+        return [
+            (-hw * 0.55, -tf),
+            ( hw * 0.55, -tf),
+            ( hw,        -tf * 0.45),
+            ( hw,         tr * 0.45),
+            ( hw * 0.60,  tr),
+            (-hw * 0.60,  tr),
+            (-hw,         tr * 0.45),
+            (-hw,        -tf * 0.45),
+        ]
+
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    levels = []
+    for cs in cross_sections:
+        pts = ring_pts(cs['hw'], cs['tf'], cs['tr'])
+        levels.append([bm.verts.new((x, y, cs['z'])) for x, y in pts])
+    n = len(levels[0])
+    for li in range(len(levels) - 1):
+        lo, hi = levels[li], levels[li + 1]
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bm.faces.new(list(reversed(levels[-1])))    # top cap
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    assign(o, mat)
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    mod = o.modifiers.new('bvl', 'BEVEL')
+    mod.width, mod.segments, mod.limit_method = bevel_width, bevel_segs, 'ANGLE'
+    mod.angle_limit = math.radians(bevel_angle)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return o
+
+
 def add_mount_empty(name, location):
     """Mount empties per the Integration Contract: 'turret' on hulls, 'mount' on turrets."""
     empty = bpy.data.objects.new(name, None)
