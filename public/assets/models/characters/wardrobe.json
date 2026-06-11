@@ -180,32 +180,6 @@
         ]
       },
       {
-        "model": "hair-side",
-        "label": "Side Part",
-        "variants": [
-          {
-            "id": "hair-side-brown",
-            "cw": "brown",
-            "hex": "#8c5123"
-          },
-          {
-            "id": "hair-side-black",
-            "cw": "black",
-            "hex": "#211e21"
-          },
-          {
-            "id": "hair-side-blond",
-            "cw": "blond",
-            "hex": "#f4c64c"
-          },
-          {
-            "id": "hair-side-red",
-            "cw": "red",
-            "hex": "#cc4c19"
-          }
-        ]
-      },
-      {
         "model": "hair-bob",
         "label": "Bob",
         "variants": [

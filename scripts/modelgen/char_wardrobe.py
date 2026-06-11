@@ -112,8 +112,8 @@ def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
     return o
 
 
-def hair_short(col):                               # classic arc hairline
-    hair_shell(col, lambda x: 0.095 + 1.1 * x * x)
+def hair_short(col):                               # curtained hairline: high center,
+    hair_shell(col, lambda x: 0.125 - 1.4 * x * x)     # temples covered (no corner gaps)
 
 
 def hair_side(col):                                # the proven diagonal sweep
@@ -126,7 +126,7 @@ def hair_bob(col):                                 # blunt low fringe + deep cur
 
 
 def hair_pony(col):                                # arc hairline + bun + thick tail
-    hair_shell(col, lambda x: 0.105 + 1.0 * x * x)
+    hair_shell(col, lambda x: 0.125 - 1.2 * x * x)
     hpiece((0, HY + 0.035, 0.185), (0.10, 0.10, 0.085), col, 'hair_bun')
     o = lock([(0, HY + 0.05, 0.175), (0, HY + 0.105, 0.09),
               (0, HY + 0.10, -0.02), (0, HY + 0.06, -0.09)], radius=0.05, tip=0.3)
@@ -257,7 +257,6 @@ PIECES = [
     ('hw-goggles',    'headwear', 'Goggles',    hw_goggles_up, None),
     ('hw-ushanka',    'headwear', 'Ushanka',    hw_ushanka,    None),
     ('hair-short', 'hair', 'Short',     hair_short, True),
-    ('hair-side',  'hair', 'Side Part', hair_side,  True),
     ('hair-bob',   'hair', 'Bob',       hair_bob,   True),
     ('hair-pony',  'hair', 'Ponytail',  hair_pony,  True),
     ('hair-curly', 'hair', 'Curly',     hair_curly, True),
