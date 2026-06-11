@@ -60,6 +60,23 @@ def hpiece(c, sz, col, name):
     return o
 
 
+def _head_proxy():
+    """Exact replica of the char_mini head (bone-local) as a shrinkwrap target."""
+    bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0.055))
+    o = bpy.context.object
+    o.name = 'fit_proxy'
+    o.scale = (0.215, 0.15, 0.15)
+    bpy.ops.object.transform_apply(scale=True)
+    for v in o.data.vertices:                  # the Kenney skull taper
+        if v.co.z > 0.055:
+            v.co.x *= 0.74
+            v.co.y *= 0.82
+    m = o.modifiers.new('bvl', 'BEVEL')
+    m.width, m.segments, m.limit_method = 0.05, 2, 'ANGLE'
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    return o
+
+
 def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
                side_cut=-0.005, nape_cut=-0.062, thick=0.028, bump=0.0, name='hair_shell'):
     # shell half-extents = head + 0.002 -> base surface touches the head; the
@@ -73,12 +90,6 @@ def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.subdivide(number_cuts=9)
     bpy.ops.object.mode_set(mode='OBJECT')
-
-    # follow the Kenney skull taper (head narrows toward the crown)
-    for v in o.data.vertices:
-        t = max(0.0, min(1.0, (v.co.z - 0.06) / 0.155))
-        v.co.x *= 1.0 - 0.26 * t
-        v.co.y = 0.012 + (v.co.y - 0.012) * (1.0 - 0.18 * t)
 
     def keep(c):
         x, y, z = c.x, c.y - 0.012, c.z - cz
@@ -103,6 +114,18 @@ def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
         hl = hairline(x)
         if y < -0.07 and hl - cell * 0.3 <= z <= hl + cell * 0.6:
             v.co.z = cz + hl
+    # SKIN-TIGHT FIT: shrinkwrap the cut shell onto an exact head replica, then
+    # grow thickness outward. Fit is by construction — survives any head reshape.
+    proxy = _head_proxy()
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    sw = o.modifiers.new('wrap', 'SHRINKWRAP')
+    sw.target = proxy
+    sw.wrap_method = 'NEAREST_SURFACEPOINT'
+    sw.offset = 0.005
+    bpy.ops.object.modifier_apply(modifier=sw.name)
+    bpy.data.objects.remove(proxy, do_unlink=True)
     m = o.modifiers.new('sol', 'SOLIDIFY')
     m.thickness = thick
     m.offset = 1.0
