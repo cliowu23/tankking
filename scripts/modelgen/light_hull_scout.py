@@ -49,7 +49,7 @@ HULL_LEN  = P['hullLen'];  BODY_W    = P['bodyW'];    TRACK_W   = P['trackW']
 LOWER_Z0  = P['groundClear']
 WHEEL_R   = P['wheelR'];   N_WHEELS  = int(P['wheelCount'])
 
-TRACK_GAP   = 0.04
+TRACK_GAP   = -0.02   # slight overlap — track band visually attaches to the hull side
 TRACK_CX    = BODY_W / 2 + TRACK_GAP + TRACK_W / 2
 TRACK_R_OUT = WHEEL_R + 0.16
 TRACK_R_IN  = WHEEL_R + 0.02
