@@ -143,11 +143,19 @@ def build_character(char_id, outfit_style, outfit_col):
 
     # ── SKIN unit (head-mesh): BIG Kenney head + face + ears + HANDS ──────────
     from _charlib import char_material
-    mk(box((0, 0, 0.515), (0.44, 0.30, 0.295), bev=0.05), WHITE, 'head')
+    h = box((0, 0, 0.515), (0.43, 0.30, 0.30))
+    for v in h.data.vertices:                  # Kenney skull taper toward the crown
+        if v.co.z > 0.515:
+            v.co.x *= 0.74
+            v.co.y *= 0.82
+    m = h.modifiers.new('bvl', 'BEVEL')
+    m.width, m.segments, m.limit_method = 0.05, 2, 'ANGLE'
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    mk(h, WHITE, 'head')
     for sx in (-1, 1):
         mk(box((sx * 0.10, -0.152, 0.50), (0.07, 0.014, 0.085), bev=0.012), DARK, 'head')   # eyes
         mk(box((sx * 0.10, -0.152, 0.565), (0.085, 0.012, 0.022)), DARK, 'head')            # brows
-        mk(box((sx * 0.227, 0, 0.50), (0.025, 0.06, 0.07), bev=0.01), WHITE, 'head')        # ears
+        mk(box((sx * 0.218, 0, 0.50), (0.025, 0.06, 0.07), bev=0.01), WHITE, 'head')        # ears
     for side, sx in (('arm-left', 1), ('arm-right', -1)):                                    # hands
         mk(sph((sx * 0.232, 0, 0.145), 0.058), WHITE, side)
     finish_mesh([o for o in bpy.context.scene.objects

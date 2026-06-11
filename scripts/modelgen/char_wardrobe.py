@@ -74,6 +74,12 @@ def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
     bpy.ops.mesh.subdivide(number_cuts=9)
     bpy.ops.object.mode_set(mode='OBJECT')
 
+    # follow the Kenney skull taper (head narrows toward the crown)
+    for v in o.data.vertices:
+        t = max(0.0, min(1.0, (v.co.z - 0.06) / 0.155))
+        v.co.x *= 1.0 - 0.26 * t
+        v.co.y = 0.012 + (v.co.y - 0.012) * (1.0 - 0.18 * t)
+
     def keep(c):
         x, y, z = c.x, c.y - 0.012, c.z - cz
         if y < -0.11 and z < hairline(x):
@@ -127,7 +133,7 @@ def hair_bob(col):                                 # blunt low fringe + deep cur
 
 def hair_pony(col):                                # arc hairline + bun + thick tail
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
-    hpiece((0, HY + 0.04, 0.185), (0.13, 0.12, 0.105), col, 'hair_bun')
+    hpiece((0, HY + 0.015, 0.18), (0.13, 0.12, 0.105), col, 'hair_bun')
     o = lock([(0, HY + 0.055, 0.175), (0, HY + 0.125, 0.09),
               (0, HY + 0.12, -0.02), (0, HY + 0.075, -0.105)],
              radius=0.085, tip=0.32)                # ONE solid gathered tail
@@ -140,14 +146,14 @@ def hair_pony(col):                                # arc hairline + bun + thick 
 def hair_buns(col):                                # Kenney twin/space buns — BIG
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
     for sx in (-1, 1):
-        hpiece((sx * 0.175, 0.03, 0.285), (0.17, 0.17, 0.155), col, f'hair_bun_{sx}')
-        box((sx * 0.175, 0.03, 0.205), (0.115, 0.115, 0.028), DARK, f'hair_buntie_{sx}')
+        hpiece((sx * 0.138, 0.025, 0.262), (0.17, 0.17, 0.155), col, f'hair_bun_{sx}')
+        box((sx * 0.138, 0.025, 0.185), (0.115, 0.115, 0.028), DARK, f'hair_buntie_{sx}')
 
 
 def hair_topbun(col):                              # regulation bun — low at the BACK
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
-    hpiece((0, HY + 0.055, 0.13), (0.17, 0.155, 0.155), col, 'hair_bun_back')
-    box((0, HY + 0.02, 0.13), (0.125, 0.05, 0.125), DARK, 'hair_bun_tie')
+    hpiece((0, HY + 0.03, 0.125), (0.17, 0.155, 0.155), col, 'hair_bun_back')
+    box((0, HY - 0.005, 0.125), (0.125, 0.05, 0.125), DARK, 'hair_bun_tie')
 
 
 def hair_curly(col):                               # shell + noise puff
