@@ -206,32 +206,6 @@
         ]
       },
       {
-        "model": "hair-buzz",
-        "label": "Buzz",
-        "variants": [
-          {
-            "id": "hair-buzz-brown",
-            "cw": "brown",
-            "hex": "#8c5123"
-          },
-          {
-            "id": "hair-buzz-black",
-            "cw": "black",
-            "hex": "#211e21"
-          },
-          {
-            "id": "hair-buzz-blond",
-            "cw": "blond",
-            "hex": "#f4c64c"
-          },
-          {
-            "id": "hair-buzz-red",
-            "cw": "red",
-            "hex": "#cc4c19"
-          }
-        ]
-      },
-      {
         "model": "hair-bob",
         "label": "Bob",
         "variants": [
