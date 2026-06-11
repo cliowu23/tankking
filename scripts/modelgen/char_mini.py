@@ -73,12 +73,19 @@ def build_character(char_id, outfit_style, outfit_col):
         torso_col = OUT                       # boilersuit/shirt: torso IS the outfit
     pants_col = OUT if outfit_style == 'overalls' else PANTS
 
-    # ── BODY (outfit, no skin parts) — Kenney-proportioned squat pear ─────────
-    mk(box((0, 0, 0.115), (0.33, 0.225, 0.10), bev=0.03), pants_col, 'root')         # hips
-    mk(box((0, 0, 0.165), (0.34, 0.235, 0.034), bev=0.012), BELT, 'root')             # belt
-    mk(box((0, -0.121, 0.165), (0.055, 0.014, 0.03)), DARK, 'root')                    # buckle
-    mk(box((0, 0, 0.225), (0.33, 0.22, 0.115), bev=0.035), torso_col, 'torso')        # belly
-    mk(box((0, 0, 0.315), (0.295, 0.195, 0.095), bev=0.028), torso_col, 'torso')       # chest
+    # ── BODY — ONE trapezoidal-prism torso (Kenney shape: wide hips, tapered
+    # shoulders; replaces the stacked-blob 'snowman' construction) ─────────────
+    t = box((0, 0, 0.235), (0.345, 0.235, 0.27))
+    for v in t.data.vertices:                       # taper toward the shoulders
+        if v.co.z > 0.235:
+            v.co.x *= 0.80
+            v.co.y *= 0.84
+    m = t.modifiers.new('bvl', 'BEVEL')
+    m.width, m.segments, m.limit_method = 0.035, 2, 'ANGLE'
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    mk(t, torso_col, 'torso')
+    mk(box((0, 0, 0.155), (0.355, 0.245, 0.034), bev=0.012), BELT, 'root')             # belt
+    mk(box((0, -0.126, 0.155), (0.055, 0.014, 0.03)), DARK, 'root')                    # buckle
 
     if outfit_style == 'jacket':
         mk(box((0, -0.095, 0.33), (0.09, 0.016, 0.045)), SHIRT, 'torso')              # shirt v
