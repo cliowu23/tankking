@@ -232,6 +232,32 @@
         ]
       },
       {
+        "model": "hair-buns",
+        "label": "Twin Buns",
+        "variants": [
+          {
+            "id": "hair-buns-brown",
+            "cw": "brown",
+            "hex": "#8c5123"
+          },
+          {
+            "id": "hair-buns-black",
+            "cw": "black",
+            "hex": "#211e21"
+          },
+          {
+            "id": "hair-buns-blond",
+            "cw": "blond",
+            "hex": "#f4c64c"
+          },
+          {
+            "id": "hair-buns-red",
+            "cw": "red",
+            "hex": "#cc4c19"
+          }
+        ]
+      },
+      {
         "model": "hair-curly",
         "label": "Curly",
         "variants": [

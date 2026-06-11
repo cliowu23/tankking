@@ -95,7 +95,7 @@ def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
     for v in o.data.vertices:
         x, y, z = v.co.x, v.co.y - 0.012, v.co.z - cz
         hl = hairline(x)
-        if y < -0.07 and hl - cell * 0.2 <= z <= hl + cell * 1.3:
+        if y < -0.07 and hl - cell * 0.3 <= z <= hl + cell * 0.6:
             v.co.z = cz + hl
     m = o.modifiers.new('sol', 'SOLIDIFY')
     m.thickness = thick
@@ -135,6 +135,13 @@ def hair_pony(col):                                # arc hairline + bun + thick 
     tint(o, col)
     o.data.materials.append(char_material())
     box((0, HY + 0.045, 0.145), (0.10, 0.09, 0.03), DARK, 'hair_tie')
+
+
+def hair_buns(col):                                # Kenney twin/space buns
+    hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
+    for sx in (-1, 1):
+        hpiece((sx * 0.155, 0.035, 0.25), (0.115, 0.115, 0.10), col, f'hair_bun_{sx}')
+        box((sx * 0.155, 0.035, 0.197), (0.085, 0.085, 0.024), DARK, f'hair_buntie_{sx}')
 
 
 def hair_curly(col):                               # shell + noise puff
@@ -260,6 +267,7 @@ PIECES = [
     ('hair-short', 'hair', 'Short',     hair_short, True),
     ('hair-bob',   'hair', 'Bob',       hair_bob,   True),
     ('hair-pony',  'hair', 'Ponytail',  hair_pony,  True),
+    ('hair-buns',  'hair', 'Twin Buns', hair_buns,  True),
     ('hair-curly', 'hair', 'Curly',     hair_curly, True),
     ('face-glasses', 'face', 'Glasses', face_glasses, None),
     ('face-shades',  'face', 'Shades',  face_shades,  None),
