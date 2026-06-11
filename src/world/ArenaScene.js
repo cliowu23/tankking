@@ -23,10 +23,12 @@ import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
 
 export default class ArenaScene {
-  constructor(engine, onExtract) {
+  constructor(engine, onExtract, zone = null) {
     this.scene = new Scene(engine);
     this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
     this._onExtract = onExtract ?? null;
+    // Zone config (e.g. zones/world1.js). Null = the legacy placeholder arena.
+    this.zone = zone;
 
     this.scene._onCameraShake = (duration, intensity) => this._triggerShake(duration, intensity);
     this._shakeTime      = 0;
@@ -44,9 +46,9 @@ export default class ArenaScene {
     this._cancelFadeAlpha    = 0;
     this._cancelFadeHoldTime = 0;
 
-    // Persistent camera target position for soft follow
-    this._camX = 0;
-    this._camZ = 0;
+    // Persistent camera target position for soft follow — starts on the spawn
+    this._camX = zone?.spawn.x ?? 0;
+    this._camZ = zone?.spawn.z ?? 0;
 
     this._paused = false;
 
@@ -69,7 +71,8 @@ export default class ArenaScene {
   }
 
   _setupCamera() {
-    this.camera = new ArcRotateCamera('cam', -Math.PI / 2, 0.5, 39, Vector3.Zero(), this.scene);
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2, 0.5, 39,
+      new Vector3(this._camX, 0, this._camZ), this.scene);
   }
 
   _setupLighting() {
@@ -92,6 +95,20 @@ export default class ArenaScene {
   }
 
   _setupGround() {
+    if (this.zone) {
+      // Zone ground: flat bright field, sized to the visual extent. The sculpted
+      // border hills + biome dressing arrive with the zone builder (M3); until
+      // then this is a plain green plane the clamps keep the player inside.
+      const size = this.zone.bounds.visual * 2;
+      const ground = MeshBuilder.CreateGround('ground', { width: size, height: size, subdivisions: 1 }, this.scene);
+      const [r, g, b] = this.zone.palette.grass;
+      const mat = new StandardMaterial('groundMat', this.scene);
+      mat.diffuseColor  = new Color3(r, g, b);
+      mat.specularColor = new Color3(0.02, 0.02, 0.02);
+      ground.material = mat;
+      ground.receiveShadows = true;
+      return;
+    }
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
 
     // Arena grid using GridMaterial — dedicated shader, no texture hacks needed
@@ -116,6 +133,7 @@ export default class ArenaScene {
   }
 
   _setupEnvironment() {
+    if (this.zone) return;   // zones have no arena walls — borders are terrain (M3)
     const wallMat = new StandardMaterial('wallMat', this.scene);
     wallMat.diffuseColor  = new Color3(0.95, 0.82, 0.30);
     wallMat.specularColor = new Color3(0.08, 0.08, 0.08);
@@ -156,6 +174,11 @@ export default class ArenaScene {
   _setupSky() {
     // Top-down camera (y=34, beta=0.5) sees the ground as the dominant surface.
     // The clearColor IS the sky — it fills all pixels outside the arena ground.
+    if (this.zone) {
+      const [r, g, b] = this.zone.palette.sky;
+      this.scene.clearColor = new Color4(r, g, b, 1.0);
+      return;   // zone clouds come with the builder (M3), placed for the bigger map
+    }
     this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
 
     // Clouds positioned outside the arena perimeter at low altitude so
@@ -196,6 +219,13 @@ export default class ArenaScene {
   }
 
   _setupHazards() {
+    if (this.zone) {
+      // Green Fields has no lava. Empty zone list keeps _checkHazards a no-op;
+      // the game loop guards _updateLavaTex/_lavaGlow on this._lavaTex.
+      this.lavaZones = [];
+      this._lavaTex  = null;
+      return;
+    }
     const TS = 16; // 16×16 pixel grid — Minecraft scale
 
     // Animated lava texture
@@ -272,23 +302,40 @@ export default class ArenaScene {
   }
 
   _setupEntities() {
-    this.tank = new Tank(this.scene, 0, 0);
+    const spawn  = this.zone?.spawn ?? { x: 0, z: 0 };
+    const bounds = this.zone?.bounds.half ?? 48;
+
+    this.tank = new Tank(this.scene, spawn.x, spawn.z);
+    this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 
-    this._enemySpawns = [
-      [  0.0, -25.5],
-      [-21.9, -10.3],
-      [ 19.2, -13.9],
-      [-13.6,  16.7],
-      [ 16.2,  14.7],
-    ];
+    // Placeholder enemies until the Chaffee light tanks land (M5). In a zone
+    // they occupy the config's patrol spots so combat happens where it will
+    // ship; ambush spots stay empty for now.
+    if (this.zone) {
+      const patrols = this.zone.enemies.filter(e => e.mode === 'patrol');
+      this._enemySpawns = patrols.slice(0, patrols.length - 1).map(e => [e.x, e.z]);
+      const last = patrols[patrols.length - 1];
+      this._aiSpawn = [last.x, last.z];
+    } else {
+      this._enemySpawns = [
+        [  0.0, -25.5],
+        [-21.9, -10.3],
+        [ 19.2, -13.9],
+        [-13.6,  16.7],
+        [ 16.2,  14.7],
+      ];
+      this._aiSpawn = [0, 42];
+    }
     this.enemies = this._enemySpawns.map(([x, z]) => {
       const e = new Enemy(this.scene, x, z);
+      e.bounds = bounds;
       e.addShadows(this.shadowGen);
       return e;
     });
 
-    this.aiEnemy = new AIEnemy(this.scene, 0, 42);
+    this.aiEnemy = new AIEnemy(this.scene, this._aiSpawn[0], this._aiSpawn[1]);
+    this.aiEnemy.bounds = bounds;
     this.aiEnemy.addShadows(this.shadowGen);
 
 
@@ -700,8 +747,10 @@ export default class ArenaScene {
         this.tank.barrelPivot.position.z = this._barrelPivotBaseZ + kick;
       }
 
-      this._updateLavaTex();
-      this._lavaGlow.intensity = 0.5 + Math.sin(performance.now() / 600) * 0.35;
+      if (this._lavaTex) {
+        this._updateLavaTex();
+        this._lavaGlow.intensity = 0.5 + Math.sin(performance.now() / 600) * 0.35;
+      }
       this._checkHazards(dt);
       this._checkCollisions();
       this._checkObstacleCollisions();
@@ -900,7 +949,7 @@ export default class ArenaScene {
       const [x, z] = this._enemySpawns[i];
       this.enemies[i].reset(x, z);
     }
-    this.aiEnemy.reset(0, 42);
+    this.aiEnemy.reset(this._aiSpawn[0], this._aiSpawn[1]);
     this.tank.reset();
     this.lockedEnemy      = null;
     this._prevLockedEnemy = null;
@@ -917,13 +966,16 @@ export default class ArenaScene {
     this._runSalvage = 0;
     this._extracting = false;
 
-    this._crates = ARENA_LOOT.salvageCrates.map((c) => {
+    const crates  = this.zone?.loot ?? ARENA_LOOT.salvageCrates;
+    const extract = this.zone?.extraction ?? ARENA_LOOT.extractionZone;
+
+    this._crates = crates.map((c) => {
       const crate = new SalvageCrate(this.scene, c);
       crate.addShadows(this.shadowGen);
       return crate;
     });
 
-    this._extractZone = new ExtractionZone(this.scene, ARENA_LOOT.extractionZone);
+    this._extractZone = new ExtractionZone(this.scene, extract);
   }
 
   _updateExtraction(dt) {

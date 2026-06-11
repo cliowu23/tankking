@@ -3,6 +3,7 @@ import ArenaScene        from '../world/ArenaScene.js';
 import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
+import { WORLD1 } from '../world/zones/world1.js';
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
@@ -171,7 +172,7 @@ function deployToArena() {
     () => {
       canvas.style.display = 'block';
       document.getElementById('hud').style.display = 'block';
-      arenaScene = new ArenaScene(engine, onExtractFromArena);
+      arenaScene = new ArenaScene(engine, onExtractFromArena, WORLD1);
       window.__arena = arenaScene;
       engine.runRenderLoop(() => arenaScene.scene.render());
       // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.

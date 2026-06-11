@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WORLD 1 — GREEN FIELDS · layout mockup</title>
+<!--
+  TanKING World 1 layout mockup — full 300×300 zone for user approval BEFORE porting.
+  South berm + tunnel mouth (bunker exit) → safe zone → NEAR fields → MID hedgerow country
+  → DEEP village + Keep approach → Iron Keep vista on the north hill.
+  Serve over HTTP:  cd game && python3 -m http.server 8788  →  http://localhost:8788/world1-mockup.html
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07070a; font-family: monospace; }
+  #c { width: 100%; height: 100%; touch-action: none; display: block; }
+  .panel { position: absolute; z-index: 10; background: rgba(0,8,20,0.93); border: 1px solid #00e5ff44;
+    padding: 14px 16px; color: #9bdfe8; font-size: 11px; letter-spacing: 1px; box-shadow: 0 0 24px #00000088; }
+  #left { top: 14px; left: 14px; width: 262px; }
+  h1 { color: #00e5ff; font-size: 13px; letter-spacing: 3px; margin: 0 0 4px; }
+  .sub { color: #4a6b72; font-size: 9px; margin-bottom: 10px; line-height: 1.5; }
+  .row { margin: 6px 0; }
+  button { background: #06202e; color: #7fc8d4; border: 1px solid #00e5ff44; font-family: monospace;
+    font-size: 10px; letter-spacing: 1px; padding: 5px 8px; cursor: pointer; margin: 2px 2px 2px 0; }
+  button:hover { background: #0a3346; color: #ddfff8; }
+  button.on { background: #00e5ff22; color: #00e5ff; border-color: #00e5ff; }
+  .legend { margin-top: 10px; font-size: 9px; line-height: 1.8; color: #7fa8b0; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .hint { margin-top: 10px; color: #4a6b72; font-size: 9px; line-height: 1.6; } .hint b { color: #7fc8d4; }
+  #coord { margin-top: 8px; color: #ffcc00; font-size: 10px; min-height: 12px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="left" class="panel">
+  <h1>WORLD 1 — GREEN FIELDS</h1>
+  <div class="sub">layout mockup · 300×300 playable · south tunnel (bunker exit) → north Iron Keep<br>
+  depth bands: NEAR (3) → MID (5) → DEEP (8)<br>
+  flank POIs: wreck + farmstead (mid) · watchtower + checkpoint (deep, guarded)</div>
+  <div class="row">
+    <button id="b-orbit" class="on">ORBIT</button>
+    <button id="b-plan">TOP-DOWN PLAN</button>
+  </div>
+  <div class="row">game cam (β 0.5 · r 39):
+    <button id="b-spawn">SPAWN</button>
+    <button id="b-mid">MID</button>
+    <button id="b-deep">DEEP</button>
+  </div>
+  <div class="row"><button id="b-markers">MARKERS: OFF</button></div>
+  <div class="legend">
+    <span class="dot" style="background:#e03030"></span>patrol enemy &nbsp;
+    <span class="dot" style="background:#ff8c1a"></span>ambush enemy<br>
+    <span class="dot" style="background:#ffcc00"></span>salvage loot &nbsp;
+    <span class="dot" style="background:#00eedd"></span>extraction (tunnel mouth)<br>
+    <span class="dot" style="background:#ffffff"></span>band boundaries + playable bounds
+  </div>
+  <div class="hint"><b>Drag</b> to orbit · scroll to zoom · <b>click ground</b> to read coordinates (for feedback like "move the store to x,z").<br>
+  Tell me what to add / cut / move — nothing ports into the game until you approve this layout.</div>
+  <div id="coord"></div>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight,
+        MeshBuilder, StandardMaterial, Color3, Color4, Vector3, TransformNode, Mesh } = BABYLON;
+
+const canvas = document.getElementById('c');
+const engine = new Engine(canvas, true, { preserveDrawingBuffer: true });
+const scene  = new Scene(engine);
+scene.clearColor = new Color4(0.53, 0.81, 0.92, 1.0);   // #87CEEB midday sky
+
+// ── world constants ──────────────────────────────────────────────────────────
+const PLAY = 140;   // playable half-extent
+const EXT  = 170;   // visual half-extent (hill skirt)
+const BANDS = { near: -110, mid: -30, deep: 60 };  // z where each band ENDS (heading north)
+
+// ── camera + lighting (high noon, warm white) ────────────────────────────────
+const cam = new ArcRotateCamera('cam', -Math.PI/2, 1.02, 280, new Vector3(0, 0, -10), scene);
+cam.attachControl(canvas, true);
+cam.useInputToRestoreState = false;   // double-click was silently resetting the view
+cam.lowerRadiusLimit = 15; cam.upperRadiusLimit = 520; cam.wheelPrecision = 1.5;
+cam.maxZ = 1200; cam.minZ = 0.5;
+
+const amb = new HemisphericLight('amb', new Vector3(0,1,0), scene);
+amb.intensity = 0.85; amb.diffuse = new Color3(1.0,0.98,0.92); amb.groundColor = new Color3(0.35,0.45,0.30);
+const sun = new DirectionalLight('sun', new Vector3(0.15,-1,0.12), scene);
+sun.intensity = 0.65; sun.diffuse = new Color3(1.0,0.97,0.88); sun.position = new Vector3(0,80,0);
+
+// ── materials ────────────────────────────────────────────────────────────────
+function mat(n,r,g,b,spec=0.02){ const m=new StandardMaterial(n,scene);
+  m.diffuseColor=new Color3(r,g,b); m.specularColor=new Color3(spec,spec,spec); return m; }
+function emat(n,r,g,b,er,eg,eb){ const m=mat(n,r,g,b,0.04); m.emissiveColor=new Color3(er,eg,eb); return m; }
+const M = {
+  grass:   mat('grass',  0.42,0.75,0.31),      // #6BBF4E bright field green
+  path:    mat('path',   0.77,0.66,0.51),      // #C4A882 dirt tan
+  asphalt: mat('asphalt',0.16,0.15,0.14),
+  hedge:   mat('hedge',  0.18,0.40,0.15),
+  foliage: mat('foliage',0.26,0.52,0.20),
+  foliage2:mat('foliage2',0.32,0.58,0.24),
+  trunk:   mat('trunk',  0.34,0.24,0.13),
+  tgrass:  mat('tgrass', 0.55,0.72,0.30),      // tall grass yellow-green
+  tgrassA: mat('tgrassA',0.64,0.70,0.26),      // ambush-tinted grass (slightly off — art dir)
+  stone:   mat('stone',  0.62,0.58,0.52),
+  stoneD:  mat('stoneD', 0.48,0.45,0.40),
+  cream:   mat('cream',  0.78,0.72,0.60),      // cottage walls
+  roof:    mat('roof',   0.55,0.28,0.20),      // terracotta
+  roofS:   mat('roofS',  0.35,0.33,0.36),      // keep slate
+  wood:    mat('wood',   0.42,0.30,0.16),
+  burnt:   mat('burnt',  0.16,0.13,0.11),
+  crate:   mat('crate',  0.30,0.24,0.12),
+  concrete:mat('concrete',0.42,0.40,0.37),
+  sand:    mat('sand',   0.60,0.54,0.40),      // sandbags
+  banner:  emat('banner',0.80,0.125,0.125,0.18,0.0,0.0),  // Tankford red #CC2020
+  cloud:   mat('cloud',  1.0,1.0,1.0,0),
+  cobalt:  mat('cobalt', 0.12,0.42,0.88),      // player tank
+  gunmetal:mat('gunmetal',0.28,0.26,0.24),
+  dark:    mat('dark',   0.05,0.05,0.06),
+  // markers
+  mkPatrol: emat('mkP',0.88,0.19,0.19,0.45,0.05,0.05),
+  mkAmbush: emat('mkA',1.0,0.55,0.10,0.5,0.25,0.0),
+  mkLoot:   emat('mkL',1.0,0.80,0.0,0.5,0.4,0.0),
+  mkBound:  emat('mkB',1,1,1,0.5,0.5,0.5),
+  extract:  emat('ext',0.0,0.93,0.87,0.0,0.55,0.5),
+};
+M.cloud.alpha = 0.88; M.extract.alpha = 0.55; M.mkBound.alpha = 0.4;
+[M.tgrass, M.tgrassA].forEach(m => {            // grass cards must read sunlit from both faces
+  m.twoSidedLighting = true; m.backFaceCulling = false;
+  m.emissiveColor = new Color3(0.16,0.20,0.07);
+});
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function box(p,n,w,h,d,x,y,z,m,ry=0,rx=0,rz=0){ const b=MeshBuilder.CreateBox(n,{width:w,height:h,depth:d},scene);
+  b.position=new Vector3(x,y,z); b.rotation.set(rx,ry,rz); b.material=m; b.isPickable=false; if(p)b.parent=p; return b; }
+function cyl(p,n,dia,h,x,y,z,m,t=12,o={}){ const c=MeshBuilder.CreateCylinder(n,{diameter:dia,height:h,tessellation:t,...o},scene);
+  c.position=new Vector3(x,y,z); c.material=m; c.isPickable=false; if(p)c.parent=p; return c; }
+function sph(p,n,d,x,y,z,m,sx=1,sy=1,sz=1){ const s=MeshBuilder.CreateSphere(n,{diameter:d,segments:7},scene);
+  s.position=new Vector3(x,y,z); s.scaling.set(sx,sy,sz); s.material=m; s.isPickable=false; if(p)s.parent=p; return s; }
+
+// ── terrain: flat playable interior, sculpted border ─────────────────────────
+function heightAt(x,z){
+  const ax=Math.abs(x), az=Math.abs(z);
+  const d=Math.max(ax,az);
+  let h=0;
+  if(d>PLAY){                                   // rolling-hill skirt ring
+    const t=Math.min(1,(d-PLAY)/(EXT-PLAY)), s=t*t*(3-2*t);
+    h=s*(7+2.5*(Math.sin(x*0.045)*Math.cos(z*0.05)+Math.sin(x*0.02+z*0.031)));
+  }
+  if(z<-PLAY){                                  // south berm (tunnel notch carved at |x|<5)
+    const t=Math.min(1,(-z-PLAY)/(EXT-PLAY)), s=t*t*(3-2*t);
+    const carve=Math.min(1,Math.max(0,(ax-5)/9));
+    h=Math.max(h, s*13*carve);
+  }
+  if(z>PLAY){                                   // north hill the Iron Keep sits on
+    const t=Math.min(1,(z-PLAY)/(EXT-PLAY)), s=t*t*(3-2*t);
+    const g=Math.exp(-(x*x)/(2*55*55));
+    h=Math.max(h, s*(10+16*g));
+  }
+  return Math.max(0,h);
+}
+const ground = MeshBuilder.CreateGround('ground',{width:EXT*2,height:EXT*2,subdivisions:120,updatable:true},scene);
+{
+  const pos = ground.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  for(let i=0;i<pos.length;i+=3) pos[i+1]=heightAt(pos[i],pos[i+2]);
+  ground.updateVerticesData(BABYLON.VertexBuffer.PositionKind,pos);
+  const norm = ground.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+  BABYLON.VertexData.ComputeNormals(pos,ground.getIndices(),norm);
+  ground.updateVerticesData(BABYLON.VertexBuffer.NormalKind,norm);
+}
+ground.material=M.grass; ground.isPickable=true;
+
+// ── dirt paths (flat strips, hard edges per art direction) ───────────────────
+const MAIN_PATH = [[0,-132],[0,-112],[-4,-95],[-10,-80],[2,-58],[10,-30],[8,-18],[10,2],[20,28],[24,46],[26,62],[30,80],[28,96],[18,112],[6,126],[0,138]];
+const SPUR_STORE = [[-10,-80],[-25,-74],[-40,-71]];
+function buildPath(wps,w=5){
+  for(let i=0;i<wps.length-1;i++){
+    const [x1,z1]=wps[i],[x2,z2]=wps[i+1];
+    const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz);
+    box(null,'path'+i,w,0.08,len+w*0.8,(x1+x2)/2,0.05,(z1+z2)/2,M.path,Math.atan2(dx,dz));
+  }
+}
+buildPath(MAIN_PATH); buildPath(SPUR_STORE,4);
+
+// ── hedgerows (cover) + stone walls ──────────────────────────────────────────
+const HEDGES = [ // {x,z,len,ry} — len along local Z; ry≈1.57 → runs east-west
+  // NEAR band (sparse singles)
+  {x:-30,z:-85,len:26,ry:0.2},{x:-52,z:-60,len:20,ry:1.57},{x:30,z:-70,len:24,ry:-0.3},
+  {x:55,z:-95,len:18,ry:1.2},{x:-80,z:-95,len:22,ry:0.9},
+  // MID band (bocage network)
+  {x:-20,z:-16,len:34,ry:1.57},{x:-37,z:0,len:30,ry:0},{x:-5,z:8,len:26,ry:0},
+  {x:30,z:-8,len:24,ry:1.57},{x:42,z:12,len:28,ry:0.35},{x:60,z:30,len:24,ry:1.57},
+  {x:-58,z:28,len:30,ry:0.15},{x:-30,z:42,len:26,ry:1.57},{x:0,z:48,len:30,ry:0.1},
+  {x:44,z:56,len:22,ry:0.9},{x:-75,z:8,len:24,ry:1.0},
+  // DEEP band (field edges near village)
+  {x:-15,z:72,len:26,ry:0.3},{x:55,z:78,len:22,ry:1.57},{x:-45,z:100,len:24,ry:0.2},
+  {x:60,z:110,len:20,ry:0.7},
+];
+const hedgeRoot = new TransformNode('hedges',scene);
+HEDGES.forEach((h,i)=>{
+  const g=new TransformNode('hedge'+i,scene); g.parent=hedgeRoot;
+  g.position.set(h.x,0,h.z); g.rotation.y=h.ry;
+  box(g,'trunk',2.2,1.7,h.len,0,0.85,0,M.hedge);
+  const n=Math.max(3,Math.round(h.len/5));
+  for(let k=0;k<n;k++){
+    const zz=-h.len/2+ (k+0.5)*(h.len/n);
+    sph(g,'puff'+k,4.4,(k%2?0.5:-0.4),1.9,zz,(k%2?M.foliage:M.foliage2),1,0.72,1.15);
+  }
+});
+const WALLS = [ {x:14,z:84,len:18,ry:1.57},{x:44,z:90,len:18,ry:0},{x:28,z:104,len:20,ry:1.57},{x:-62,z:-30,len:22,ry:0.4} ];
+WALLS.forEach((w,i)=> box(null,'wall'+i,1.0,0.95,w.len,w.x,0.47,w.z,M.stoneD,w.ry));
+
+// ── tall grass (concealment patches; ambush ones tinted) ─────────────────────
+const GRASS = [
+  {x:-38,z:-78,r:8,amb:1},{x:-20,z:-10,r:7,amb:1},{x:55,z:25,r:8,amb:1},{x:-5,z:50,r:7,amb:1},
+  {x:45,z:95,r:7,amb:1},{x:15,z:100,r:6,amb:1},{x:-50,z:115,r:8,amb:1},
+  {x:-86,z:93,r:7,amb:1},{x:79,z:101,r:6,amb:1},   // POI guards' concealment
+  {x:-93,z:21,r:8},                                 // overgrowth around the wreck
+  {x:20,z:-95,r:9},{x:-65,z:-85,r:8},{x:70,z:-40,r:10},{x:-45,z:55,r:8},{x:30,z:30,r:7},
+  {x:-80,z:75,r:9},{x:75,z:55,r:8},{x:0,z:-60,r:9},{x:-10,z:105,r:7},
+];
+function makeGrassSource(m,name){
+  const p1=MeshBuilder.CreatePlane(name+'-a',{width:1.5,height:1.3,sideOrientation:Mesh.DOUBLESIDE},scene);
+  const p2=p1.clone(name+'-b'); p2.rotation.y=Math.PI/2;
+  const s=Mesh.MergeMeshes([p1,p2],true); s.material=m; s.isPickable=false; s.setEnabled(false); return s;
+}
+const grassSrc=makeGrassSource(M.tgrass,'tg'), grassSrcA=makeGrassSource(M.tgrassA,'tga');
+GRASS.forEach((g,i)=>{
+  const src=g.amb?grassSrcA:grassSrc, n=Math.round(g.r*g.r*0.45);
+  for(let k=0;k<n;k++){
+    const a=Math.random()*Math.PI*2, rr=Math.sqrt(Math.random())*g.r;
+    const inst=src.createInstance('g'+i+'_'+k);
+    inst.position.set(g.x+Math.cos(a)*rr,0.62,g.z+Math.sin(a)*rr);
+    inst.rotation.y=Math.random()*Math.PI; const sc=0.8+Math.random()*0.6; inst.scaling.set(sc,sc,sc);
+  }
+});
+
+// ── trees + rocks + fences (instanced) ───────────────────────────────────────
+const trunkSrc=cyl(null,'trunkSrc',0.7,2.6,0,1.3,0,M.trunk,7); trunkSrc.setEnabled(false);
+const blobSrc=(()=>{ const a=sph(null,'b1',3.6,0,3.4,0,M.foliage), b=sph(null,'b2',2.8,0.9,4.3,0.4,M.foliage),
+  c=sph(null,'b3',2.6,-0.9,4.1,-0.3,M.foliage); const s=Mesh.MergeMeshes([a,b,c],true);
+  s.material=M.foliage; s.isPickable=false; s.setEnabled(false); return s; })();
+const TREES=[[-34,-92],[-26,-78],[58,-88],[24,-64],[-58,-52],[-88,-70],[70,-60],[85,-30],
+ [-44,-6],[-12,12],[24,18],[50,40],[-66,36],[-84,60],[8,42],[66,64],[-22,66],[-52,108],
+ [70,100],[40,120],[-8,118],[-78,-10],[78,8],[-100,30],[100,-60],[90,80],
+ [-150,-60],[152,20],[-148,80],[150,120],[-60,150],[80,148],[120,-150],[-110,-148]];
+TREES.forEach(([x,z],i)=>{
+  const y=heightAt(x,z), sc=0.85+((i*37)%10)/18;
+  const t=trunkSrc.createInstance('tt'+i); t.position.set(x,y,z); t.scaling.set(sc,sc,sc);
+  const b=blobSrc.createInstance('tb'+i); b.position.set(x,y,z); b.scaling.set(sc,sc,sc);
+  b.rotation.y=(i*1.3)%Math.PI;
+});
+const rockSrc=sph(null,'rockSrc',2.4,0,0.6,0,M.stone,1.3,0.7,1.0); rockSrc.setEnabled(false);
+[[-70,-40],[15,-30],[48,-15],[-40,20],[35,35],[-15,90],[52,68],[-90,90],[20,-110],[-20,-50]]
+ .forEach(([x,z],i)=>{ const r=rockSrc.createInstance('rk'+i); r.position.set(x,0.5,z);
+   r.rotation.y=i*0.9; const sc=0.7+(i%4)*0.35; r.scaling.scaleInPlace(sc); });
+function fence(x,z,len,ry){
+  const g=new TransformNode('fence',scene); g.position.set(x,0,z); g.rotation.y=ry;
+  const n=Math.round(len/2.2);
+  for(let k=0;k<=n;k++) box(g,'post'+k,0.16,1.0,0.16,0,0.5,-len/2+k*(len/n),M.wood);
+  box(g,'rail1',0.1,0.12,len,0,0.78,0,M.wood); box(g,'rail2',0.1,0.12,len,0,0.42,0,M.wood);
+}
+fence(22,70,16,0.3); fence(36,74,14,1.2); fence(-18,-100,14,1.0);
+
+// ── SOUTH TUNNEL + SAFE ZONE (the bunker exit) ───────────────────────────────
+const tun = new TransformNode('tunnel',scene);
+// bore: inside-out cylinder along Z (the hangar recipe), mouth at z=-138
+const bore=MeshBuilder.CreateCylinder('bore',{diameter:7,height:16,tessellation:24,
+  sideOrientation:Mesh.BACKSIDE,cap:Mesh.CAP_END},scene);
+bore.rotation.x=Math.PI/2; bore.position.set(0,1.5,-146); bore.material=M.dark; bore.parent=tun;
+box(tun,'plug',6.8,7,0.3,0,2,-152.5,M.dark);                       // dark depth at the far end
+[ -138.6,-142,-145.5,-149 ].forEach((z,i)=>{                       // support ribs
+  const r=MeshBuilder.CreateTorus('rib'+i,{diameter:6.6,thickness:0.45,tessellation:20},scene);
+  r.rotation.x=Math.PI/2; r.position.set(0,1.5,z); r.material=M.concrete; r.parent=tun; });
+// concrete portal headwall around the mouth
+box(tun,'head-top',15,3.2,1.2,0,6.2,-138.6,M.concrete);
+box(tun,'head-l',4.2,7.8,1.2,-5.6,3.9,-138.6,M.concrete);
+box(tun,'head-r',4.2,7.8,1.2,5.6,3.9,-138.6,M.concrete);
+// grassy mounds burying the bore (Ghibli hill swallowing the tunnel)
+sph(tun,'mound1',30,0,-2.5,-152,M.grass,1.15,0.42,0.9);
+sph(tun,'mound2',22,-12,-2,-148,M.grass,1,0.45,0.9);
+sph(tun,'mound3',22,12,-2,-148,M.grass,1,0.45,0.9);
+// asphalt apron out of the mouth, blending into the dirt path
+box(tun,'apron',6,0.1,26,0,0.06,-139,M.asphalt);
+// extraction pad at the mouth
+const pad=MeshBuilder.CreateDisc('pad',{radius:4,tessellation:36},scene);
+pad.rotation.x=Math.PI/2; pad.position.set(0,0.12,-133); pad.material=M.extract;
+const padRing=MeshBuilder.CreateTorus('padRing',{diameter:8,thickness:0.18,tessellation:36},scene);
+padRing.position.set(0,0.14,-133); padRing.material=M.extract;
+// sandbag arcs flanking the spawn (gap at the path)
+const bagSrc=box(null,'bagSrc',1.5,0.55,0.8,0,0,0,M.sand); bagSrc.setEnabled(false);
+function bagArc(cx,cz,r,a0,a1,n){
+  for(let k=0;k<n;k++){ const a=a0+(a1-a0)*(k/(n-1));
+    const b=bagSrc.createInstance('bag');
+    b.position.set(cx+Math.cos(a)*r,0.28,cz+Math.sin(a)*r); b.rotation.y=-a;
+    const b2=bagSrc.createInstance('bag2');                       // second course, offset
+    b2.position.set(cx+Math.cos(a+0.06)*r,0.78,cz+Math.sin(a+0.06)*r); b2.rotation.y=-a-0.06; }
+}
+bagArc(0,-128,13, 0.45, 1.25, 6);    // east arc (opens north at the path)
+bagArc(0,-128,13, 1.92, 2.70, 6);    // west arc
+// dragon-teeth rows at the safe-zone edge (gap at the path)
+const toothSrc=cyl(null,'toothSrc',1.6,1.5,0,0.75,0,M.concrete,4,{diameterTop:0.25}); toothSrc.setEnabled(false);
+for(let x=-34;x<=-10;x+=6){ const t=toothSrc.createInstance('th'); t.position.set(x,0.75,-116); t.rotation.y=0.5; }
+for(let x=10;x<=34;x+=6){ const t=toothSrc.createInstance('th'); t.position.set(x,0.75,-116); t.rotation.y=0.5; }
+// player tank placeholder at spawn (0,-127), facing north
+const ptk=new TransformNode('ptank',scene); ptk.position.set(0,0,-127);
+box(ptk,'hull',2.6,0.9,4.0,0,0.75,0,M.cobalt);
+box(ptk,'trk-l',0.7,0.8,4.4,-1.55,0.5,0,M.gunmetal); box(ptk,'trk-r',0.7,0.8,4.4,1.55,0.5,0,M.gunmetal);
+box(ptk,'tur',1.7,0.7,2.0,0,1.5,0.1,M.cobalt);
+cyl(ptk,'gun',0.28,2.6,0,1.6,2.2,M.gunmetal,10).rotation.x=Math.PI/2;
+
+// ── CLINT'S RUINED STORE (NEAR-band POI, no quest logic yet) ─────────────────
+const store=new TransformNode('store',scene); store.position.set(-45,0,-70); store.rotation.y=0.25;
+box(store,'slab',8,0.25,7,0,0.12,0,M.stoneD);
+box(store,'wall-s',8,2.6,0.4,0,1.3,-3.3,M.cream);                 // intact south wall
+box(store,'wall-w',0.4,2.6,4.5,-3.8,1.3,-1.0,M.cream);            // partial west wall
+box(store,'wall-e',0.4,1.2,3.0,3.8,0.6,-1.6,M.cream);             // broken east stub
+box(store,'roof-fall',7.6,0.18,5.2,0.3,1.55,0.6,M.burnt,0,0.62);  // collapsed roof leaning inside
+box(store,'crate1',1.3,1.3,1.3,2.6,0.65,2.2,M.crate,0.4);
+box(store,'crate2',1.0,1.0,1.0,1.4,0.5,3.0,M.crate,0.1);
+box(store,'sign-post',0.18,2.6,0.18,-4.6,1.3,2.8,M.wood,0,0,0.12);
+box(store,'sign',2.2,0.9,0.12,-4.6,2.35,2.8,M.wood,0.15,0,0.1);
+const scorch=MeshBuilder.CreateDisc('scorch',{radius:5.5,tessellation:24},scene);
+scorch.rotation.x=Math.PI/2; scorch.position.set(-44,0.04,-69); scorch.material=M.burnt;
+
+// ── VILLAGE (DEEP band, around the plaza at ~(30,90)) ────────────────────────
+function cottage(x,z,ry,w=6,d=5){
+  const g=new TransformNode('cot',scene); g.position.set(x,0,z); g.rotation.y=ry;
+  box(g,'body',w,2.8,d,0,1.4,0,M.cream);
+  box(g,'roof-l',w*0.66,0.2,d+0.7,-w*0.23,3.35,0,M.roof,0,0,0.62);
+  box(g,'roof-r',w*0.66,0.2,d+0.7, w*0.23,3.35,0,M.roof,0,0,-0.62);
+  box(g,'door',1.0,1.7,0.1,0,0.85,d/2+0.03,M.burnt);
+  box(g,'chimney',0.7,1.6,0.7,w*0.3,3.6,-d*0.2,M.stoneD);
+}
+cottage(24,86,0.15); cottage(37,95,-1.35,7,5); cottage(22,99,1.62,5,4.5);
+box(null,'well',0,0,0,0,0,0,M.stoneD); // placeholder no-op kept minimal
+cyl(null,'well-ring',2.2,1.0,30,0.5,90,M.stoneD,12);
+box(null,'well-roofpost1',0.15,1.6,0.15,29.3,1.6,90,M.wood);
+box(null,'well-roofpost2',0.15,1.6,0.15,30.7,1.6,90,M.wood);
+box(null,'well-roof',2.0,0.12,1.6,30,2.5,90,M.roof,0,0,0.3);
+
+// ── FLANK POIs (mid + deep east/west edges; near band stays empty) ───────────
+// West MID — crashed outsider machine (environmental lore: buried traveler wreck)
+const wreck=new TransformNode('wreck',scene); wreck.position.set(-95,0,18); wreck.rotation.y=0.7;
+box(wreck,'hull',3.2,1.4,5.2,0,0.4,0,M.gunmetal,0,0.06,0.18);      // half-sunk, listing
+box(wreck,'tur',2.0,0.9,2.4,0.4,1.25,-0.6,M.gunmetal,0.5,0,0.1);
+cyl(wreck,'gun',0.3,3.4,1.6,1.2,1.6,M.gunmetal,8).rotation.set(Math.PI/2+0.35,0.6,0);
+box(wreck,'plate',1.8,0.15,2.2,-2.4,0.1,1.8,M.gunmetal,0.9);       // blown-off plate
+const wscorch=MeshBuilder.CreateDisc('wscorch',{radius:5,tessellation:24},scene);
+wscorch.rotation.x=Math.PI/2; wscorch.position.set(-95,0.04,18); wscorch.material=M.burnt;
+// East MID — farmstead (barn + hay bales)
+const farm=new TransformNode('farm',scene); farm.position.set(88,0,28); farm.rotation.y=-0.2;
+box(farm,'barn',8,4.2,6.5,0,2.1,0,M.roof);                          // big red barn
+box(farm,'barn-roof-l',5.4,0.22,7.3,-1.9,4.9,0,M.burnt,0,0,0.55);
+box(farm,'barn-roof-r',5.4,0.22,7.3, 1.9,4.9,0,M.burnt,0,0,-0.55);
+box(farm,'barn-door',2.6,2.6,0.12,0,1.3,3.3,M.wood);
+cyl(farm,'hay1',2.2,1.6,-5.5,0.8,2.0,M.tgrass,14).rotation.z=Math.PI/2;
+cyl(farm,'hay2',2.2,1.6,-5.0,0.8,-1.2,M.tgrass,14).rotation.z=Math.PI/2;
+cyl(farm,'hay3',2.2,1.6,-6.4,2.0,0.4,M.tgrass,14).rotation.z=Math.PI/2;
+fence(80,20,12,1.3);
+// West DEEP — ruined watchtower
+const tower=new TransformNode('tower',scene); tower.position.set(-92,0,100);
+cyl(tower,'shaft',6,9,0,4.5,0,M.stone,8);
+// jagged broken rim — uneven merlon stubs around the top edge
+[[0,2.6,1.8],[0.8,-2.5,1.1],[1.6,2.2,-1.6,0.9],[2.4,-2.4,-1.4,1.4],[3.1,0.2,2.7,0.7]].forEach(([a,x,z,h=1.2],i)=>
+  box(tower,'merlon'+i,1.5,h,1.1,x,9+h/2,z,M.stoneD,a));
+[[3.2,1.1,2.0],[-2.6,0.5,3.4],[1.8,0.4,-3.6],[-3.8,0.7,-1.5]].forEach(([x,h,z],i)=>
+  box(tower,'rubble'+i,1.6,h,1.4,x,h/2,z,M.stoneD,i*0.8));
+box(tower,'arch',2.0,3.0,0.8,0,1.5,-3.0,M.burnt);                   // dark doorway
+// East DEEP — Tankford checkpoint
+const ckpt=new TransformNode('ckpt',scene); ckpt.position.set(85,0,95); ckpt.rotation.y=0.15;
+box(ckpt,'hut',3.4,2.6,2.8,0,1.3,0,M.cream);
+box(ckpt,'hut-roof',4.0,0.18,3.4,0,2.75,0,M.roofS,0,0,0.06);
+cyl(ckpt,'barrier-post',0.3,1.2,-2.2,0.6,2.2,M.stoneD,8);
+box(ckpt,'barrier',5.5,0.18,0.18,0.5,1.15,2.2,M.banner,0,0,0.08);   // striped pole (red)
+box(ckpt,'bpole',0.22,5.5,0.22,2.4,2.75,-1.8,M.wood);
+box(ckpt,'bflag',2.0,3.2,0.08,3.5,4.0,-1.8,M.banner,0,0.2);
+const ctoothA=toothSrc.createInstance('ct1'); ctoothA.position.set(81,0.75,90);
+const ctoothB=toothSrc.createInstance('ct2'); ctoothB.position.set(89,0.75,101);
+
+// ── IRON KEEP vista (on the unreachable north hill) ──────────────────────────
+const keepY=heightAt(0,166);
+const keep=new TransformNode('keep',scene); keep.position.set(0,keepY-0.4,166);
+box(keep,'wall-s',40,8,2.5,0,4,-15,M.stone);
+box(keep,'wall-n',40,8,2.5,0,4, 15,M.stone);
+box(keep,'wall-w',2.5,8,28,-20,4,0,M.stone);
+box(keep,'wall-e',2.5,8,28, 20,4,0,M.stone);
+[[-20,-15],[20,-15],[-20,15],[20,15]].forEach(([x,z],i)=>{
+  cyl(keep,'twr'+i,8,15,x,7.5,z,M.stone,8);
+  cyl(keep,'twr-roof'+i,9.5,5,x,17.5,z,M.roofS,8,{diameterTop:0});
+  box(keep,'bpole'+i,0.2,6,0.2,x,21,z,M.wood);
+  box(keep,'ban'+i,2.2,4,0.08,x+1.2,20,z,M.banner,0,0.18);
+});
+box(keep,'donjon',16,14,12,0,7,2,M.stone);
+box(keep,'donjon-cap',17.5,1.2,13.5,0,14.6,2,M.stoneD);
+cyl(keep,'donjon-twr',7,22,0,11,2,M.stone,8);
+cyl(keep,'donjon-roof',8.5,6,0,25,2,M.roofS,8,{diameterTop:0});
+box(keep,'kpole',0.25,8,0.25,0,31,2,M.wood);
+box(keep,'kban',3.2,5.5,0.1,1.7,29.5,2,M.banner,0,0.18);
+// gatehouse facing south (toward the player)
+cyl(keep,'gh-l',5,11,-5,5.5,-15.5,M.stone,8); cyl(keep,'gh-r',5,11,5,5.5,-15.5,M.stone,8);
+cyl(keep,'gh-lr',6,3.5,-5,12.7,-15.5,M.roofS,8,{diameterTop:0});
+cyl(keep,'gh-rr',6,3.5,5,12.7,-15.5,M.roofS,8,{diameterTop:0});
+box(keep,'gh-arch',6,7,2.6,0,3.5,-15.2,M.stoneD);
+box(keep,'gh-gate',4,4.5,0.4,0,2.2,-16.4,M.burnt);
+box(keep,'gh-banl',2.6,5,0.08,-7.8,8,-16.8,M.banner,0,0.25);
+box(keep,'gh-banr',2.6,5,0.08, 7.8,8,-16.8,M.banner,0,-0.25);
+
+// ── clouds (flat, cheerful, high) ────────────────────────────────────────────
+const clouds=new TransformNode('clouds',scene);
+[[-60,62,-40,16],[40,68,30,20],[-20,58,100,14],[90,64,-90,18],[-110,66,40,15],[20,70,-130,13]]
+ .forEach(([x,y,z,d],i)=> sph(clouds,'cl'+i,d,x,y,z,M.cloud,1.5,0.28,1));
+
+// ── ENEMY SPAWNS + LOOT (fixed positions; markers toggleable) ────────────────
+const ENEMIES=[
+  // NEAR (3)
+  {x:12,z:-95,mode:'patrol',band:'near'},{x:-38,z:-78,mode:'ambush',band:'near'},{x:35,z:-55,mode:'patrol',band:'near'},
+  // MID (5)
+  {x:-20,z:-10,mode:'ambush',band:'mid'},{x:25,z:5,mode:'patrol',band:'mid'},{x:55,z:25,mode:'ambush',band:'mid'},
+  {x:-50,z:30,mode:'patrol',band:'mid'},{x:-5,z:50,mode:'ambush',band:'mid'},
+  // DEEP (6)
+  {x:30,z:75,mode:'patrol',band:'deep'},{x:45,z:95,mode:'ambush',band:'deep'},{x:15,z:100,mode:'ambush',band:'deep'},
+  {x:-30,z:90,mode:'patrol',band:'deep'},{x:0,z:120,mode:'patrol',band:'deep'},{x:-50,z:115,mode:'ambush',band:'deep'},
+  {x:-86,z:94,mode:'ambush',band:'deep'},   // watchtower guard
+  {x:80,z:100,mode:'ambush',band:'deep'},   // checkpoint guard
+];
+const LOOT=[
+  {x:20,z:-90,v:25},{x:-50,z:-65,v:25},{x:45,z:-40,v:25},
+  {x:-30,z:0,v:50},{x:60,z:30,v:50},{x:-60,z:45,v:50},
+  {x:-92,z:14,v:50},{x:84,z:25,v:50},                    // POIs: wreck + farmstead
+  {x:35,z:92,v:100},{x:-45,z:120,v:100},{x:5,z:135,v:100},
+  {x:-90,z:96,v:100},{x:87,z:98,v:100},                  // POIs: watchtower + checkpoint
+];
+const markers=new TransformNode('markers',scene);
+ENEMIES.forEach((e,i)=>{
+  const m=e.mode==='ambush'?M.mkAmbush:M.mkPatrol;
+  cyl(markers,'em'+i,6,1.5,e.x,0.8,e.z,m,18);
+  if(e.mode==='ambush'){ const r=MeshBuilder.CreateTorus('er'+i,{diameter:10,thickness:0.5,tessellation:24},scene);
+    r.position.set(e.x,0.9,e.z); r.material=m; r.parent=markers; }
+});
+LOOT.forEach((l,i)=>{ cyl(markers,'lm'+i,4,2.0,l.x,1.0,l.z,M.mkLoot,12); });
+// band boundary lines + playable bounds
+[BANDS.near,BANDS.mid,BANDS.deep].forEach((z,i)=> box(markers,'band'+i,280,0.6,1.4,0,0.4,z,M.mkBound));
+box(markers,'bx-w',1.4,0.6,280,-140,0.4,0,M.mkBound); box(markers,'bx-e',1.4,0.6,280,140,0.4,0,M.mkBound);
+box(markers,'bx-n',280,0.6,1.4,0,0.4,140,M.mkBound);  box(markers,'bx-s',280,0.6,1.4,0,0.4,-140,M.mkBound);
+markers.setEnabled(false);
+
+// ── UI: view modes + coordinate readout ──────────────────────────────────────
+const $=id=>document.getElementById(id);
+let markersOn=false, camLock=null;   // camLock reasserts the preset each frame until the user drags
+function setBtns(on){ ['b-orbit','b-plan','b-spawn','b-mid','b-deep'].forEach(b=>$(b).classList.remove('on')); if(on)$(on).classList.add('on'); }
+function flyTo(alpha,beta,radius,tx,ty,tz){ camLock={alpha,beta,radius,t:new Vector3(tx,ty,tz)};
+  cam.alpha=alpha; cam.beta=beta; cam.radius=radius; cam.target=camLock.t.clone(); }
+scene.onBeforeRenderObservable.add(()=>{ if(camLock){ cam.alpha=camLock.alpha; cam.beta=camLock.beta;
+  cam.radius=camLock.radius; cam.target.copyFrom(camLock.t); } });
+canvas.addEventListener('pointerdown',()=>{ camLock=null; });          // user takes over
+canvas.addEventListener('wheel',()=>{ camLock=null; },{passive:true});
+function setMode(btn,plan){ setBtns(btn); markers.setEnabled(plan||markersOn); clouds.setEnabled(!plan); }
+$('b-orbit').onclick=()=>{ setMode('b-orbit',false); flyTo(-Math.PI/2,1.02,280,0,0,-10); };
+$('b-plan').onclick =()=>{ setMode('b-plan',true);   flyTo(-Math.PI/2,0.02,430,0,0,5); };   // north = screen-up
+$('b-spawn').onclick=()=>{ setMode('b-spawn',false); flyTo(-Math.PI/2,0.5,39,0,0,-122); };
+$('b-mid').onclick  =()=>{ setMode('b-mid',false);   flyTo(-Math.PI/2,0.5,39,10,0,8); };
+$('b-deep').onclick =()=>{ setMode('b-deep',false);  flyTo(-Math.PI/2,0.5,39,30,0,90); };
+$('b-markers').onclick=()=>{ markersOn=!markersOn; markers.setEnabled(markersOn);
+  $('b-markers').textContent='MARKERS: '+(markersOn?'ON':'OFF'); $('b-markers').classList.toggle('on',markersOn); };
+scene.onPointerDown=()=>{ const p=scene.pick(scene.pointerX,scene.pointerY);
+  if(p&&p.hit&&p.pickedPoint) $('coord').textContent=`picked: x ${p.pickedPoint.x.toFixed(1)} · z ${p.pickedPoint.z.toFixed(1)}`; };
+
+window.__w1 = { cam, scene, markers, clouds };   // debug handle for live tuning
+engine.runRenderLoop(()=>scene.render());
+addEventListener('resize',()=>engine.resize());
+</script>
+</body>
+</html>

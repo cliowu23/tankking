@@ -8,6 +8,7 @@ export default class Enemy {
     this.staticFrictionThreshold = 1.0;
     this.vx = 0;
     this.vz = 0;
+    this.bounds = 48;   // playable half-extent; zones override (e.g. World 1 = 140)
 
     this.maxHp = 100;
     this.hp    = 100;
@@ -161,7 +162,7 @@ export default class Enemy {
       this.vz = 0;
     }
 
-    this.root.position.x = Math.max(-48, Math.min(48, this.root.position.x + this.vx * dt));
-    this.root.position.z = Math.max(-48, Math.min(48, this.root.position.z + this.vz * dt));
+    this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.vx * dt));
+    this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.vz * dt));
   }
 }

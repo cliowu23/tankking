@@ -31,6 +31,10 @@ export default class Tank {
     this.hp               = 340;
     this.alive            = true;
 
+    this.bounds           = 48;   // playable half-extent; zones override (e.g. World 1 = 140)
+    this.spawnX           = x;    // reset() returns here, not to a hardcoded origin
+    this.spawnZ           = z;
+
     this._momentumTimer   = 0;    // counts down while coasting after boost release
 
     this.isDashing        = false;
@@ -222,7 +226,7 @@ export default class Tank {
     this.turretAimAngle  = 0;
     this.barrelElevation = 0;
     this.fuel  = this.maxFuel;
-    this.root.position.set(0, 0, 0);
+    this.root.position.set(this.spawnX, 0, this.spawnZ);
     this.root.rotation.y = 0;
     this.hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
     this.hullMat.emissiveColor = new Color3(0, 0, 0);
@@ -238,8 +242,8 @@ export default class Tank {
     // --- Dash ---
     if (this.dashTimeLeft > 0) {
       this.dashTimeLeft -= dt;
-      this.root.position.x = Math.max(-48, Math.min(48, this.root.position.x + this.dashVx * dt));
-      this.root.position.z = Math.max(-48, Math.min(48, this.root.position.z + this.dashVz * dt));
+      this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.dashVx * dt));
+      this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.dashVz * dt));
       if (this.dashTimeLeft <= 0) {
         this.isDashing    = false;
         this.speed        = this.dashExitSpeed;
@@ -322,8 +326,8 @@ export default class Tank {
     // --- Apply velocity ---
     const vx = forward.x * this.speed;
     const vz = forward.z * this.speed;
-    this.root.position.x = Math.max(-48, Math.min(48, this.root.position.x + vx * dt));
-    this.root.position.z = Math.max(-48, Math.min(48, this.root.position.z + vz * dt));
+    this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + vx * dt));
+    this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + vz * dt));
     this.root.rotation.y = this.rotY;
 
     this._updateTurret(dt);
