@@ -21,7 +21,7 @@ WHITE = (1.0, 1.0, 1.0, 1.0)      # skin parts: WHITE -> runtime tint = the colo
 # USER-APPROVED outfit list (plan 2026-06-11) — 6 styles, curated colorways
 OUTFITS = {
     'jacket':     { 'label': 'Driver Jacket',     'colorways': { 'blue': (0.18, 0.46, 0.88, 1), 'orange': (0.95, 0.50, 0.12, 1) } },
-    'overalls':   { 'label': 'Mechanic Overalls', 'colorways': { 'denim': (0.22, 0.42, 0.78, 1), 'green': (0.24, 0.66, 0.30, 1) } },
+    'overalls':   { 'label': 'Boilersuit', 'colorways': { 'denim': (0.22, 0.42, 0.78, 1), 'green': (0.24, 0.66, 0.30, 1) } },
     'vest':       { 'label': 'Merchant Vest',     'colorways': { 'rust': (0.85, 0.42, 0.15, 1) } },
     'medic':      { 'label': 'Medic Coat',        'colorways': { 'white': (0.95, 0.95, 0.93, 1) } },
     'telogreika': { 'label': 'Padded Jacket',     'colorways': { 'teal': (0.12, 0.62, 0.58, 1), 'mustard': (0.90, 0.68, 0.14, 1) } },
@@ -66,8 +66,8 @@ def build_character(char_id, outfit_style, outfit_col):
     arm = make_armature()
     OUT = outfit_col
     torso_col = SHIRT if outfit_style in ('overalls', 'vest', 'workshirt') else OUT
-    if outfit_style == 'workshirt':
-        torso_col = OUT
+    if outfit_style in ('workshirt', 'overalls'):
+        torso_col = OUT                       # boilersuit/shirt: torso IS the outfit
     pants_col = OUT if outfit_style == 'overalls' else PANTS
 
     # ── BODY (outfit, no skin parts) ──────────────────────────────────────────
@@ -85,11 +85,14 @@ def build_character(char_id, outfit_style, outfit_col):
             mk(box((sx * 0.068, -0.099, 0.355), (0.055, 0.012, 0.04)), OUT, 'torso')
             mk(box((sx * 0.068, -0.102, 0.373), (0.055, 0.01, 0.012)), BELT, 'torso')
     elif outfit_style == 'overalls':
-        mk(box((0, -0.103, 0.40), (0.165, 0.014, 0.13), bev=0.01), OUT, 'torso')     # bib
-        mk(box((0, -0.107, 0.415), (0.075, 0.012, 0.05)), OUT, 'torso')              # bib pocket
-        for sx in (-1, 1):                                                            # straps
-            mk(box((sx * 0.07, -0.10, 0.455), (0.04, 0.014, 0.06)), OUT, 'torso')
-            mk(box((sx * 0.07, 0.0, 0.468), (0.04, 0.20, 0.014)), OUT, 'torso')
+        # BOILERSUIT (user pick B): one-piece coverall — chest zip, waist cinch,
+        # stand collar, chest + thigh cargo pockets; sleeves/pants match
+        mk(box((0, -0.099, 0.36), (0.014, 0.012, 0.16)), DARK, 'torso')              # chest zip
+        mk(box((0, 0, 0.30), (0.305, 0.21, 0.035), bev=0.01), DARK, 'torso')          # waist cinch
+        mk(box((0, 0, 0.443), (0.21, 0.15, 0.026), bev=0.008), OUT, 'torso')          # stand collar
+        for sx in (-1, 1):                                                            # chest pockets
+            mk(box((sx * 0.07, -0.097, 0.415), (0.06, 0.012, 0.045)), OUT, 'torso')
+            mk(box((sx * 0.07, -0.10, 0.435), (0.06, 0.01, 0.012)), DARK, 'torso')
     elif outfit_style == 'vest':
         for sx in (-1, 1):                                                            # front panels
             mk(box((sx * 0.078, -0.102, 0.385), (0.085, 0.014, 0.135), bev=0.01), OUT, 'torso')
@@ -115,6 +118,8 @@ def build_character(char_id, outfit_style, outfit_col):
     for side, sx in (('leg-left', 1), ('leg-right', -1)):
         mk(cyl((sx * 0.088, 0, 0.155), 0.062, 0.175), pants_col, side)
         mk(cyl((sx * 0.088, 0, 0.085), 0.067, 0.035), pants_col, side)
+        if outfit_style == 'overalls':                                               # thigh cargo pockets
+            mk(box((sx * 0.098, -0.062, 0.16), (0.055, 0.018, 0.055)), pants_col, side)
         mk(box((sx * 0.088, -0.025, 0.038), (0.13, 0.20, 0.076), bev=0.018), BOOTS, side)
     ARM_TILT = 0.12
     sleeve_col = OUT if outfit_style != 'vest' else SHIRT

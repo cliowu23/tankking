@@ -82,7 +82,7 @@
     },
     {
       "model": "body-overalls",
-      "label": "Mechanic Overalls",
+      "label": "Boilersuit",
       "variants": [
         {
           "id": "body-overalls-denim",
