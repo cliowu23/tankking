@@ -3,33 +3,13 @@ import { PARTS_BY_ID } from './index.js';
 import { measureBasket } from './measureBasket.js';
 import { worldBounds } from '../../utils/meshBounds.js';
 
-// Native ring diameter cache: a hull's ring is as big as its native turret's base.
-// Keyed by turret id; value is the measured base diameter.
-const _ringCache = new Map();
-
-async function nativeRingDiameter(scene, hullPart, equippedTurretId, equippedBase) {
-  const nativeId = hullPart.nativeTurret;
-  if (!nativeId) return equippedBase.diameter;          // no native declared → no scaling
-  if (nativeId === equippedTurretId) return equippedBase.diameter; // equipped IS native
-  if (_ringCache.has(nativeId)) return _ringCache.get(nativeId);
-
-  // Build the native turret once just to measure its base, then dispose it.
-  const nativePart = PARTS_BY_ID[nativeId];
-  const built = await nativePart.build(scene);
-  const d = built.base.diameter;
-  _ringCache.set(nativeId, d);
-  built.root.dispose();
-  for (const m of built.meshes) if (!m.isDisposed()) m.dispose(false, true);
-  return d;
-}
-
 // Dev-only self-check: warn (naming the link + loadout) on the reliable failure modes —
 // orientation, scale sanity, and barrel aim. Centering/seating are guaranteed by the
 // extraction contract (turret centered on its ring at origin) + the hull's ringCenter, NOT
 // re-measured: a turret's lowest slice is its mantlet, so a re-measured center would
 // false-fail (M26 bottom-slice center reads Z≈+0.6). Those stay on the visual checklist.
 function validateComposition(ctx) {
-  const { loadout, turretPivot, barrelPivot, scale, turretBuilt, cannonBuilt } = ctx;
+  const { loadout, turretPivot, barrelPivot, scale, turretBuilt, cannonBuilt, turretPart } = ctx;
   const tag = `${loadout.hull}+${loadout.turret}+${loadout.cannon}`;
   const warn = (link, msg) => console.warn(`[validateComposition] ${tag} — ${link}: ${msg}`);
 
@@ -40,6 +20,17 @@ function validateComposition(ctx) {
   }
   // Link 1: scale sanity.
   if (!(scale > 0.3 && scale < 3.0)) warn('scale', `scale ${scale.toFixed(2)} out of sane range`);
+
+  // Link 0: ring contract — the turret's collar mesh extent must match its declared ring.
+  // Catches "declared ringDiameter flipped but GLB not regenerated". 3% tolerance covers
+  // the 24-gon flat-to-flat error (~0.9%).
+  const ringMesh = turretBuilt.meshes.find(m => m.name.includes('turret_ring'));
+  if (ringMesh && turretPart?.ringDiameter) {
+    const d = ringMesh.getBoundingInfo().boundingBox.extendSize.x * 2;
+    if (Math.abs(d - turretPart.ringDiameter) / turretPart.ringDiameter > 0.03) {
+      warn('ring-contract', `collar mesh d=${d.toFixed(2)} ≠ declared ${turretPart.ringDiameter} — regen the GLB?`);
+    }
+  }
 
   // Link 2: barrel aimed forward — cannon's furthest world +Z is ahead of the barrel pivot,
   // and the barrel pivot is ahead of the turret pivot.
@@ -84,11 +75,14 @@ export async function assembleTank(scene, loadout, materials = {}, options = {})
   const basket = measureBasket(turretBuilt.meshes);
   console.log(`[assembleTank] ${loadout.turret} basket center=(${basket.center.x.toFixed(2)},${basket.center.z.toFixed(2)}) from ${basket.domeMeshes.length} dome meshes`);
 
-  // 3. Scale the turret so its base diameter matches the hull ring. The turret is centered on
-  //    its ring at its origin (extraction contract); we place the origin at the ring and scale
-  //    about it — the ring stays put, the dome scales around it.
-  const ringDiameter = await nativeRingDiameter(scene, hullPart, loadout.turret, turretBuilt.base);
-  let scale = ringDiameter / turretBuilt.base.diameter;
+  // 3. Scale the turret so its declared ring matches the hull's declared ring. Both values are
+  //    contract-declared in the part modules (each mirrors `ringD` in scripts/modelgen/params/
+  //    <tank>.json) — never runtime-measured. Undeclared parts (hull-calib) default to the
+  //    legacy 1.8. The turret is centered on its ring at its origin (integration contract); we
+  //    place the origin at the ring and scale about it — the ring stays put, the dome scales.
+  const hullRing   = hullPart.ringDiameter   ?? 1.8;
+  const turretRing = turretPart.ringDiameter ?? 1.8;
+  let scale = hullRing / turretRing;
   if (!(scale > 0.3 && scale < 3.0)) {
     console.warn(`[assembleTank] scale ${scale.toFixed(3)} out of range for ${loadout.turret} on ${loadout.hull}; using 1`);
     scale = 1;
@@ -118,6 +112,9 @@ export async function assembleTank(scene, loadout, materials = {}, options = {})
 
   const cannonBuilt = await cannonPart.build(scene, materials.cannon);
   cannonBuilt.root.parent = barrelPivot;
+  // The gun grows with its turret: sleeve diameter keeps matching the scaled mantlet bore.
+  // Muzzle consumers (_measureBarrelTip, shell spawn) measure world geometry, so they adapt.
+  cannonBuilt.root.scaling = new Vector3(scale, scale, scale);
 
   // 6. Ground the tank — shift the lowest mesh point to y=0. With our own root we just move the
   //    root; on a target rig the root is gameplay-controlled, so we shift the parts (hull +
@@ -134,7 +131,7 @@ export async function assembleTank(scene, loadout, materials = {}, options = {})
   }
 
   if (import.meta.env?.DEV) {
-    validateComposition({ loadout, turretPivot, barrelPivot, ringDiameter, scale, turretBuilt, cannonBuilt });
+    validateComposition({ loadout, turretPivot, barrelPivot, scale, turretBuilt, cannonBuilt, turretPart });
   }
 
   return {
