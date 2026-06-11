@@ -8,7 +8,7 @@ const PAINT = { paintColor: [0.78, 0.12, 0.08] };
 
 export default {
   id: 'light-turret-enclosed',
-  name: 'Light Turret (Enclosed)',
+  name: 'Light Turret',
   category: 'turret',
   stats: { traverseSpeed: 88 },
   mountEmpty: 'mount',

@@ -7,7 +7,7 @@ const PAINT = { paintColor: [0.78, 0.12, 0.08] };
 
 export default {
   id: 'light-hull-scout',
-  name: 'Light Hull (Scout)',
+  name: 'Light Hull',
   category: 'hull',
   stats: {},
   mountEmpty: 'turret',
