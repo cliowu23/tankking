@@ -128,13 +128,12 @@ def hair_bob(col):                                 # blunt low fringe + deep cur
 def hair_pony(col):                                # arc hairline + bun + thick tail
     hair_shell(col, lambda x: 0.122 - 1.7 * max(0, abs(x) - 0.06) ** 2)
     hpiece((0, HY + 0.04, 0.185), (0.13, 0.12, 0.105), col, 'hair_bun')
-    for j, (dx, r, ln) in enumerate(((0, 0.072, 1.0), (0.045, 0.05, 0.75), (-0.045, 0.05, 0.75))):
-        o = lock([(dx, HY + 0.055, 0.175), (dx * 1.3, HY + 0.12, 0.08 * ln + 0.02),
-                  (dx * 1.5, HY + 0.115, -0.03 * ln), (dx * 1.6, HY + 0.07, -0.10 * ln)],
-                 radius=r, tip=0.35)
-        o.name = f'hair_tail_{j}'
-        tint(o, col)
-        o.data.materials.append(char_material())
+    o = lock([(0, HY + 0.055, 0.175), (0, HY + 0.125, 0.09),
+              (0, HY + 0.12, -0.02), (0, HY + 0.075, -0.105)],
+             radius=0.085, tip=0.32)                # ONE solid gathered tail
+    o.name = 'hair_tail'
+    tint(o, col)
+    o.data.materials.append(char_material())
     box((0, HY + 0.045, 0.145), (0.10, 0.09, 0.03), DARK, 'hair_tie')
 
 
