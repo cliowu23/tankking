@@ -47,61 +47,22 @@ ring = bpy.context.object; ring.name = 'turret_ring'; assign(ring, body_mat)
 
 make_lofted_turret('turret_shell', body_mat, _cs)
 
-# Turret roof — nearly flat plate, tilted ~3 deg so the front edge sits higher
-# (continues the raked front), NOT a dome.
-bpy.ops.mesh.primitive_cube_add(location=(0, 0.02, TURRET_TOP - 0.005))
-roof = bpy.context.object; roof.name = 'turret_roof'
-roof.scale = (0.50, 0.58, 0.02)
-roof.rotation_euler.x = math.radians(-3)   # -Y front raised
-bpy.ops.object.transform_apply(rotation=True, scale=True)
-assign(roof, body_mat)
 
-# Rear bustle
-bpy.ops.mesh.primitive_cube_add(location=(0, P['bustleY'], SHELL_Z0 + P['bustleH'] / 2 + 0.04))
-bustle = bpy.context.object; bustle.name = 'turret_bustle'
-bustle.scale = (P['bustleW'] / 2, P['bustleL'] / 2, P['bustleH'] / 2)
-bpy.ops.object.transform_apply(scale=True)
-bevel(bustle, width=0.07, segments=3)
-assign(bustle, body_mat)
-
-# Composite mantlet (4 parts, all UNPAINTABLE via 'mantlet' keyword)
-# 1. Outer shield plate
-SHIELD_MID_Y = P['mountY'] - P['mant_protrude'] / 2
-bpy.ops.mesh.primitive_cube_add(location=(0, SHIELD_MID_Y, P['mountZ']))
+# Mantlet — rounded casting disc (UV sphere flattened front-to-back)
+bpy.ops.mesh.primitive_uv_sphere_add(
+    segments=14, ring_count=8, radius=0.28,
+    location=(0, P['mountY'] - 0.06, P['mountZ']))
 shield = bpy.context.object; shield.name = 'mantlet_shield'
-shield.scale = (P['mant_shieldW'] / 2, P['mant_protrude'] / 2 + 0.04, P['mant_shieldH'])
+shield.scale = (1.34, 0.50, 0.96)
 bpy.ops.object.transform_apply(scale=True)
-bevel(shield, width=0.04, segments=2)
 assign(shield, gear_mat)
 
-# 2. Inner rotor bowl
-bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=P['mant_bowlR'],
-                                    depth=P['mant_protrude'] * 0.60,
-                                    location=(0, P['mountY'] - P['mant_protrude'] * 0.30, P['mountZ']),
-                                    rotation=(math.pi / 2, 0, 0))
-bowl = bpy.context.object; bowl.name = 'mantlet_rotor_bowl'
-bowl.scale = (1.0, 1.0, 1.20)
-bpy.ops.object.transform_apply(scale=True)
-assign(bowl, gear_mat)
-
-# 3. Gun collar ring
-bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=P['mant_collarR'], depth=0.10,
+# Gun collar
+bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=P['mant_collarR'], depth=0.12,
                                     location=(0, P['mountY'] + 0.01, P['mountZ']),
                                     rotation=(math.pi / 2, 0, 0))
 collar = bpy.context.object; collar.name = 'mantlet_collar'
 assign(collar, gear_mat)
-
-# 4. Barrel sleeve — tapered short cylinder
-bpy.ops.mesh.primitive_cylinder_add(vertices=12,
-                                    radius=P['mant_collarR'] + 0.026, depth=0.20,
-                                    location=(0, P['mountY'] + 0.11, P['mountZ']),
-                                    rotation=(math.pi / 2, 0, 0))
-sleeve = bpy.context.object; sleeve.name = 'mantlet_sleeve'
-for v in sleeve.data.vertices:
-    if v.co.y > 0.06:
-        v.co.x *= 0.80
-        v.co.z *= 0.80
-assign(sleeve, gear_mat)
 
 # Commander's cupola (tank's RIGHT = Blender -X)
 bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=P['cupolaR'], depth=0.18,
@@ -131,8 +92,6 @@ bolt_row('turret_base', gear_mat,
          (-0.62, -0.62, SHELL_Z0 + 0.005),
          ( 0.62,  0.62, SHELL_Z0 + 0.005), 6, 'z')
 weld_seam('turret_top', gear_mat, (0, 0.18, TURRET_TOP + 0.005), 1.0, 'x')
-grab_handle('bustle', gear_mat,
-            (0, P['bustleY'] + P['bustleL'] / 2 + 0.03, SHELL_Z0 + P['bustleH'] / 2))
 
 add_mount_empty('mount', MOUNT)
 finalize_and_export('light_turret_enclosed')
