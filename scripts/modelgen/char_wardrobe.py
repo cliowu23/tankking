@@ -149,9 +149,64 @@ def hair_side(col):                                # the proven diagonal sweep
     hair_shell(col, lambda x: 0.118 - 0.22 * x)
 
 
-def hair_bob(col):                                 # blunt low fringe + deep curtains
+def _long_curtain(col):
+    # Continuous U-curtain (back + sides, open at the face) falling to the waist
+    # and tapering/gathering at the hem. Bone-local (= world z - 0.46). Sculpted
+    # live in Blender 2026-06-11 then baked. Sits at head width up top, falls free.
+    CZ = -0.12
+    bpy.ops.mesh.primitive_cube_add(location=(0, 0.02, CZ))
+    o = bpy.context.object
+    o.name = 'hair_curtain'
+    o.scale = (0.215, 0.16, 0.235)
+    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.subdivide(number_cuts=7)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    def keep(c):
+        ly, lz = c.y - 0.02, c.z - CZ
+        if ly < -0.07 and lz > -0.12:      # open the face (upper front)
+            return False
+        if lz > 0.205:                     # open the top (fitted cap covers the crown)
+            return False
+        return True
+
+    bm = _bmesh.new()
+    bm.from_mesh(o.data)
+    _bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep(f.calc_center_median())],
+                      context='FACES')
+    bm.to_mesh(o.data)
+    bm.free()
+    m = o.modifiers.new('sol', 'SOLIDIFY')
+    m.thickness, m.offset = 0.022, 0
+    bpy.ops.object.modifier_apply(modifier='sol')
+    m = o.modifiers.new('bvl', 'BEVEL')
+    m.width, m.segments, m.limit_method = 0.012, 1, 'ANGLE'
+    bpy.ops.object.modifier_apply(modifier='bvl')
+    # taper + gather toward the hem (natural fall, not a barrel)
+    for v in o.data.vertices:
+        zl = v.co.z - CZ
+        if zl < 0.05:
+            t = max(0.0, min(1.0, (0.05 - zl) / 0.30))
+            v.co.x *= 1.0 - 0.22 * t
+            if v.co.y > 0.02:
+                v.co.y = 0.02 + (v.co.y - 0.02) * (1.0 - 0.18 * t)
+            if zl < -0.18 and v.co.y < -0.05:
+                v.co.y *= 0.9
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.shade_smooth()
+    tint(o, col)
+    o.data.materials.append(char_material())
+    return o
+
+
+def hair_bob(col):                                 # LONG female cut: fitted cap + curtain
     hair_shell(col, lambda x: 0.092, cz=0.055, hz=0.175,
                side_cut=-0.095, nape_cut=-0.112, thick=0.032)
+    _long_curtain(col)
 
 
 def hair_pony(col):                                # arc hairline + bun + thick tail
