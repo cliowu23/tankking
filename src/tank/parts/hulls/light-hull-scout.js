@@ -12,6 +12,7 @@ export default {
   stats: {},
   mountEmpty: 'turret',
   nativeTurret: 'light-turret-enclosed',
+  ringDiameter: 1.6,   // mirrors ringD in scripts/modelgen/params/
 
   async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'light_hull_scout.glb', scene);

@@ -13,6 +13,7 @@ export default {
   stats: { traverseSpeed: 88 },
   mountEmpty: 'mount',
   defaultCannon: 'light-gun-75mm',
+  ringDiameter: 1.6,   // mirrors ringD in scripts/modelgen/params/
   paintColor: PAINT.paintColor,
 
   async build(scene, paintOverride = null) {

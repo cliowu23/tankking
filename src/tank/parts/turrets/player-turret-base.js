@@ -14,6 +14,7 @@ export default {
   stats: { traverseSpeed: 72 },
   mountEmpty: 'mount',
   defaultCannon: 'player-gun-90mm',
+  ringDiameter: 1.95,   // mirrors ringD in scripts/modelgen/params/
   paintColor: PAINT.paintColor,     // composed barrel matches the body color
 
   async build(scene, paintOverride = null) {

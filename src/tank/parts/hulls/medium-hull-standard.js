@@ -14,6 +14,7 @@ export default {
   stats: {},
   mountEmpty: 'turret',
   nativeTurret: 'medium-turret-angular',
+  ringDiameter: 1.8,   // mirrors ringD in scripts/modelgen/params/
 
   async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'medium_hull_standard.glb', scene);
