@@ -397,6 +397,7 @@ async function buildCrewPanel() {
   }
   const wheel = document.createElement('input');
   wheel.type = 'color';
+  wheel.id = 'skin-wheel';
   wheel.value = '#eebb94';
   wheel.style.cssText = 'width:30px;height:24px;padding:0;border:1px solid #00eedd55;background:none;cursor:pointer;';
   wheel.addEventListener('input', () => {
@@ -422,7 +423,8 @@ async function buildCrewPanel() {
   const br = row('Outfit');
   for (const it of _wardrobe.bodies ?? []) {
     addGrouped(br, it, id => {
-      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ body: id }));
+      // outfit drives head+body together (unified character — no head grafting)
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
     });
   }
   for (const [slot, items] of Object.entries(_wardrobe.slots)) {
@@ -442,6 +444,8 @@ function syncCrewPanel(cfg) {
     b.classList.toggle('on', b.dataset.character === cfg.body));
   document.querySelectorAll('#lounge-slots [data-skin]').forEach(b =>
     b.classList.toggle('on', b.dataset.skin === cfg.skin));
+  const wheel = document.getElementById('skin-wheel');
+  if (wheel && typeof cfg.skin === 'string' && /^#[0-9a-f]{6}$/i.test(cfg.skin)) wheel.value = cfg.skin;
   const active = new Set(Object.values(cfg));
   document.querySelectorAll('#lounge-slots [data-gid]').forEach(b =>
     b.classList.toggle('on', active.has(b.dataset.gid)
