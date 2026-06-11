@@ -5,7 +5,7 @@ import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_empty,
                   bevel, make_box, finalize_and_export, load_params,
-                  STANDARD_RING_DIAMETER, DOCTRINE_COLORS)
+                  STANDARD_RING_DIAMETER, ring_diameter, DOCTRINE_COLORS)
 import bpy
 from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
 
@@ -22,7 +22,7 @@ clear_scene()
 body_mat = flat_material('medium_body', DOCTRINE_COLORS['medium'])
 gear_mat = gear_material()
 
-RING_R   = STANDARD_RING_DIAMETER / 2
+RING_R   = ring_diameter('medium_tank') / 2   # per-doctrine ring (params ringD)
 SHELL_Z0 = 0.08
 SHELL_H  = P['shellH']
 MOUNT    = (0, P['mountY'], P['mountZ'])

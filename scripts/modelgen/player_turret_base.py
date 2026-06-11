@@ -5,7 +5,7 @@
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_empty, bevel,
-                  finalize_and_export, load_params, STANDARD_RING_DIAMETER,
+                  finalize_and_export, load_params, STANDARD_RING_DIAMETER, ring_diameter,
                   DOCTRINE_COLORS)
 import bpy
 from _details import bolt_row, weld_seam, lifting_eye, tow_shackle, periscope, grab_handle, vision_slit
@@ -23,12 +23,12 @@ clear_scene()
 body_mat = flat_material('player_body', DOCTRINE_COLORS['player'])
 gear_mat = gear_material()
 
-RING_R   = STANDARD_RING_DIAMETER / 2      # 0.9 — the engine interface, never a slider
+RING_R   = ring_diameter('player_tank') / 2   # per-doctrine ring (params ringD), never a slider
 SHELL_Z0 = 0.08
 SHELL_H  = P['shellH']
 MOUNT    = (0, P['mountY'], P['mountZ'])
 
-# Ring collar — the bottom slice measureBase() reads; must be the standard diameter.
+# Ring collar — must match the part module's declared ringDiameter (ring contract).
 bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=RING_R, depth=SHELL_Z0,
                                     location=(0, 0, SHELL_Z0 / 2))
 ring = bpy.context.object

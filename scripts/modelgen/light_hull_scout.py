@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, track_material,
                   assign, add_mount_empty, bevel, make_track_band,
                   make_hull_bmesh, finalize_and_export, load_params, tuner_mode,
-                  game_to_blender, DOCTRINE_COLORS)
+                  game_to_blender, ring_diameter, DOCTRINE_COLORS)
 from _greebles import GREEBLES
 from _details import (bolt_row, weld_seam, lifting_eye, tow_shackle, periscope,
                       grab_handle)
@@ -276,7 +276,8 @@ for sx in (-1, 1):
 
 # Turret-ring pedestal — fills the gap under the ring where it overhangs the
 # glacis (ring sits forward at ringY; the deck slopes away beneath it).
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.99, radius2=0.92,
+PED_R = ring_diameter('light_tank') / 2   # pedestal tracks the per-doctrine ring
+bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=PED_R + 0.09, radius2=PED_R + 0.02,
                                 depth=Z_TOP - 1.02,
                                 location=(0, P['ringY'], (Z_TOP + 1.02) / 2))
 ped = bpy.context.object

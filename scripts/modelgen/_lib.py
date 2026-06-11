@@ -7,8 +7,10 @@ import bmesh
 import math
 import os
 
-# One ring diameter for ALL doctrines — cross-doctrine turret/hull mixes compose at
-# scale ≈ 1. Calibrated against the composed M26's measured base (1.83) in Batch 0.
+# Default turret-ring diameter (Batch-0 calibration, M26 measured 1.83). Doctrines may
+# override via top-level 'ringD' in their params JSON — assembleTank.js scales cross-
+# doctrine turret swaps by hullRing/turretRing, so each part module's ringDiameter
+# declaration MUST mirror its params ringD.
 STANDARD_RING_DIAMETER = 1.8
 
 EXPORT_DIR = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -26,6 +28,17 @@ def load_params(tank, group):
         return {}
     with open(path) as f:
         return json.load(f).get(group, {}) or {}
+
+
+def ring_diameter(tank):
+    """Per-doctrine turret-ring diameter from the canon JSON (top-level 'ringD').
+    Must match the part module's ringDiameter declaration in src/tank/parts/."""
+    import json
+    path = os.path.join(PARAMS_DIR, f'{tank}.json')
+    if not os.path.exists(path):
+        return STANDARD_RING_DIAMETER
+    with open(path) as f:
+        return json.load(f).get('ringD', STANDARD_RING_DIAMETER)
 
 
 def tuner_mode():

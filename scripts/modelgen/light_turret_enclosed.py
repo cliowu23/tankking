@@ -16,7 +16,7 @@ import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import (clear_scene, flat_material, gear_material, assign, add_mount_empty,
                   bevel, finalize_and_export, load_params,
-                  STANDARD_RING_DIAMETER, DOCTRINE_COLORS)
+                  STANDARD_RING_DIAMETER, ring_diameter, DOCTRINE_COLORS)
 from _details import bolt_row, weld_seam, lifting_eye, periscope, grab_handle
 import bpy
 import bmesh
@@ -32,7 +32,7 @@ clear_scene()
 body_mat = flat_material('light_body', DOCTRINE_COLORS['light'])
 gear_mat = gear_material()
 
-RING_R    = STANDARD_RING_DIAMETER / 2
+RING_R    = ring_diameter('light_tank') / 2   # per-doctrine ring (params ringD)
 BASE_Z    = 0.07          # ring collar top = casting base
 TOP_Z     = 0.69          # roof plate height at centerline
 ROOF_TILT = 0.04          # z += -y * tilt on the top ring → ~2.3 deg front-up roof
