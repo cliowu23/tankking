@@ -60,8 +60,10 @@ def hpiece(c, sz, col, name):
     return o
 
 
-def hair_shell(col, hairline, cz=0.075, hz=0.145, shx=0.242, shy=0.172,
+def hair_shell(col, hairline, cz=0.068, hz=0.148, shx=0.2245, shy=0.1545,
                side_cut=-0.005, nape_cut=-0.062, thick=0.028, bump=0.0, name='hair_shell'):
+    # shell half-extents = head + 0.002 -> base surface touches the head; the
+    # solidify grows OUTWARD, so the hair hugs instead of floating (user fix)
     bpy.ops.mesh.primitive_cube_add(location=(0, 0.012, cz))
     o = bpy.context.object
     o.name = name

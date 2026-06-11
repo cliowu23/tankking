@@ -74,64 +74,64 @@ def build_character(char_id, outfit_style, outfit_col):
     pants_col = OUT if outfit_style == 'overalls' else PANTS
 
     # ── BODY (outfit, no skin parts) — Kenney-proportioned squat pear ─────────
-    mk(box((0, 0, 0.115), (0.40, 0.275, 0.10), bev=0.03), pants_col, 'root')         # hips
-    mk(box((0, 0, 0.165), (0.41, 0.285, 0.034), bev=0.012), BELT, 'root')             # belt
-    mk(box((0, -0.146, 0.165), (0.06, 0.014, 0.03)), DARK, 'root')                    # buckle
-    mk(box((0, 0, 0.225), (0.40, 0.27, 0.115), bev=0.035), torso_col, 'torso')        # belly
-    mk(box((0, 0, 0.315), (0.355, 0.24, 0.095), bev=0.028), torso_col, 'torso')       # chest
+    mk(box((0, 0, 0.115), (0.33, 0.225, 0.10), bev=0.03), pants_col, 'root')         # hips
+    mk(box((0, 0, 0.165), (0.34, 0.235, 0.034), bev=0.012), BELT, 'root')             # belt
+    mk(box((0, -0.121, 0.165), (0.055, 0.014, 0.03)), DARK, 'root')                    # buckle
+    mk(box((0, 0, 0.225), (0.33, 0.22, 0.115), bev=0.035), torso_col, 'torso')        # belly
+    mk(box((0, 0, 0.315), (0.295, 0.195, 0.095), bev=0.028), torso_col, 'torso')       # chest
 
     if outfit_style == 'jacket':
-        mk(box((0, -0.115, 0.33), (0.10, 0.016, 0.045)), SHIRT, 'torso')              # shirt v
-        mk(box((0, 0, 0.358), (0.30, 0.21, 0.028), bev=0.01), OUT, 'torso')           # collar
-        mk(box((0, -0.135, 0.26), (0.014, 0.014, 0.16)), DARK, 'torso')               # zip
+        mk(box((0, -0.095, 0.33), (0.09, 0.016, 0.045)), SHIRT, 'torso')              # shirt v
+        mk(box((0, 0, 0.358), (0.25, 0.175, 0.028), bev=0.01), OUT, 'torso')           # collar
+        mk(box((0, -0.112, 0.26), (0.014, 0.014, 0.16)), DARK, 'torso')               # zip
         for sx in (-1, 1):
-            mk(box((sx * 0.095, -0.133, 0.27), (0.07, 0.014, 0.05)), OUT, 'torso')
-            mk(box((sx * 0.095, -0.137, 0.293), (0.07, 0.012, 0.014)), BELT, 'torso')
+            mk(box((sx * 0.08, -0.11, 0.27), (0.06, 0.014, 0.05)), OUT, 'torso')
+            mk(box((sx * 0.08, -0.114, 0.293), (0.06, 0.012, 0.014)), BELT, 'torso')
     elif outfit_style == 'overalls':
-        mk(box((0, -0.135, 0.26), (0.016, 0.014, 0.17)), DARK, 'torso')               # chest zip
-        mk(box((0, 0, 0.175), (0.415, 0.29, 0.036), bev=0.012), DARK, 'torso')        # waist cinch
-        mk(box((0, 0, 0.358), (0.295, 0.205, 0.028), bev=0.01), OUT, 'torso')         # stand collar
+        mk(box((0, -0.112, 0.26), (0.016, 0.014, 0.17)), DARK, 'torso')               # chest zip
+        mk(box((0, 0, 0.175), (0.345, 0.24, 0.036), bev=0.012), DARK, 'torso')        # waist cinch
+        mk(box((0, 0, 0.358), (0.25, 0.175, 0.028), bev=0.01), OUT, 'torso')         # stand collar
         for sx in (-1, 1):
-            mk(box((sx * 0.10, -0.132, 0.30), (0.075, 0.014, 0.05)), OUT, 'torso')
-            mk(box((sx * 0.10, -0.136, 0.323), (0.075, 0.012, 0.014)), DARK, 'torso')
+            mk(box((sx * 0.082, -0.108, 0.30), (0.065, 0.014, 0.05)), OUT, 'torso')
+            mk(box((sx * 0.082, -0.112, 0.323), (0.065, 0.012, 0.014)), DARK, 'torso')
     elif outfit_style == 'vest':
         for sx in (-1, 1):
-            mk(box((sx * 0.107, -0.138, 0.27), (0.115, 0.016, 0.165), bev=0.012), OUT, 'torso')
-        mk(box((0, 0.135, 0.27), (0.33, 0.018, 0.17), bev=0.012), OUT, 'torso')
+            mk(box((sx * 0.088, -0.112, 0.27), (0.095, 0.016, 0.165), bev=0.012), OUT, 'torso')
+        mk(box((0, 0.112, 0.27), (0.27, 0.018, 0.17), bev=0.012), OUT, 'torso')
     elif outfit_style == 'medic':
-        mk(box((0, -0.115, 0.33), (0.10, 0.016, 0.045)), SHIRT, 'torso')
-        mk(box((0, 0, 0.358), (0.295, 0.205, 0.028), bev=0.01), OUT, 'torso')
-        mk(box((0, 0, 0.10), (0.41, 0.285, 0.075), bev=0.02), OUT, 'root')            # coat hem
-        mk(box((0.095, -0.138, 0.30), (0.045, 0.014, 0.015)), (0.85, 0.15, 0.12, 1), 'torso')
-        mk(box((0.095, -0.138, 0.30), (0.015, 0.014, 0.045)), (0.85, 0.15, 0.12, 1), 'torso')
+        mk(box((0, -0.095, 0.33), (0.09, 0.016, 0.045)), SHIRT, 'torso')
+        mk(box((0, 0, 0.358), (0.25, 0.175, 0.028), bev=0.01), OUT, 'torso')
+        mk(box((0, 0, 0.10), (0.34, 0.235, 0.075), bev=0.02), OUT, 'root')            # coat hem
+        mk(box((0.08, -0.113, 0.30), (0.045, 0.014, 0.015)), (0.85, 0.15, 0.12, 1), 'torso')
+        mk(box((0.08, -0.113, 0.30), (0.015, 0.014, 0.045)), (0.85, 0.15, 0.12, 1), 'torso')
     elif outfit_style == 'telogreika':
         for z in (0.185, 0.235, 0.285, 0.335):
-            mk(box((0, -0.137, z), (0.33, 0.016, 0.02)), OUT, 'torso')
-            mk(box((0, 0.137, z), (0.33, 0.016, 0.02)), OUT, 'torso')
-        mk(box((0, 0, 0.362), (0.28, 0.20, 0.04), bev=0.012), OUT, 'torso')
+            mk(box((0, -0.112, z), (0.27, 0.016, 0.02)), OUT, 'torso')
+            mk(box((0, 0.112, z), (0.27, 0.016, 0.02)), OUT, 'torso')
+        mk(box((0, 0, 0.362), (0.235, 0.17, 0.04), bev=0.012), OUT, 'torso')
     elif outfit_style == 'workshirt':
         for sx in (-1, 1):
-            mk(box((sx * 0.09, -0.136, 0.28), (0.04, 0.014, 0.17)), DARK, 'torso')
-            mk(box((sx * 0.09, 0.136, 0.28), (0.04, 0.014, 0.17)), DARK, 'torso')
+            mk(box((sx * 0.075, -0.112, 0.28), (0.036, 0.014, 0.17)), DARK, 'torso')
+            mk(box((sx * 0.075, 0.112, 0.28), (0.036, 0.014, 0.17)), DARK, 'torso')
         for i in (0, 1):
-            mk(box((0, -0.14, 0.24 + i * 0.05), (0.015, 0.012, 0.015)), DARK, 'torso')
+            mk(box((0, -0.115, 0.24 + i * 0.05), (0.015, 0.012, 0.015)), DARK, 'torso')
 
     # stub legs + BIG Kenney shoes
     for side, sx in (('leg-left', 1), ('leg-right', -1)):
-        mk(cyl((sx * 0.105, 0, 0.075), 0.072, 0.075), pants_col, side)
+        mk(cyl((sx * 0.088, 0, 0.075), 0.062, 0.075), pants_col, side)
         if outfit_style == 'overalls':
-            mk(box((sx * 0.118, -0.085, 0.085), (0.06, 0.02, 0.05)), pants_col, side)
-        mk(box((sx * 0.108, -0.035, 0.045), (0.155, 0.235, 0.09), bev=0.025), BOOTS, side)
+            mk(box((sx * 0.098, -0.072, 0.085), (0.055, 0.02, 0.05)), pants_col, side)
+        mk(box((sx * 0.09, -0.03, 0.045), (0.135, 0.21, 0.09), bev=0.025), BOOTS, side)
     # arms — flared out (Kenney bind), mitten hands live in the SKIN mesh
     ARM_TILT = 0.16
     sleeve_col = OUT if outfit_style != 'vest' else SHIRT
     for side, sx in (('arm-left', 1), ('arm-right', -1)):
-        a = cyl((sx * 0.245, 0, 0.265), 0.054, 0.16)
+        a = cyl((sx * 0.205, 0, 0.265), 0.048, 0.16)
         a.rotation_euler.y = -sx * ARM_TILT
         mk(a, sleeve_col, side)
-        mk(cyl((sx * 0.258, 0, 0.185), 0.06, 0.038), BELT, side)                      # cuff
+        mk(cyl((sx * 0.217, 0, 0.185), 0.054, 0.038), BELT, side)                      # cuff
     for sx in (-1, 1):
-        mk(sph((sx * 0.225, 0, 0.305), 0.062), sleeve_col, 'torso')                   # shoulders
+        mk(sph((sx * 0.185, 0, 0.305), 0.056), sleeve_col, 'torso')                   # shoulders
     finish_mesh([o for o in bpy.context.scene.objects if o.type == 'MESH'], 'body-mesh', arm)
 
     # ── SKIN unit (head-mesh): BIG Kenney head + face + ears + HANDS ──────────
@@ -142,7 +142,7 @@ def build_character(char_id, outfit_style, outfit_col):
         mk(box((sx * 0.10, -0.152, 0.565), (0.085, 0.012, 0.022)), DARK, 'head')            # brows
         mk(box((sx * 0.227, 0, 0.50), (0.025, 0.06, 0.07), bev=0.01), WHITE, 'head')        # ears
     for side, sx in (('arm-left', 1), ('arm-right', -1)):                                    # hands
-        mk(sph((sx * 0.272, 0, 0.145), 0.062), WHITE, side)
+        mk(sph((sx * 0.232, 0, 0.145), 0.058), WHITE, side)
     finish_mesh([o for o in bpy.context.scene.objects
                  if o.type == 'MESH' and o.name != 'body-mesh'], 'head-mesh', arm,
                 material=char_material('skinMat'))
