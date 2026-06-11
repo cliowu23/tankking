@@ -42,10 +42,10 @@ def box(c, s, col, name, rot=(0, 0, 0)):
     return o
 
 
-# ── HAIR (6, x4 colors) — v4: thick OVERLAPPING masses, bevel-rounded + smooth.
-# (v3 lesson: subsurf SHRINKS boxes -> gaps/"balding". Bevel rounds WITHOUT
-# shrinking; connectedness comes from real geometric overlap >= 0.02 everywhere.)
-HX, HY = HW + 0.012, HD + 0.012          # hair shell half-extents
+# ── HAIR (6, x4 colors) — v5: SCULPTED curve-locks (_hairlib) over a thin scalp.
+# Kenney finding: quality = form language (swoops/locks/tips), ~500 verts total.
+from _hairlib import lock, crown_flow, fringe_swoops
+HX, HY = HW + 0.012, HD + 0.012
 
 def hpiece(c, sz, col, name):
     o = box(c, sz, col, name)
@@ -57,59 +57,71 @@ def hpiece(c, sz, col, name):
     return o
 
 
-def _wrap(col, thick=0.085, side_drop=0.15, back_drop=0.19, grow=0.0):
-    """Connected helmet wrap: top slab + side slabs + back slab, all overlapping."""
-    hpiece((0, 0.012, HTOP + thick / 2 - 0.025), (2 * HX + grow, 2 * HY + grow, thick + 0.05), col, 'hair_top')
+def _scalp(col, thick=0.05, side_drop=0.12, back_drop=0.15):
+    hpiece((0, 0.012, HTOP + thick / 2 - 0.02), (2 * HX - 0.005, 2 * HY - 0.005, thick + 0.04), col, 'hair_scalp')
     for sx in (-1, 1):
-        hpiece((sx * (HX + 0.006), 0.018, HTOP - side_drop / 2 + 0.02),
-               (0.05, 2 * HY - 0.03, side_drop + 0.06), col, f'hair_side_{sx}')
-    hpiece((0, HY + 0.002, HTOP - back_drop / 2 + 0.02),
-           (2 * HX - 0.01, 0.06, back_drop + 0.06), col, 'hair_back')
+        hpiece((sx * HX, 0.018, HTOP - side_drop / 2 + 0.02), (0.04, 2 * HY - 0.04, side_drop + 0.05), col, f'hair_scalp_s{sx}')
+    hpiece((0, HY - 0.004, HTOP - back_drop / 2 + 0.02), (2 * HX - 0.02, 0.05, back_drop + 0.05), col, 'hair_scalp_b')
 
 
-def _fringe(col, w=0.25, drop=0.10, sweep=0.0):
-    hpiece((sweep, -HY - 0.002, HTOP - drop / 2 + 0.015), (w, 0.055, drop + 0.06), col, 'hair_fringe')
+def _locks(paths, col, radius=0.034, tip=0.25):
+    for i, pts in enumerate(paths):
+        o = lock(pts, radius=radius, tip=tip)
+        o.name = f'hair_lock_{i}'
+        tint(o, col)
+        o.data.materials.append(char_material())
 
 
 def hair_short(col):
-    _wrap(col)
-    _fringe(col)
+    _scalp(col)
+    _locks(crown_flow(n=11, droop=0.09, crown=(0.025, 0.035)), col, radius=0.036)
+    _locks(fringe_swoops(k=3, width=0.20, drop=0.075), col, radius=0.034)
 
 
 def hair_side(col):
-    _wrap(col)
-    _fringe(col, w=0.17, drop=0.115, sweep=0.05)
-    _fringe(col, w=0.09, drop=0.07, sweep=-0.085)
+    _scalp(col)
+    _locks(crown_flow(n=10, droop=0.10, crown=(-0.055, 0.025), sweep=0.025), col, radius=0.037)
+    _locks(fringe_swoops(k=2, width=0.13, drop=0.10, sweep=0.075), col, radius=0.042)
 
 
-def hair_buzz(col):
-    _wrap(col, thick=0.055, side_drop=0.11, back_drop=0.13, grow=-0.025)
+def hair_buzz(col):                                   # v4 shell stays (correct as-is)
+    _scalp(col, thick=0.045, side_drop=0.10, back_drop=0.12)
 
 
 def hair_bob(col):
-    _wrap(col, thick=0.095, side_drop=0.30, back_drop=0.34, grow=0.015)
-    _fringe(col, w=0.28, drop=0.095)
-    for sx in (-1, 1):                                  # extra width at the curtain bottoms
-        hpiece((sx * (HX + 0.012), 0.018, 0.06), (0.055, 2 * HY - 0.02, 0.12), col, f'hair_curtain_{sx}')
+    _scalp(col, thick=0.06, side_drop=0.16, back_drop=0.20)
+    _locks(crown_flow(n=13, length=0.2, droop=0.225, crown=(0.0, 0.03), out=1.04), col, radius=0.041, tip=0.55)
+    _locks(fringe_swoops(k=4, width=0.24, drop=0.075), col, radius=0.038, tip=0.6)
 
 
 def hair_pony(col):
-    _wrap(col, thick=0.065)
-    _fringe(col, w=0.22, drop=0.075)
-    hpiece((0, HY + 0.03, 0.245), (0.10, 0.10, 0.085), col, 'hair_bun')
-    hpiece((0, HY + 0.045, 0.115), (0.07, 0.065, 0.24), col, 'hair_tail')
-    box((0, HY + 0.042, 0.205), (0.082, 0.07, 0.026), DARK, 'hair_tie')
+    _scalp(col, thick=0.05)
+    _locks(crown_flow(n=9, droop=0.05, crown=(0.0, 0.05)), col, radius=0.034, tip=0.5)
+    _locks(fringe_swoops(k=2, width=0.18, drop=0.05), col, radius=0.034)
+    # gathered tail: bun + three locks curving down from the gather point
+    hpiece((0, HY + 0.035, 0.235), (0.095, 0.095, 0.085), col, 'hair_bun')
+    for j, dx in enumerate((-0.025, 0.0, 0.025)):
+        o = lock([(dx, HY + 0.045, 0.225), (dx * 1.6, HY + 0.085, 0.15),
+                  (dx * 2.0, HY + 0.075, 0.02)], radius=0.030, tip=0.3)
+        o.name = f'hair_tail_{j}'
+        tint(o, col)
+        o.data.materials.append(char_material())
+    box((0, HY + 0.042, 0.198), (0.085, 0.075, 0.026), DARK, 'hair_tie')
 
 
 def hair_curly(col):
-    _wrap(col, thick=0.075)                             # base wrap keeps it connected
-    for (x, y, z, sx, sy, sz) in (
-        (0, 0.01, HTOP + 0.075, 0.27, 0.25, 0.12),
-        (0.10, -0.05, HTOP + 0.035, 0.14, 0.13, 0.11), (-0.10, -0.05, HTOP + 0.035, 0.14, 0.13, 0.11),
-        (0.105, 0.08, HTOP + 0.025, 0.14, 0.14, 0.12), (-0.105, 0.08, HTOP + 0.025, 0.14, 0.14, 0.12),
-        (0, -0.10, HTOP + 0.02, 0.17, 0.11, 0.11), (0, 0.12, HTOP + 0.005, 0.19, 0.11, 0.13),
-    ):
-        hpiece((x, y, z), (sx, sy, sz), col, f'hair_puff_{x}_{y}')
+    _scalp(col, thick=0.06)
+    import math as _m
+    for i in range(14):                                # short fat curls, tips hooking out
+        a = -_m.pi / 2 + 0.55 + (2 * _m.pi - 1.1) * i / 14
+        ex, ey = _m.cos(a) * (HX + 0.01), _m.sin(a) * (HY + 0.01)
+        o = lock([(ex * 0.35, ey * 0.35, HTOP + 0.075),
+                  (ex * 0.85, ey * 0.85, HTOP + 0.05),
+                  (ex * 1.12, ey * 1.12, HTOP + 0.015),
+                  (ex * 1.05, ey * 1.05, HTOP + 0.055)], radius=0.042, tip=0.45)
+        o.name = f'hair_curl_{i}'
+        tint(o, col)
+        o.data.materials.append(char_material())
 
 
 # ── HEADWEAR (6) — box shells over the hair envelope ────────────────────────
