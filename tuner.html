@@ -88,10 +88,12 @@ const TANK = new URLSearchParams(location.search).get('tank') ?? 'player_tank';
 const TANK_FILES = {
   player_tank: ['player_hull_base.glb', 'player_turret_base.glb', 'player_gun_90mm.glb'],
   medium_tank: ['medium_hull_standard.glb', 'medium_turret_angular.glb', 'medium_gun_50mm.glb'],
+  light_tank:  ['light_hull_scout.glb',    'light_turret_enclosed.glb', 'light_gun_75mm.glb'],
 };
 const TANK_PAINTS = {
   player_tank: new BABYLON.Color3(0.12, 0.42, 0.88),   // cobalt
   medium_tank: new BABYLON.Color3(0.78, 0.66, 0.43),   // doctrine sand
+  light_tank:  new BABYLON.Color3(0.545, 0.722, 0.478), // sage green (Light doctrine)
 };
 const PAINT = TANK_PAINTS[TANK] ?? TANK_PAINTS.player_tank;
 document.querySelector('h1').textContent = `⚙ TANK TUNER — ${TANK}`;

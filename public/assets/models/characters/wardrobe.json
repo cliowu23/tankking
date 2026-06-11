@@ -1,0 +1,97 @@
+{
+  "presets": [
+    {
+      "id": "char-driver-a",
+      "label": "OG"
+    },
+    {
+      "id": "character-male-a",
+      "label": "M1"
+    },
+    {
+      "id": "character-male-b",
+      "label": "M2"
+    },
+    {
+      "id": "character-male-c",
+      "label": "M3"
+    },
+    {
+      "id": "character-male-d",
+      "label": "M4"
+    },
+    {
+      "id": "character-male-e",
+      "label": "M5"
+    },
+    {
+      "id": "character-male-f",
+      "label": "M6"
+    },
+    {
+      "id": "character-female-a",
+      "label": "F1"
+    },
+    {
+      "id": "character-female-b",
+      "label": "F2"
+    },
+    {
+      "id": "character-female-c",
+      "label": "F3"
+    },
+    {
+      "id": "character-female-d",
+      "label": "F4"
+    },
+    {
+      "id": "character-female-e",
+      "label": "F5"
+    },
+    {
+      "id": "character-female-f",
+      "label": "F6"
+    }
+  ],
+  "slots": {
+    "hair": [
+      {
+        "id": "hair-short-brown",
+        "label": "Short Crop (brown)"
+      },
+      {
+        "id": "hair-short-black",
+        "label": "Short Crop (black)"
+      },
+      {
+        "id": "hair-short-blond",
+        "label": "Short Crop (blond)"
+      },
+      {
+        "id": "hair-short-grey",
+        "label": "Short Crop (grey)"
+      }
+    ],
+    "headwear": [
+      {
+        "id": "hw-tanker-cap",
+        "label": "Tanker Cap"
+      }
+    ],
+    "face": [
+      {
+        "id": "aid-glasses",
+        "label": "Glasses"
+      },
+      {
+        "id": "aid-sunglasses",
+        "label": "Shades"
+      },
+      {
+        "id": "aid-mask",
+        "label": "Mask"
+      }
+    ],
+    "back": []
+  }
+}

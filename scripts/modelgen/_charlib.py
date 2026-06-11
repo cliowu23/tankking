@@ -154,6 +154,38 @@ def walk_action(arm):
     return add_action(arm, 'walk', frames)
 
 
+# ── Attachment (wardrobe) authoring frame ────────────────────────────────────
+# Convention (decoded from Kenney aid-glasses + live calibration): author the piece
+# in Blender at the ORIGIN = target bone origin, Z = up along the bone, front = -Y
+# (same as characters). Attachments ride the BONE (unscaled), while character meshes
+# carry the 1.12 build scale — so fit targets below are for the SCALED standard head.
+ATT_SCALP_Z = 0.251    # top of the scaled bald head (bone-local)
+# HAIR/HAT FIT CONTRACT (shell containment — supersedes the draft "crown plane"):
+# hats fully SHELL hair above the brim line; hair below the brim peeks out (good!).
+HAT_BRIM_Z  = 0.19     # hats are opaque from here up...
+HAT_MIN_R   = 0.18     # ...with at least this inner radius
+HAIR_MAX_Z  = 0.31     # hair above HAT_BRIM_Z must stay under this height...
+HAIR_MAX_R  = 0.17     # ...and inside this radius (below the brim: free)
+ATT_HEAD_W  = 0.292    # scaled head width  (head box 0.26 * 1.12)
+ATT_HEAD_D  = 0.252    # scaled head depth
+ATT_FACE_Y  = -0.126   # front face plane (-Y)
+ATT_EYE_Z   = 0.145    # eye height, bone-local
+ATT_BACK_Y  = 0.115    # torso-bone back plane (+Y) for the back slot
+WARDROBE_DIR = os.path.join(EXPORT_DIR, 'wardrobe')
+
+
+def export_attachment(att_id):
+    """Static (unskinned, unanimated) wardrobe piece → characters/wardrobe/."""
+    os.makedirs(WARDROBE_DIR, exist_ok=True)
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            obj.data.name = obj.name
+    out = os.path.abspath(os.path.join(WARDROBE_DIR, f'{att_id}.glb'))
+    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_animations=False)
+    print(f'[modelgen] exported {out}')
+    return out
+
+
 def export_char(char_id, subdir=''):
     """Character-safe export: NO transform_apply anywhere (armature would break)."""
     out_dir = os.path.join(EXPORT_DIR, subdir) if subdir else EXPORT_DIR

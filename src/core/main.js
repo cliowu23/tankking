@@ -276,7 +276,12 @@ document.addEventListener('keydown', (e) => {
       if (!station) return;
       if (station.id === 'tank') { hangarScene.mountTank(); return; }
       if (station.id === 'exit') { hangarScene.exitToMenu(); return; }
-      if (station.id === 'lounge') { hangarScene.openLounge(); syncDriverButtons(hangarScene.getDriverConfig()); return; }
+      if (station.id === 'lounge') {
+        hangarScene.openLounge();
+        buildCrewPanel().then(() => syncCrewPanel(hangarScene.getDriverConfig()))
+          .catch(e => console.warn('[crew panel] wardrobe load failed', e));
+        return;
+      }
       hangarScene.openPanel(station);
     }
     if (e.code === 'Escape' && hangarScene._panelOpen) {
@@ -349,24 +354,51 @@ document.getElementById('lounge-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
 });
 
-// ── Driver (crew) customization — shares the lounge "Crew Quarters" panel ──────
-function syncDriverButtons(cfg) {
-  // Presets: one character drives head+body together, so highlight by cfg.body.
-  document.querySelectorAll('#lounge-panel [data-character]').forEach(b =>
-    b.classList.toggle('on', b.dataset.character === cfg.body));
-  document.querySelectorAll('#lounge-panel [data-accessory]').forEach(b =>
-    b.classList.toggle('on', b.dataset.accessory === cfg.accessory));
+// ── Crew Quarters wardrobe panel — rows built from wardrobe.json ──────────────
+// (presets row + one row per wardrobe slot: hair / headwear / face / back)
+let _wardrobe = null;
+async function buildCrewPanel() {
+  if (_wardrobe) return;
+  _wardrobe = await (await fetch('/assets/models/characters/wardrobe.json')).json();
+  const host = document.getElementById('lounge-slots');
+  host.innerHTML = '';
+  const row = (label) => {
+    const g = document.createElement('div');
+    g.className = 'lng-grp';
+    g.innerHTML = `<div class="lng-lbl">${label}</div>`;
+    const btns = document.createElement('div');
+    btns.className = 'lng-btns';
+    g.appendChild(btns);
+    host.appendChild(g);
+    return btns;
+  };
+  const mkBtn = (btns, label, dataset, onClick) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    Object.assign(b.dataset, dataset);
+    b.addEventListener('click', onClick);
+    btns.appendChild(b);
+  };
+  const pr = row('Preset');
+  for (const p of _wardrobe.presets) {
+    mkBtn(pr, p.label, { character: p.id }, () => {
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: p.id }));
+    });
+  }
+  for (const [slot, items] of Object.entries(_wardrobe.slots)) {
+    const btns = row(slot[0].toUpperCase() + slot.slice(1));
+    for (const it of [{ id: 'none', label: 'None' }, ...items]) {
+      mkBtn(btns, it.label, { slot, id: it.id }, () => {
+        if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: it.id }));
+      });
+    }
+  }
 }
-
-document.querySelectorAll('#lounge-panel [data-character]').forEach(b =>
-  b.addEventListener('click', () => {
-    if (!hangarScene) return;
-    syncDriverButtons(hangarScene.setDriverConfig({ character: b.dataset.character }));
-  }));
-document.querySelectorAll('#lounge-panel [data-accessory]').forEach(b =>
-  b.addEventListener('click', () => {
-    if (!hangarScene) return;
-    syncDriverButtons(hangarScene.setDriverConfig({ accessory: b.dataset.accessory }));
-  }));
+function syncCrewPanel(cfg) {
+  document.querySelectorAll('#lounge-slots [data-character]').forEach(b =>
+    b.classList.toggle('on', b.dataset.character === cfg.body));
+  document.querySelectorAll('#lounge-slots [data-slot]').forEach(b =>
+    b.classList.toggle('on', (cfg[b.dataset.slot] ?? 'none') === b.dataset.id));
+}
 
 window.addEventListener('resize', () => engine.resize());

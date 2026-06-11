@@ -874,37 +874,9 @@
     <div class="lng-head">CREW QUARTERS</div>
     <div class="lng-sub">DRIVER · SW LOUNGE</div>
 
-    <div class="lng-grp">
-      <div class="lng-lbl">Character</div>
-      <div class="lng-btns">
-        <button data-character="character-male-a">M1</button>
-        <button data-character="character-male-b">M2</button>
-        <button data-character="character-male-c">M3</button>
-        <button data-character="character-male-d">M4</button>
-        <button data-character="character-male-e">M5</button>
-        <button data-character="character-male-f">M6</button>
-        <button data-character="character-female-a">F1</button>
-        <button data-character="character-female-b">F2</button>
-        <button data-character="character-female-c">F3</button>
-        <button data-character="character-female-d">F4</button>
-        <button data-character="character-female-e">F5</button>
-        <button data-character="character-female-f">F6</button>
-        <button data-character="char-driver-a" title="Original (CHARACTER_MODEL_SPEC C1)">OG</button>
-      </div>
-    </div>
-
-    <!-- Accessory row temporarily hidden — glasses/mask attach buried inside the
-         head (head-bone pivot issue); re-enable + fix placement when verifiable.
-    <div class="lng-grp">
-      <div class="lng-lbl">Accessory</div>
-      <div class="lng-btns">
-        <button data-accessory="none">None</button>
-        <button data-accessory="aid-glasses">Glasses</button>
-        <button data-accessory="aid-sunglasses">Shades</button>
-        <button data-accessory="aid-mask">Mask</button>
-      </div>
-    </div>
-    -->
+    <!-- Rows are built dynamically from /assets/models/characters/wardrobe.json
+         (presets + one row per wardrobe slot) — see buildCrewPanel() in main.js -->
+    <div id="lounge-slots"></div>
 
     <button id="lounge-panel-close">CLOSE [E / ESC]</button>
   </div>

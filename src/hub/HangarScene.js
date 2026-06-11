@@ -5,7 +5,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
-import DriverCharacter, { DRIVER_DEFAULT } from './DriverCharacter.js';
+import DriverCharacter, { DRIVER_DEFAULT, ATTACH_SLOTS, normalizeDriverConfig } from './DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, addBlob } from './HangarProps.js';
 import { buildLounge } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
@@ -659,8 +659,16 @@ export default class HangarScene {
   _setupDriver() {
     this.driver = new DriverCharacter(this.scene);
     this._driverConfig = this._loadDriverConfig();
-    // Apply the saved look once the Kenney model finishes loading.
-    this.driver.ready.then(() => this.driver.applyConfig(this._driverConfig));
+    // Apply the saved look once the default model finishes loading; adopt back the
+    // APPLIED config (the driver clears slots whose pieces failed to load).
+    this.driver.ready
+      .then(() => this.driver.applyConfig(this._driverConfig))
+      .then(applied => { if (applied) this._adoptDriverConfig(applied); });
+  }
+
+  _adoptDriverConfig(applied) {
+    this._driverConfig = { ...applied };
+    try { localStorage.setItem('driverConfig', JSON.stringify(this._driverConfig)); } catch (e) { /* ignore */ }
   }
 
   // ── Driver customization (mirrors the lounge config plumbing) ────────────────
@@ -668,24 +676,29 @@ export default class HangarScene {
     let cfg = { ...DRIVER_DEFAULT };
     try {
       const saved = JSON.parse(localStorage.getItem('driverConfig'));
-      if (saved && saved.head && saved.body && saved.accessory) cfg = saved;
+      if (saved && saved.head && saved.body) cfg = normalizeDriverConfig(saved);
     } catch (e) { /* fall through to default */ }
-    cfg.accessory = 'none';   // accessories temporarily hidden (buried-in-head placement bug)
     return cfg;
   }
 
   getDriverConfig() { return this._driverConfig; }
 
-  // Merge a partial change. Presets: { character } drives head+body together
-  // (no mixing); { accessory } sets the headgear. Persists + live-applies.
+  // Merge a partial change. Presets: { character } drives head+body together;
+  // wardrobe slots (hair/headwear/face/back) set attachments. Persists + live-applies.
   setDriverConfig(partial) {
     if (partial.character) {
       this._driverConfig.head = this._driverConfig.body = partial.character;
     }
-    if (partial.head)                    this._driverConfig.head      = partial.head;
-    if (partial.body)                    this._driverConfig.body      = partial.body;
-    if (partial.accessory !== undefined) this._driverConfig.accessory = partial.accessory;
-    this.driver.applyConfig(this._driverConfig);
+    if (partial.head) this._driverConfig.head = partial.head;
+    if (partial.body) this._driverConfig.body = partial.body;
+    if (partial.accessory !== undefined) partial.face = partial.accessory; // legacy key
+    for (const slot of Object.keys(ATTACH_SLOTS)) {
+      if (partial[slot] !== undefined) this._driverConfig[slot] = partial[slot];
+    }
+    // Persist the APPLIED config (the driver clears slots that fail to load),
+    // so a dead piece id can't get stuck in localStorage and retry forever.
+    this.driver.applyConfig(this._driverConfig)
+      .then(applied => { if (applied) this._adoptDriverConfig(applied); });
     try { localStorage.setItem('driverConfig', JSON.stringify(this._driverConfig)); } catch (e) { /* ignore */ }
     return this._driverConfig;
   }

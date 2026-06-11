@@ -22,12 +22,35 @@ export const DRIVER_CHARACTERS = [
 ];
 export const DRIVER_ACCESSORIES = ['none', 'aid-glasses', 'aid-sunglasses', 'aid-mask'];
 
+// Wardrobe attachment slots (CHARACTER_MODEL_SPEC customization section).
+// Each is a static GLB attached to a bone; pieces authored at the bone origin
+// (Blender Z=up, -Y=front — calibrated 2026-06-11, markers landed 1:1).
+export const ATTACH_SLOTS = {
+  hair:     { boneRe: /(^|[^a-z])head/i },
+  headwear: { boneRe: /(^|[^a-z])head/i },
+  face:     { boneRe: /(^|[^a-z])head/i },
+  back:     { boneRe: /torso/i },
+};
+const WARDROBE_DIR = MODEL_DIR + 'wardrobe/';
+// Legacy Kenney accessories live in the characters/ root, wardrobe pieces in wardrobe/.
+const attachmentDir = id => (id.startsWith('aid-') ? MODEL_DIR : WARDROBE_DIR);
+
 export const DRIVER_OPTIONS = {
   head: DRIVER_CHARACTERS, body: DRIVER_CHARACTERS, accessory: DRIVER_ACCESSORIES,
 };
 export const DRIVER_DEFAULT = {
-  head: 'character-male-a', body: 'character-male-a', accessory: 'none',
+  head: 'char-driver-a', body: 'char-driver-a',
+  hair: 'none', headwear: 'none', face: 'none', back: 'none',
 };
+
+// Stale/legacy config guard: maps the old `accessory` key to the `face` slot and
+// fills missing slots — old localStorage saves keep working.
+export function normalizeDriverConfig(cfg) {
+  const c = { ...DRIVER_DEFAULT, ...(cfg ?? {}) };
+  if (cfg?.accessory && (!cfg.face || cfg.face === 'none')) c.face = cfg.accessory;
+  delete c.accessory;
+  return c;
+}
 
 // Model is ~0.67u tall in bind pose → scale to fill the 1.8u capsule.
 const MODEL_SCALE = 2.5;
@@ -69,7 +92,8 @@ export default class DriverCharacter {
     this._base         = null;   // { root, bodyMesh, headMesh(native), skeleton, charId }
     this._swappedHead  = null;   // foreign head grafted on (null = native head)
     this._headBone     = null;
-    this._accessoryRoot = null;
+    this._slotBones    = {};     // slot -> bone (resolved per ATTACH_SLOTS on base load)
+    this._attachRoots  = {};     // slot -> attached GLB root
     this._animGroups   = [];
     this._animState    = null;
     this._applyChain   = Promise.resolve();
@@ -96,6 +120,10 @@ export default class DriverCharacter {
 
     this._base     = { root, bodyMesh, headMesh, skeleton, charId: bodyId };
     this._headBone = skeleton?.bones.find(b => /(^|[^a-z])head/i.test(b.name)) ?? null;
+    this._slotBones = {};
+    for (const [slot, def] of Object.entries(ATTACH_SLOTS)) {
+      this._slotBones[slot] = skeleton?.bones.find(b => def.boneRe.test(b.name)) ?? null;
+    }
 
     this._playAnim('idle');
     if (!this._visible) root.setEnabled(false);
@@ -125,14 +153,22 @@ export default class DriverCharacter {
     res.meshes[0].dispose(false, false);       // __root__ + leftover body-mesh; keep shared material
   }
 
-  async _setAccessory(name) {
-    if (this._accessoryRoot) { this._accessoryRoot.dispose(false, true); this._accessoryRoot = null; }
+  async _setAttachment(slot, name) {
+    if (this._attachRoots[slot]) { this._attachRoots[slot].dispose(false, true); this._attachRoots[slot] = null; }
     if (!name || name === 'none') return;
-    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, `${name}.glb`, this.scene);
+    let res;
+    try {
+      res = await SceneLoader.ImportMeshAsync('', attachmentDir(name), `${name}.glb`, this.scene);
+    } catch (e) {
+      console.warn(`[DriverCharacter] ${slot} piece '${name}' failed to load — clearing slot`, e);
+      this._config[slot] = 'none';
+      return;
+    }
     const root = res.meshes[0];
-    this._accessoryRoot = root;
-    if (this._headBone && this._base?.bodyMesh) {
-      root.attachToBone(this._headBone, this._base.bodyMesh);
+    this._attachRoots[slot] = root;
+    const bone = this._slotBones[slot] ?? this._headBone;
+    if (bone && this._base?.bodyMesh) {
+      root.attachToBone(bone, this._base.bodyMesh);
     } else {
       root.parent = this.modelRoot;
     }
@@ -170,14 +206,20 @@ export default class DriverCharacter {
   }
 
   async _applyConfigNow(partial, initial = false) {
+    if (partial.accessory !== undefined) {        // legacy key → face slot
+      partial = { ...partial, face: partial.accessory };
+      delete partial.accessory;
+    }
     const prev    = this._config;
     const next    = { ...prev, ...partial };
     const changed = k => initial || next[k] !== prev[k];
     this._config  = next;
 
-    if (changed('body'))                       await this._loadBase(next.body);
-    if (changed('body') || changed('head'))    await this._setHead(next.head);
-    if (changed('body') || changed('accessory')) await this._setAccessory(next.accessory);
+    if (changed('body'))                    await this._loadBase(next.body);
+    if (changed('body') || changed('head')) await this._setHead(next.head);
+    for (const slot of Object.keys(ATTACH_SLOTS)) {
+      if (changed('body') || changed(slot)) await this._setAttachment(slot, next[slot]);
+    }
     return { ...this._config };
   }
 
@@ -223,7 +265,8 @@ export default class DriverCharacter {
   dispose() {
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup',   this._onKeyUp);
-    if (this._accessoryRoot) this._accessoryRoot.dispose(false, true);
+    for (const r of Object.values(this._attachRoots)) r?.dispose(false, true);
+    this._attachRoots = {};
     this._disposeBase();
     this.modelRoot.dispose();
     this.mesh.dispose();
