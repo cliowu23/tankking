@@ -8,7 +8,7 @@ import bpy
 import math
 
 # Head shell references (match char_wardrobe HW/HD/HTOP)
-HX, HY, HTOP = 0.158, 0.138, 0.250
+HX, HY, HTOP = 0.234, 0.164, 0.205   # Kenney-proportioned head
 
 
 def lock(points, radius=0.034, tip=0.25, bevel_res=1, res_u=4):

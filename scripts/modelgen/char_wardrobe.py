@@ -19,7 +19,7 @@ HAIR_COLORS = {  # vibrant set (grey benched; red in, per art critique)
 SKIN_TONES = ['#f6d7b8', '#eebb94', '#dd9d6b', '#c08152', '#9c6240', '#7a4a30', '#5d3a26', '#43291b']
 
 # Head-box fit constants (bone-local)
-HW, HD, HTOP, HBOT = 0.146, 0.126, 0.250, 0.010
+HW, HD, HTOP, HBOT = 0.222, 0.152, 0.205, -0.090   # Kenney-proportioned head (bone-local)
 
 
 def soften(obj, levels=2):
@@ -60,8 +60,8 @@ def hpiece(c, sz, col, name):
     return o
 
 
-def hair_shell(col, hairline, cz=0.165, hz=0.115, shx=0.165, shy=0.145,
-               side_cut=-0.04, nape_cut=-0.105, thick=0.024, bump=0.0, name='hair_shell'):
+def hair_shell(col, hairline, cz=0.075, hz=0.145, shx=0.242, shy=0.172,
+               side_cut=-0.005, nape_cut=-0.062, thick=0.028, bump=0.0, name='hair_shell'):
     bpy.ops.mesh.primitive_cube_add(location=(0, 0.012, cz))
     o = bpy.context.object
     o.name = name
@@ -74,9 +74,9 @@ def hair_shell(col, hairline, cz=0.165, hz=0.115, shx=0.165, shy=0.145,
 
     def keep(c):
         x, y, z = c.x, c.y - 0.012, c.z - cz
-        if y < -0.09 and z < hairline(x):
+        if y < -0.11 and z < hairline(x):
             return False
-        if z < side_cut and y < 0.05:
+        if z < side_cut and y < 0.06:
             return False
         if z < nape_cut:
             return False
@@ -111,140 +111,140 @@ def hair_shell(col, hairline, cz=0.165, hz=0.115, shx=0.165, shy=0.145,
 
 
 def hair_short(col):                               # classic arc hairline
-    hair_shell(col, lambda x: 0.030 + 2.2 * x * x)
+    hair_shell(col, lambda x: 0.095 + 1.1 * x * x)
 
 
 def hair_side(col):                                # the proven diagonal sweep
-    hair_shell(col, lambda x: 0.055 - 0.30 * x)
+    hair_shell(col, lambda x: 0.118 - 0.22 * x)
 
 
 def hair_bob(col):                                 # blunt low fringe + deep curtains
-    hair_shell(col, lambda x: -0.050, cz=0.145, hz=0.15,
-               side_cut=-0.135, nape_cut=-0.142, thick=0.028)
+    hair_shell(col, lambda x: 0.092, cz=0.055, hz=0.175,
+               side_cut=-0.095, nape_cut=-0.112, thick=0.032)
 
 
 def hair_pony(col):                                # arc hairline + bun + thick tail
-    hair_shell(col, lambda x: 0.038 + 1.8 * x * x)
-    hpiece((0, HY + 0.03, 0.235), (0.085, 0.085, 0.075), col, 'hair_bun')
-    o = lock([(0, HY + 0.04, 0.23), (0, HY + 0.09, 0.15),
-              (0, HY + 0.085, 0.05), (0, HY + 0.05, -0.015)], radius=0.045, tip=0.3)
+    hair_shell(col, lambda x: 0.105 + 1.0 * x * x)
+    hpiece((0, HY + 0.035, 0.185), (0.10, 0.10, 0.085), col, 'hair_bun')
+    o = lock([(0, HY + 0.05, 0.175), (0, HY + 0.105, 0.09),
+              (0, HY + 0.10, -0.02), (0, HY + 0.06, -0.09)], radius=0.05, tip=0.3)
     o.name = 'hair_tail'
     tint(o, col)
     o.data.materials.append(char_material())
-    box((0, HY + 0.038, 0.20), (0.09, 0.08, 0.026), DARK, 'hair_tie')
+    box((0, HY + 0.045, 0.145), (0.10, 0.09, 0.03), DARK, 'hair_tie')
 
 
 def hair_curly(col):                               # shell + noise puff
-    hair_shell(col, lambda x: 0.028 + 2.0 * x * x, hz=0.125, thick=0.040, bump=0.022)
+    hair_shell(col, lambda x: 0.090 + 1.0 * x * x, hz=0.16, thick=0.048, bump=0.026)
 
 
 # ── HEADWEAR (6) — box shells over the hair envelope ────────────────────────
 WX, WY = HW + 0.034, HD + 0.034          # hat shell half-extents (covers hair tops)
 
 def hw_tanker_cap(col=(0.62, 0.40, 0.18, 1)):
-    box((0, 0.005, 0.315), (2 * WX, 2 * WY, 0.115), col, 'hat_crown')
-    box((0, 0.005, 0.235), (2 * WX + 0.014, 2 * WY + 0.014, 0.055), col, 'hat_band')
+    box((0, 0.005, 0.225), (2 * WX, 2 * WY, 0.125), col, 'hat_crown')
+    box((0, 0.005, 0.145), (2 * WX + 0.014, 2 * WY + 0.014, 0.06), col, 'hat_band')
     for i, x in ((0, -0.075), (1, 0.0), (2, 0.075)):
-        box((x, 0.005, 0.378), (0.035, 2 * WY - 0.02, 0.024), col, f'hat_rib_{i}')
+        box((x, 0.005, 0.293), (0.04, 2 * WY - 0.02, 0.026), col, f'hat_rib_{i}')
     for sx in (-1, 1):
-        box((sx * (WX + 0.012), 0.015, 0.15), (0.028, 0.12, 0.16), col, f'hat_earflap_{sx}')
+        box((sx * (WX + 0.012), 0.015, 0.045), (0.03, 0.13, 0.17), col, f'hat_earflap_{sx}')
 
 
 def hw_helmet(col=(0.42, 0.58, 0.30, 1)):
-    box((0, 0.005, 0.315), (2 * WX + 0.01, 2 * WY + 0.01, 0.12), col, 'helmet_pot')
-    box((0, 0.005, 0.243), (2 * WX + 0.045, 2 * WY + 0.045, 0.035), col, 'helmet_rim')
+    box((0, 0.005, 0.225), (2 * WX + 0.01, 2 * WY + 0.01, 0.13), col, 'helmet_pot')
+    box((0, 0.005, 0.15), (2 * WX + 0.045, 2 * WY + 0.045, 0.04), col, 'helmet_rim')
 
 
 def hw_beanie(col=(0.92, 0.25, 0.20, 1)):
-    box((0, 0.005, 0.31), (2 * WX - 0.01, 2 * WY - 0.01, 0.10), col, 'beanie_dome')
-    box((0, 0.005, 0.243), (2 * WX + 0.01, 2 * WY + 0.01, 0.055), col, 'beanie_fold')
-    box((0, 0.005, 0.385), (0.055, 0.055, 0.05), (0.96, 0.92, 0.80, 1), 'beanie_pom')
+    box((0, 0.005, 0.22), (2 * WX - 0.01, 2 * WY - 0.01, 0.11), col, 'beanie_dome')
+    box((0, 0.005, 0.15), (2 * WX + 0.01, 2 * WY + 0.01, 0.06), col, 'beanie_fold')
+    box((0, 0.005, 0.30), (0.06, 0.06, 0.055), (0.96, 0.92, 0.80, 1), 'beanie_pom')
 
 
 def hw_headset(col=DARK):
     acc = (0.95, 0.62, 0.10, 1)
-    box((0, 0.005, 0.345), (0.34, 0.05, 0.035), col, 'headset_band')
+    box((0, 0.005, 0.26), (0.46, 0.055, 0.04), col, 'headset_band')
     for sx in (-1, 1):
-        box((sx * 0.18, 0.005, 0.21), (0.03, 0.05, 0.25), col, f'headset_arm_{sx}')
-        box((sx * 0.19, 0.005, 0.075), (0.045, 0.095, 0.10), acc, f'headset_cup_{sx}')
-    box((-0.165, -0.085, 0.05), (0.02, 0.13, 0.02), col, 'headset_boom')
-    box((-0.16, -0.15, 0.04), (0.04, 0.04, 0.035), acc, 'headset_mic')
+        box((sx * 0.245, 0.005, 0.13), (0.035, 0.055, 0.26), col, f'headset_arm_{sx}')
+        box((sx * 0.255, 0.005, 0.01), (0.05, 0.105, 0.11), acc, f'headset_cup_{sx}')
+    box((-0.225, -0.10, -0.01), (0.022, 0.15, 0.022), col, 'headset_boom')
+    box((-0.215, -0.175, -0.02), (0.045, 0.045, 0.04), acc, 'headset_mic')
 
 
 def hw_goggles_up(col=(0.55, 0.35, 0.15, 1)):
     lens = (0.35, 0.80, 0.85, 1)
-    box((0, 0.005, 0.272), (2 * HX + 0.02, 2 * HY + 0.02, 0.045), DARK, 'goggle_strap')
+    box((0, 0.005, 0.175), (2 * HX + 0.02, 2 * HY + 0.02, 0.05), DARK, 'goggle_strap')
     for sx in (-1, 1):
-        box((sx * 0.062, -HY - 0.02, 0.272), (0.085, 0.04, 0.07), col, f'goggle_frame_{sx}')
-        box((sx * 0.062, -HY - 0.042, 0.272), (0.062, 0.012, 0.05), lens, f'goggle_lens_{sx}')
+        box((sx * 0.085, -HY - 0.025, 0.175), (0.10, 0.045, 0.08), col, f'goggle_frame_{sx}')
+        box((sx * 0.085, -HY - 0.05, 0.175), (0.075, 0.014, 0.06), lens, f'goggle_lens_{sx}')
 
 
 def hw_ushanka(col=(0.72, 0.46, 0.24, 1)):
     fur = (0.94, 0.88, 0.74, 1)
-    box((0, 0.005, 0.315), (2 * WX, 2 * WY, 0.11), col, 'ushanka_crown')
-    box((0, 0.005, 0.245), (2 * WX + 0.025, 2 * WY + 0.025, 0.06), fur, 'ushanka_furband')
+    box((0, 0.005, 0.225), (2 * WX, 2 * WY, 0.12), col, 'ushanka_crown')
+    box((0, 0.005, 0.15), (2 * WX + 0.025, 2 * WY + 0.025, 0.065), fur, 'ushanka_furband')
     for sx in (-1, 1):
-        box((sx * (WX + 0.02), 0.02, 0.135), (0.045, 0.13, 0.22), fur, f'ushanka_flap_{sx}')
-    box((0, -WY - 0.02, 0.30), (0.16, 0.055, 0.03), fur, 'ushanka_frontflap')
+        box((sx * (WX + 0.02), 0.02, 0.03), (0.05, 0.14, 0.23), fur, f'ushanka_flap_{sx}')
+    box((0, -WY - 0.02, 0.21), (0.20, 0.06, 0.034), fur, 'ushanka_frontflap')
 
 
 # ── FACE (5) — unchanged style (user-approved as great), brighter accents ───
 def face_glasses(col=DARK):
     for sx in (-1, 1):
-        box((sx * 0.062, -0.138, 0.145), (0.075, 0.014, 0.06), col, f'glasses_rim_{sx}')
-        box((sx * 0.062, -0.142, 0.145), (0.055, 0.01, 0.042), (0.72, 0.88, 0.92, 1), f'glasses_lens_{sx}')
-        box((sx * 0.105, -0.04, 0.152), (0.012, 0.19, 0.012), col, f'glasses_arm_{sx}')
-    box((0, -0.138, 0.152), (0.05, 0.012, 0.012), col, 'glasses_bridge')
+        box((sx * 0.10, -0.168, 0.045), (0.095, 0.016, 0.075), col, f'glasses_rim_{sx}')
+        box((sx * 0.10, -0.172, 0.045), (0.072, 0.012, 0.055), (0.72, 0.88, 0.92, 1), f'glasses_lens_{sx}')
+        box((sx * 0.165, -0.04, 0.055), (0.014, 0.24, 0.014), col, f'glasses_arm_{sx}')
+    box((0, -0.168, 0.055), (0.065, 0.014, 0.014), col, 'glasses_bridge')
 
 
 def face_shades(col=DARK):
     for sx in (-1, 1):
-        box((sx * 0.062, -0.138, 0.145), (0.075, 0.018, 0.055), col, f'shades_lens_{sx}')
-        box((sx * 0.105, -0.04, 0.152), (0.012, 0.19, 0.012), col, f'shades_arm_{sx}')
-    box((0, -0.138, 0.155), (0.05, 0.014, 0.014), col, 'shades_bridge')
+        box((sx * 0.10, -0.168, 0.045), (0.095, 0.02, 0.07), col, f'shades_lens_{sx}')
+        box((sx * 0.165, -0.04, 0.055), (0.014, 0.24, 0.014), col, f'shades_arm_{sx}')
+    box((0, -0.168, 0.058), (0.065, 0.016, 0.016), col, 'shades_bridge')
 
 
 def face_mask(col=(0.88, 0.86, 0.78, 1)):
-    box((0, -0.128, 0.085), (0.165, 0.055, 0.105), col, 'mask_body')
+    box((0, -0.162, -0.015), (0.23, 0.06, 0.13), col, 'mask_body')
     for sx in (-1, 1):
-        box((sx * 0.11, -0.04, 0.10), (0.012, 0.18, 0.012), DARK, f'mask_strap_{sx}')
+        box((sx * 0.17, -0.04, 0.0), (0.014, 0.23, 0.014), DARK, f'mask_strap_{sx}')
 
 
 def face_beard(col):
-    box((0, -0.118, 0.025), (0.175, 0.06, 0.115), col, 'beard_chin')
+    box((0, -0.15, -0.065), (0.25, 0.065, 0.13), col, 'beard_chin')
     for sx in (-1, 1):
-        box((sx * 0.105, -0.095, 0.075), (0.035, 0.05, 0.105), col, f'beard_cheek_{sx}')
-    box((0, -0.137, 0.098), (0.095, 0.03, 0.028), col, 'beard_stache')
+        box((sx * 0.155, -0.12, -0.01), (0.045, 0.055, 0.12), col, f'beard_cheek_{sx}')
+    box((0, -0.168, 0.0), (0.13, 0.034, 0.032), col, 'beard_stache')
 
 
 def face_stache(col):
-    box((0, -0.135, 0.098), (0.10, 0.03, 0.03), col, 'stache')
+    box((0, -0.166, 0.0), (0.135, 0.034, 0.034), col, 'stache')
     for sx in (-1, 1):
-        box((sx * 0.058, -0.132, 0.092), (0.025, 0.026, 0.024), col, f'stache_tip_{sx}', rot=(0, sx * 0.3, 0))
+        box((sx * 0.078, -0.162, -0.007), (0.03, 0.03, 0.028), col, f'stache_tip_{sx}', rot=(0, sx * 0.3, 0))
 
 
 # ── BACK (3) — toolpack kept (approved); satchel + bedroll rebuilt snug/cubic ─
 def back_toolpack(col=(0.78, 0.52, 0.20, 1)):
-    box((0, 0.165, 0.07), (0.21, 0.10, 0.23), col, 'pack_body')
-    box((0, 0.16, 0.165), (0.215, 0.105, 0.05), DARK, 'pack_flap')
-    box((0.05, 0.165, 0.225), (0.022, 0.022, 0.09), DARK, 'pack_wrench')
+    box((0, 0.195, 0.04), (0.26, 0.11, 0.25), col, 'pack_body')
+    box((0, 0.19, 0.145), (0.265, 0.115, 0.055), DARK, 'pack_flap')
+    box((0.06, 0.195, 0.21), (0.025, 0.025, 0.10), DARK, 'pack_wrench')
     for sx in (-1, 1):
-        box((sx * 0.07, 0.10, 0.07), (0.03, 0.04, 0.20), DARK, f'pack_strap_{sx}')
+        box((sx * 0.09, 0.125, 0.04), (0.035, 0.045, 0.22), DARK, f'pack_strap_{sx}')
 
 
 def back_satchel(col=(0.85, 0.50, 0.18, 1)):
-    box((0, 0.155, 0.02), (0.20, 0.075, 0.15), col, 'satchel_body')
-    box((0, 0.158, 0.075), (0.205, 0.08, 0.05), DARK, 'satchel_flap')
-    box((0, 0.16, -0.02), (0.06, 0.082, 0.035), DARK, 'satchel_clasp')
+    box((0, 0.19, -0.01), (0.25, 0.08, 0.16), col, 'satchel_body')
+    box((0, 0.193, 0.05), (0.255, 0.085, 0.055), DARK, 'satchel_flap')
+    box((0, 0.195, -0.05), (0.07, 0.088, 0.04), DARK, 'satchel_clasp')
     for sx in (-1, 1):
-        box((sx * 0.065, 0.10, 0.07), (0.028, 0.04, 0.18), DARK, f'satchel_strap_{sx}')
+        box((sx * 0.085, 0.125, 0.03), (0.032, 0.045, 0.20), DARK, f'satchel_strap_{sx}')
 
 
 def back_bedroll(col=(0.36, 0.70, 0.38, 1)):
-    box((0, 0.16, 0.17), (0.27, 0.095, 0.095), col, 'bedroll_body')
+    box((0, 0.195, 0.135), (0.33, 0.10, 0.10), col, 'bedroll_body')
     for sx in (-1, 1):
-        box((sx * 0.085, 0.16, 0.17), (0.03, 0.105, 0.105), DARK, f'bedroll_strap_{sx}')
-        box((sx * 0.142, 0.16, 0.17), (0.014, 0.08, 0.08), (0.96, 0.92, 0.80, 1), f'bedroll_end_{sx}')
+        box((sx * 0.105, 0.195, 0.135), (0.035, 0.11, 0.11), DARK, f'bedroll_strap_{sx}')
+        box((sx * 0.172, 0.195, 0.135), (0.016, 0.085, 0.085), (0.96, 0.92, 0.80, 1), f'bedroll_end_{sx}')
 
 
 PIECES = [
