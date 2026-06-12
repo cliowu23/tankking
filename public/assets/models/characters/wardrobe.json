@@ -77,6 +77,11 @@
           "id": "body-jacket-orange",
           "cw": "orange",
           "hex": "#f27f1e"
+        },
+        {
+          "id": "body-jacket-tan",
+          "cw": "tan",
+          "hex": "#c4a872"
         }
       ]
     },
@@ -93,6 +98,16 @@
           "id": "body-overalls-green",
           "cw": "green",
           "hex": "#3da84c"
+        },
+        {
+          "id": "body-overalls-navy",
+          "cw": "navy",
+          "hex": "#1e2f6e"
+        },
+        {
+          "id": "body-overalls-olive",
+          "cw": "olive",
+          "hex": "#6b7c3a"
         }
       ]
     },
@@ -104,6 +119,11 @@
           "id": "body-vest-rust",
           "cw": "rust",
           "hex": "#d86b26"
+        },
+        {
+          "id": "body-vest-brown",
+          "cw": "brown",
+          "hex": "#7a4e2e"
         }
       ]
     },
@@ -115,6 +135,11 @@
           "id": "body-medic-white",
           "cw": "white",
           "hex": "#f2f2ed"
+        },
+        {
+          "id": "body-medic-cream",
+          "cw": "cream",
+          "hex": "#e8d9b8"
         }
       ]
     },
@@ -131,6 +156,16 @@
           "id": "body-telogreika-mustard",
           "cw": "mustard",
           "hex": "#e5ad23"
+        },
+        {
+          "id": "body-telogreika-grey",
+          "cw": "grey",
+          "hex": "#808080"
+        },
+        {
+          "id": "body-telogreika-khaki",
+          "cw": "khaki",
+          "hex": "#b8a86a"
         }
       ]
     },
@@ -147,6 +182,11 @@
           "id": "body-workshirt-yellow",
           "cw": "yellow",
           "hex": "#efc633"
+        },
+        {
+          "id": "body-workshirt-sand",
+          "cw": "sand",
+          "hex": "#d4b896"
         }
       ]
     }
