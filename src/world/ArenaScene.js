@@ -95,14 +95,46 @@ export default class ArenaScene {
     this.dirLight.position  = new Vector3(12, 20, 12);
 
     this.shadowGen = new ShadowGenerator(2048, this.dirLight);
-    this.shadowGen.useBlurExponentialShadowMap = true;
     this.shadowGen.bias       = 0.0001;
     this.shadowGen.normalBias = 0.02;
+    // Mac/Chrome (ANGLE→Metal) renders blur-ESM float-texture shadow maps BLANK,
+    // which reads as "no shadows". Default to the basic depth map + Poisson sampling
+    // (a plain depth texture ANGLE handles reliably). Cycle types live from the console:
+    //   window.__arena.setShadowType('basic'|'poisson'|'pcf'|'pcss'|'blur-esm')
+    this.setShadowType('poisson');
 
     // Warm green bounce from below — grass reflection
     const fillLight = new HemisphericLight('fill', new Vector3(0, -1, 0), this.scene);
     fillLight.diffuse   = new Color3(0.20, 0.45, 0.10);
     fillLight.intensity = 0.15;
+  }
+
+  // Live shadow-map filter switch — diagnoses which type actually renders on a
+  // given GPU. Mac/ANGLE chokes on float-texture ESM; basic/poisson/pcf use plain
+  // depth textures. Call from the console: window.__arena.setShadowType('pcf').
+  setShadowType(type) {
+    const sg = this.shadowGen;
+    if (!sg) return type;
+    sg.useBlurExponentialShadowMap      = false;
+    sg.useExponentialShadowMap          = false;
+    sg.useBlurCloseExponentialShadowMap = false;
+    sg.useCloseExponentialShadowMap     = false;
+    sg.usePoissonSampling               = false;
+    sg.usePercentageCloserFiltering     = false;
+    sg.useContactHardeningShadow        = false;
+    switch (type) {
+      case 'basic':    break;                                    // hard depth map — most compatible
+      case 'poisson':  sg.usePoissonSampling = true; break;      // soft, depth-based, compatible
+      case 'pcf':      sg.usePercentageCloserFiltering = true;
+                       sg.filteringQuality = ShadowGenerator.QUALITY_HIGH; break;
+      case 'pcss':     sg.useContactHardeningShadow = true;
+                       sg.contactHardeningLightSizeUVRatio = 0.06; break;
+      case 'blur-esm': sg.useBlurExponentialShadowMap = true; break; // the type that fails on Mac
+      default:         sg.usePoissonSampling = true; type = 'poisson'; break;
+    }
+    this._shadowType = type;
+    console.log('[shadow] type =', type, '— do you see tank/tree shadows on the ground?');
+    return type;
   }
 
   _setupGround() {

@@ -43,16 +43,27 @@ export default class LightTankEnemy extends AIEnemy {
     this._barrelBaseZ = this.barrelPivot.position.z;
     this._tipOffset   = this._measureTip(cannonBuilt.meshes);
 
+    // makePaintMaterial caches by colour, so all red enemies come back sharing ONE
+    // material instance — mutating it on death would darken every tank. Clone each
+    // distinct material to a per-enemy instance and reassign, so the death tint
+    // stays isolated to this enemy (dedupe within the enemy via cloneByShared).
+    const uid = (LightTankEnemy._instanceCount = (LightTankEnemy._instanceCount ?? 0) + 1);
+    const cloneByShared = new Map();
     for (const m of this._allMeshes) {
       m.isPickable = false;
-      const mat = m.material;
-      if (mat && !this._matStates.some(s => s.mat === mat)) {
+      const shared = m.material;
+      if (!shared) continue;
+      let mine = cloneByShared.get(shared);
+      if (!mine) {
+        mine = shared.clone(`${shared.name}__e${uid}`);
+        cloneByShared.set(shared, mine);
         this._matStates.push({
-          mat,
-          d: mat.diffuseColor?.clone() ?? null,
-          e: mat.emissiveColor?.clone() ?? null,
+          mat: mine,
+          d: mine.diffuseColor?.clone() ?? null,
+          e: mine.emissiveColor?.clone() ?? null,
         });
       }
+      m.material = mine;
     }
 
     // Raise the hp bar above the composed silhouette.
