@@ -104,6 +104,8 @@ export function makeMats(s) {
   const screenDark = new StandardMaterial('prop-screen-dark', s);
   screenDark.diffuseColor = new Color3(0.04, 0.06, 0.05);
 
+  // Props stay flat-coloured — tiling textures smear on small primitive meshes;
+  // their grounding comes from the blob shadows, not surface texture.
   const all = { wood, metal, darkGreen, crate, parchment, darkMetal, redInd, olive, lampGlow,
                 plankDark, crateMed, crateLight, screenDark, blob: makeBlobMat(s) };
   // Lift the per-material light cap (StandardMaterial defaults to 4) so accent

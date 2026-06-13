@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TanKING — Ground Texture Explorer</title>
+<!--
+  Ground & world texture exploration — 6 approaches rendered live in Babylon.js.
+  Run: cd game && python3 -m http.server 8788  →  http://localhost:8788/ground-explorer.html
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07070a; font-family: monospace; }
+  #c { display: block; width: 100%; height: 100%; }
+  #ui { position: absolute; top: 14px; left: 14px; z-index: 10; display: flex; flex-direction: column; gap: 4px; width: 240px; }
+  h1 { color: #00e5ff; font-size: 11px; letter-spacing: 3px; margin: 0 0 6px;
+       background: rgba(0,8,20,0.93); border: 1px solid #00e5ff44; padding: 8px 12px; }
+  button {
+    background: rgba(0,8,20,0.88); color: #7fc8d4; border: 1px solid #00e5ff22;
+    font-family: monospace; font-size: 10px; letter-spacing: 1px;
+    padding: 8px 12px; cursor: pointer; text-align: left; transition: background 0.1s;
+  }
+  button:hover { background: rgba(0,40,60,0.9); color: #ddfff8; border-color: #00e5ff55; }
+  button.on { background: rgba(0,80,45,0.9); color: #6eff9b; border-color: #6eff9b88; }
+  #desc {
+    background: rgba(0,8,20,0.93); border: 1px solid #00e5ff22;
+    padding: 10px 12px; color: #9bdfe8; font-size: 10px; line-height: 1.65;
+    margin-top: 4px;
+  }
+  #desc b { color: #00e5ff; }
+  #hint { position: absolute; bottom: 12px; left: 14px; color: #4a6b72; font-size: 9px; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>GROUND EXPLORER</h1>
+</div>
+<div id="hint">drag to orbit · scroll to zoom · http://localhost:8788/ground-explorer.html</div>
+<canvas id="c"></canvas>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const engine = new BABYLON.Engine(canvas, true, { antialias: true });
+const scene  = new BABYLON.Scene(engine);
+
+// ── Camera — match game angle ───────────────────────────────────────────────
+const cam = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, 0.42, 55, BABYLON.Vector3.Zero(), scene);
+cam.lowerRadiusLimit = 18; cam.upperRadiusLimit = 95;
+cam.lowerBetaLimit   = 0.1; cam.upperBetaLimit  = 1.3;
+cam.attachControl(canvas, true);
+
+// ── Lighting — matches ArenaScene.js exactly ────────────────────────────────
+scene.clearColor = new BABYLON.Color4(0.53, 0.81, 0.92, 1);
+const ambient = new BABYLON.HemisphericLight('amb', new BABYLON.Vector3(0,1,0), scene);
+ambient.intensity   = 0.85;
+ambient.diffuse     = new BABYLON.Color3(1.0, 0.97, 0.88);
+ambient.groundColor = new BABYLON.Color3(0.28, 0.52, 0.10);
+const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(0.15,-1,0.12), scene);
+sun.intensity = 0.65;
+sun.position  = new BABYLON.Vector3(12, 20, 12);
+const shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+shadowGen.useBlurExponentialShadowMap = true;
+
+// ── Ground (80×80, 80 subdivisions — enough verts for smooth vertex colors) ─
+const ground = BABYLON.MeshBuilder.CreateGround('ground', {
+  width: 80, height: 80, subdivisions: 80, updatable: false
+}, scene);
+ground.receiveShadows = true;
+const mat = new BABYLON.StandardMaterial('gnd', scene);
+mat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+mat.diffuseColor  = new BABYLON.Color3(0.42, 0.75, 0.31);
+ground.material   = mat;
+
+// ── Scene dressing — path, hedgerow, trees, tank, rocks ────────────────────
+const mk = (col, spec = 0.02) => {
+  const m = new BABYLON.StandardMaterial('_m' + Math.random(), scene);
+  m.diffuseColor  = new BABYLON.Color3(...col);
+  m.specularColor = new BABYLON.Color3(spec, spec, spec);
+  return m;
+};
+const box = (w,h,d,x,y,z,m,ry=0) => {
+  const b = BABYLON.MeshBuilder.CreateBox('b',{width:w,height:h,depth:d},scene);
+  b.position.set(x,y,z); b.rotation.y=ry; b.material=m; return b;
+};
+const sph = (dia,x,y,z,m,sx=1,sy=1,sz=1) => {
+  const s = BABYLON.MeshBuilder.CreateSphere('s',{diameter:dia,segments:7},scene);
+  s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=m; return s;
+};
+const cyl = (dia,h,x,y,z,m,t=8) => {
+  const c = BABYLON.MeshBuilder.CreateCylinder('c',{diameter:dia,height:h,tessellation:t},scene);
+  c.position.set(x,y,z); c.material=m; return c;
+};
+
+// Path (main dirt strip)
+const pMat = mk([0.77,0.66,0.51]);
+const pathStrip = box(5,0.09,80, 0,0.055,0, pMat);
+pathStrip.receiveShadows = true;
+
+// Hedgerow (NW cluster)
+const hedgeMat   = mk([0.18,0.40,0.15]);
+const foliageMat = mk([0.26,0.52,0.20]);
+foliageMat.emissiveColor = new BABYLON.Color3(0.06,0.12,0.02);
+const hedgeG = new BABYLON.TransformNode('hg', scene);
+hedgeG.position.set(-24, 0, -8); hedgeG.rotation.y = 0.2;
+const hedgeBase = box(2.2,1.7,22, 0,0.85,0, hedgeMat);
+hedgeBase.parent = hedgeG;
+shadowGen.addShadowCaster(hedgeBase);
+for (let k=0;k<5;k++) {
+  const p = sph(4.4, (k%2?.5:-.4), 1.9, -9+k*4.6, foliageMat, 1, 0.72, 1.15);
+  p.parent = hedgeG; shadowGen.addShadowCaster(p);
+}
+
+// Trees
+const trunkMat  = mk([0.34,0.24,0.13]);
+const blobMat2  = mk([0.26,0.52,0.20]);
+blobMat2.emissiveColor = new BABYLON.Color3(0.04,0.10,0.01);
+const treeDefs = [[22,14],[-10,20],[30,-18],[-22,4],[9,-28],[34,20],[-8,34]];
+for (const [tx,tz] of treeDefs) {
+  const t = cyl(0.7,2.6,tx,1.3,tz,trunkMat,7); shadowGen.addShadowCaster(t);
+  const a = sph(3.6,tx,3.4,tz,blobMat2); shadowGen.addShadowCaster(a);
+  const b = sph(2.8,tx+.9,4.3,tz+.4,blobMat2); shadowGen.addShadowCaster(b);
+}
+
+// Tank
+const tankMat = mk([0.28,0.38,0.22], 0.05);
+const hull    = box(3,1,4.5, 10,0.5,-5, tankMat, 0.5);
+const turret  = box(2,0.8,2.5, 10.2,1.4,-4.6, tankMat, 0.65);
+const gun     = cyl(0.28,3.5, 10.2,1.6,-3.2, tankMat);
+gun.rotation.x = Math.PI/2; gun.rotation.y = 0.65;
+for (const m of [hull,turret,gun]) shadowGen.addShadowCaster(m);
+
+// Rocks
+const rockMat = mk([0.62,0.58,0.52]);
+for (const [rx,rz,sc] of [[-15,-12,1],[22,8,.7],[-5,30,1.3],[15,-35,.85]]) {
+  const r = sph(2.4,rx,0.6,rz,rockMat,1.3*sc,0.7*sc,1.0*sc);
+  shadowGen.addShadowCaster(r);
+}
+
+// Ruined store corner (Clint's)
+const storeMat = mk([0.78,0.72,0.60]);
+const roofMat  = mk([0.16,0.13,0.11]);
+box(8,0.25,7, -34,0.12,-22, mk([0.48,0.45,0.40]));
+box(8,2.6,.4, -34,1.3,-25.3, storeMat);
+box(.4,2.6,4.5, -38,1.3,-23, storeMat);
+box(7.6,.18,5.2, -33.7,1.55,-22, roofMat, 0, 0, 0.62);
+
+// ── Noise helpers ───────────────────────────────────────────────────────────
+function hash(n) {
+  let s = Math.sin(n * 127.1 + n * 0.5) * 43758.5453;
+  return s - Math.floor(s);
+}
+function hash2(x, y) {
+  return hash(x * 127.1 + y * 311.7);
+}
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x-xi, yf = y-yi;
+  const ux = xf*xf*(3-2*xf), uy = yf*yf*(3-2*yf);
+  const a = hash2(xi,yi), b = hash2(xi+1,yi);
+  const c = hash2(xi,yi+1), d = hash2(xi+1,yi+1);
+  return a + (b-a)*ux + (c-a)*uy + (a-b-c+d)*ux*uy;
+}
+function fbm(x, y, oct=4, lac=2.1) {
+  let v=0, a=1, f=1, mx=0;
+  for (let i=0;i<oct;i++) { v+=vnoise(x*f,y*f)*a; mx+=a; a*=0.5; f*=lac; }
+  return v/mx;
+}
+
+// ── Ground manipulation helpers ─────────────────────────────────────────────
+let activeTex = null;
+
+function resetGround() {
+  if (activeTex) { activeTex.dispose(); activeTex = null; }
+  mat.diffuseTexture    = null;
+  mat.vertexColorsEnabled = false;
+  mat.diffuseColor = new BABYLON.Color3(0.42, 0.75, 0.31);
+  // clear vertex colors buffer (all white = no tint)
+  const n = ground.getTotalVertices();
+  ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, new Float32Array(n*4).fill(1), false);
+}
+
+function paintVertexColors(fn) {
+  const pos = ground.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  const n   = pos.length / 3;
+  const col = new Float32Array(n*4);
+  for (let i=0;i<n;i++) {
+    const [r,g,b] = fn(pos[i*3], pos[i*3+2]);
+    col[i*4]=r; col[i*4+1]=g; col[i*4+2]=b; col[i*4+3]=1;
+  }
+  ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, col, false);
+  mat.vertexColorsEnabled = true;
+  mat.diffuseColor = new BABYLON.Color3(1,1,1);
+}
+
+function makeTexture(size, drawFn) {
+  const tex = new BABYLON.DynamicTexture('gt', {width:size,height:size}, scene, false);
+  const ctx = tex.getContext();
+  drawFn(ctx, size);
+  tex.update();
+  tex.wrapU = tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  mat.diffuseTexture = tex;
+  mat.diffuseColor   = new BABYLON.Color3(1,1,1);
+  activeTex = tex;
+  return tex;
+}
+
+// ── 6 Approaches ───────────────────────────────────────────────────────────
+const approaches = [
+  // ── 1. Flat (current state) ──────────────────────────────────────────────
+  {
+    label: '① Flat  (current)',
+    desc: '<b>Baseline — current game state.</b> Single flat color #6BBF4E. Clean and readable but no depth or variation. Good reference point.',
+    apply() { resetGround(); }
+  },
+
+  // ── 2. Noise Vertex Colors ───────────────────────────────────────────────
+  {
+    label: '② Noise vertex colors',
+    desc: '<b>Organic field variation.</b> Layered fractal noise drives subtle color shifts per-vertex. Lighter sunlit patches, cooler dark damp areas, occasional dry yellow-green. Zero texture memory cost — just math.',
+    apply() {
+      resetGround();
+      paintVertexColors((x, z) => {
+        const n1 = fbm(x*0.055, z*0.055, 4);   // large rolling patches
+        const n2 = fbm(x*0.20,  z*0.20+7, 3);  // medium grass clumps
+        const n  = n1*0.6 + n2*0.4;
+        // base World1 green with noise-driven variation
+        let r = 0.42 + (n-0.5)*0.10;
+        let g = 0.75 + (n-0.5)*0.16;
+        let b = 0.31 + (n-0.5)*0.05;
+        // warm dry blend at high noise values
+        const dry = Math.max(0, (n-0.70)*3.5);
+        r += dry*0.14; g += dry*0.02; b -= dry*0.10;
+        return [Math.min(1,r), Math.min(1,g), Math.min(1,b)];
+      });
+    }
+  },
+
+  // ── 3. Soft stipple grain ─────────────────────────────────────────────────
+  {
+    label: '③ Soft stipple grain',
+    desc: '<b>Barely-there organic grain.</b> Multi-scale noise at very low amplitude — ±5% max variation. No hard edges, no grid. Bilinear sampled so everything blurs at camera distance. You feel it more than you see it.',
+    apply() {
+      resetGround();
+      makeTexture(512, (ctx, S) => {
+        const img = ctx.createImageData(S, S);
+        const d   = img.data;
+        for (let y=0;y<S;y++) {
+          for (let x=0;x<S;x++) {
+            // map texture pixel to noise space — gentle multi-scale
+            const nx = x / S * 5.5, ny = y / S * 5.5;
+            const n  = vnoise(nx, ny)*0.55 + vnoise(nx*3.2, ny*3.2)*0.30 + vnoise(nx*8, ny*8)*0.15;
+            // amplitude so small it just barely breaks up the flat color
+            const amp = (n - 0.5) * 0.10;
+            const r = Math.round(Math.min(255, Math.max(0, (0.42 + amp*0.7) * 255)));
+            const g = Math.round(Math.min(255, Math.max(0, (0.75 + amp*1.2) * 255)));
+            const b = Math.round(Math.min(255, Math.max(0, (0.31 + amp*0.4) * 255)));
+            const idx = (y*S+x)*4;
+            d[idx]=r; d[idx+1]=g; d[idx+2]=b; d[idx+3]=255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+      });
+      activeTex.uScale = activeTex.vScale = 1;
+    }
+  },
+
+  // ── 4. Grass stroke texture (refined) ────────────────────────────────────
+  {
+    label: '④ Grass stroke  (refined)',
+    desc: '<b>Three-layer curved grass.</b> Shadow blades → mid blades → highlight tips. Each blade is a quadratic bezier so they curve naturally. Noise density mask makes strokes cluster rather than scatter uniformly. Low contrast throughout.',
+    apply() {
+      resetGround();
+      makeTexture(512, (ctx, S) => {
+        // ── noise-tinted base (very subtle, just breaks up the flat fill) ───
+        const baseImg = ctx.createImageData(S, S);
+        const bd = baseImg.data;
+        for (let y=0;y<S;y++) {
+          for (let x=0;x<S;x++) {
+            const n = vnoise(x*0.032,y*0.032)*0.55 + vnoise(x*0.095,y*0.095)*0.45;
+            const s = (n-0.5)*0.055;
+            const idx=(y*S+x)*4;
+            bd[idx]  =Math.min(255,Math.round((0.36+s*0.5)*255));
+            bd[idx+1]=Math.min(255,Math.round((0.64+s*1.0)*255));
+            bd[idx+2]=Math.min(255,Math.round((0.26+s*0.3)*255));
+            bd[idx+3]=255;
+          }
+        }
+        ctx.putImageData(baseImg,0,0);
+        ctx.lineCap='round';
+
+        // ── curved blade helper ──────────────────────────────────────────────
+        const blade=(x,y,angle,len,w,r,g,b,a)=>{
+          // wind lean derived from position so nearby blades curve the same way
+          const lean=(hash2(x*0.007,y*0.007)-0.5)*len*0.45;
+          ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
+          ctx.lineWidth=w;
+          ctx.beginPath();
+          ctx.moveTo(x,y);
+          ctx.quadraticCurveTo(
+            x+Math.cos(angle)*len*0.5+lean,
+            y+Math.sin(angle)*len*0.55,
+            x+Math.cos(angle)*len+lean*0.65,
+            y+Math.sin(angle)*len
+          );
+          ctx.stroke();
+        };
+
+        // density field — drives which areas get more or fewer strokes
+        const dense=(cx,cy)=>vnoise(cx*0.017,cy*0.017);
+
+        // ── pass 1: shadow blades — dark, wide, most horizontal variation ───
+        for(let k=0;k<300;k++){
+          const cx=hash2(k,20)*S, cy=hash2(k,21)*S;
+          if(dense(cx,cy)<0.28) continue;
+          const n=2+Math.floor(hash2(k,22)*4);
+          for(let j=0;j<n;j++){
+            const ox=(hash2(k+j*.1,23)-.5)*16, oy=(hash2(k+j*.1,24)-.5)*16;
+            const angle=-Math.PI/2+(hash2(k+j,25)-.5)*1.1;
+            blade(cx+ox,cy+oy,angle,9+hash2(k+j,26)*6,2.0+hash2(k+j,27)*.9, 56,108,38,0.38);
+          }
+        }
+
+        // ── pass 2: main blades — mid green, dominant layer ─────────────────
+        for(let k=0;k<520;k++){
+          const cx=hash2(k,30)*S, cy=hash2(k,31)*S;
+          if(dense(cx,cy)<0.16) continue;
+          const n=3+Math.floor(hash2(k,32)*6);
+          for(let j=0;j<n;j++){
+            const ox=(hash2(k+j*.1,33)-.5)*13, oy=(hash2(k+j*.1,34)-.5)*13;
+            const angle=-Math.PI/2+(hash2(k+j,35)-.5)*0.62;
+            blade(cx+ox,cy+oy,angle,5+hash2(k+j,36)*7,0.85+hash2(k+j,37)*.65, 110,192,76,0.57);
+          }
+        }
+
+        // ── pass 3: highlight tips — light, thin, nearly straight up ────────
+        for(let k=0;k<230;k++){
+          const cx=hash2(k,40)*S, cy=hash2(k,41)*S;
+          if(dense(cx,cy)<0.48) continue; // only in denser clumps
+          const n=2+Math.floor(hash2(k,42)*3);
+          for(let j=0;j<n;j++){
+            const ox=(hash2(k+j*.1,43)-.5)*9, oy=(hash2(k+j*.1,44)-.5)*9;
+            const angle=-Math.PI/2+(hash2(k+j,45)-.5)*0.32;
+            blade(cx+ox,cy+oy,angle,4+hash2(k+j,46)*5,0.55+hash2(k+j,47)*.38, 148,222,96,0.44);
+          }
+        }
+      });
+      activeTex.uScale = activeTex.vScale = 3;
+    }
+  },
+
+  // ── 5. Combined — noise + zones ───────────────────────────────────────────
+  {
+    label: '⑤ Combined  noise + zones',
+    desc: '<b>Best of ② and ⑥ merged.</b> Organic noise variation as the base, with zone-aware tint layered on top. Path edges warm to tan, hedge zones deepen, open fields lighten — but all sitting on top of natural noise variation.',
+    apply() {
+      resetGround();
+      paintVertexColors((x, z) => {
+        // ② organic noise base
+        const n1 = fbm(x*0.055, z*0.055, 4);
+        const n2 = fbm(x*0.22,  z*0.22+7, 3);
+        const n  = n1*0.6 + n2*0.4;
+        let r = 0.42 + (n-0.5)*0.10;
+        let g = 0.75 + (n-0.5)*0.16;
+        let b = 0.31 + (n-0.5)*0.05;
+        const dry = Math.max(0, (n-0.70)*3.5);
+        r += dry*0.12; g += dry*0.01; b -= dry*0.08;
+
+        // ⑥ zone tint on top — slightly pulled back so noise still reads through
+        const pathW  = Math.max(0, 1 - Math.abs(x)/5.5);
+        r += pathW*(0.60-r)*0.55;
+        g += pathW*(0.58-g)*0.55;
+        b += pathW*(0.36-b)*0.55;
+        const hedgeW = Math.max(0, 1-(x+24)/12) * Math.max(0, 1-Math.abs(z+8)/16);
+        r -= hedgeW*0.07; g += hedgeW*0.06; b += hedgeW*0.01;
+        const northW = Math.max(0, (z-10)/28);
+        r += northW*0.05; g += northW*0.03; b += northW*0.01;
+
+        return [Math.max(0,Math.min(1,r)), Math.max(0,Math.min(1,g)), Math.max(0,Math.min(1,b))];
+      });
+    }
+  },
+
+  // ── 6. Ground Zone Tint ───────────────────────────────────────────────────
+  {
+    label: '⑥ Ground zone tint',
+    desc: '<b>Contextual terrain storytelling.</b> Vertex colours reflect what\'s happening on the ground: worn tan near the path, dark lush green in shadowed hedge zones, lighter washed-out green in open sunlit fields. The ground reads like a map legend.',
+    apply() {
+      resetGround();
+      paintVertexColors((x, z) => {
+        const base_n = fbm(x*0.07, z*0.07, 3);      // gentle base variation
+        // open field — slight sun variation
+        let r = 0.42 + (base_n-0.5)*0.06;
+        let g = 0.75 + (base_n-0.5)*0.10;
+        let b = 0.31 + (base_n-0.5)*0.03;
+        // near path (x ≈ 0) → warm tan earth blend
+        const pathW = Math.max(0, 1 - Math.abs(x)/5.5);
+        r += pathW*(0.62-r)*0.7;
+        g += pathW*(0.60-g)*0.7;
+        b += pathW*(0.38-b)*0.7;
+        // hedge zone (west side) → darker, richer
+        const hedgeW = Math.max(0, 1-(x+24)/12) * Math.max(0, 1-Math.abs(z+8)/16);
+        r -= hedgeW*0.09; g += hedgeW*0.07; b += hedgeW*0.02;
+        // open north field → slightly lighter/sunwashed
+        const northW = Math.max(0, (z-10)/28);
+        r += northW*0.06; g += northW*0.04; b += northW*0.02;
+        return [Math.max(0,Math.min(1,r)), Math.max(0,Math.min(1,g)), Math.max(0,Math.min(1,b))];
+      });
+    }
+  }
+];
+
+// ── Path texture helpers ─────────────────────────────────────────────────────
+let activePTex = null;
+function resetPath() {
+  if (activePTex) { activePTex.dispose(); activePTex = null; }
+  pMat.diffuseTexture = null;
+  pMat.diffuseColor   = new BABYLON.Color3(0.77, 0.66, 0.51);
+}
+function makePathTex(size, drawFn) {
+  const tex = new BABYLON.DynamicTexture('pt', {width:size,height:size}, scene, false);
+  drawFn(tex.getContext(), size);
+  tex.update();
+  tex.wrapU = tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  pMat.diffuseTexture = tex;
+  pMat.diffuseColor   = new BABYLON.Color3(1,1,1);
+  activePTex = tex;
+  return tex;
+}
+
+// Path approaches — U = across 5-unit width, V tiles along length
+const pathApproaches = [
+  {
+    label: 'PATH ① flat (current)',
+    desc: '<b>Baseline path.</b> Flat #C4A882 tan — the current state. Clean but reads as a solid block.',
+    apply() { resetPath(); }
+  },
+  {
+    label: 'PATH ② dirt ruts + grain',
+    desc: '<b>Worn dirt road.</b> Two wheel-rut shadows flanking a lighter compacted centre. Fine grain noise throughout. Edges slightly darker where dirt meets grass.',
+    apply() {
+      resetPath();
+      makePathTex(128, (ctx, S) => {
+        const img = ctx.createImageData(S, S);
+        const d   = img.data;
+        for (let y=0;y<S;y++) {
+          for (let x=0;x<S;x++) {
+            const u = x/S;  // 0=left edge, 1=right edge
+            // base grain noise
+            const n = vnoise(x*0.18, y*0.14)*0.6 + vnoise(x*0.45, y*0.4)*0.4;
+            const grain = (n-0.5)*0.06;
+            // cross-section profile: edges dark, ruts slightly dark, centre light
+            const edge  = Math.max(0, 1-Math.min(u,1-u)/0.14);          // 0→1 at both edges
+            const rutL  = Math.exp(-Math.pow((u-0.28)*12,2));           // left rut
+            const rutR  = Math.exp(-Math.pow((u-0.72)*12,2));           // right rut
+            const ctr   = Math.exp(-Math.pow((u-0.5)*7,2))*0.06;       // centre highlight
+            const dark  = edge*0.12 + (rutL+rutR)*0.08 - ctr + grain;
+            const br = Math.min(255,Math.max(0,Math.round((0.77-dark)*255)));
+            const bg = Math.min(255,Math.max(0,Math.round((0.66-dark*0.9)*255)));
+            const bb = Math.min(255,Math.max(0,Math.round((0.51-dark*0.7)*255)));
+            const idx=(y*S+x)*4;
+            d[idx]=br; d[idx+1]=bg; d[idx+2]=bb; d[idx+3]=255;
+          }
+        }
+        ctx.putImageData(img,0,0);
+      });
+      activePTex.uScale=16; activePTex.vScale=1;
+    }
+  },
+  {
+    label: 'PATH ③ sandy dry',
+    desc: '<b>Sun-baked dirt track.</b> Lighter sandy centre (most compacted, reflects more light), darker shadowed edges, fine pebble-grain scatter across the surface.',
+    apply() {
+      resetPath();
+      makePathTex(128, (ctx, S) => {
+        const img = ctx.createImageData(S, S);
+        const d   = img.data;
+        for (let y=0;y<S;y++) {
+          for (let x=0;x<S;x++) {
+            const u = x/S;
+            const n1 = vnoise(x*0.14, y*0.11)*0.5 + vnoise(x*0.38, y*0.32)*0.3 + vnoise(x*0.9, y*0.85)*0.2;
+            const grain = (n1-0.5)*0.08;
+            // wide bright centre, darker edges — no obvious ruts, more sandy
+            const ctrLift = Math.exp(-Math.pow((u-0.5)*3.5,2))*0.09;
+            const edgeDark = Math.max(0, 1-Math.min(u,1-u)/0.22)*0.10;
+            // pebble spots: small darker dots
+            const pebble = hash2(Math.floor(x*0.6), Math.floor(y*0.6)) > 0.91 ? 0.06 : 0;
+            const shift = -ctrLift + edgeDark + grain*0.7 + pebble;
+            const br = Math.min(255,Math.max(0,Math.round((0.80-shift)*255)));
+            const bg = Math.min(255,Math.max(0,Math.round((0.69-shift*0.85)*255)));
+            const bb = Math.min(255,Math.max(0,Math.round((0.53-shift*0.65)*255)));
+            const idx=(y*S+x)*4;
+            d[idx]=br; d[idx+1]=bg; d[idx+2]=bb; d[idx+3]=255;
+          }
+        }
+        ctx.putImageData(img,0,0);
+      });
+      activePTex.uScale=16; activePTex.vScale=1;
+    }
+  },
+  {
+    label: 'PATH ④ muddy worn',
+    desc: '<b>Well-travelled dirt road.</b> 2048×128 texture (16:1 matches path 80:5 aspect) — 25.6 px/game-unit in BOTH axes so blobs are geometrically round. Canvas X = path length (80u), canvas Y = path width (5u). Zero tiling, zero repetition.',
+    apply() {
+      resetPath();
+      // UV diagnostic confirmed: canvas X → U → path LENGTH (80u), canvas Y → V → path WIDTH (5u)
+      // 2048×128 gives PL=PW=25.6 → blobs drawn as circles in canvas ARE circles in game space
+      const CW = 2048, CH = 128;
+      const WL = 80, WW = 5;          // world length / width in game units
+      const P  = CW / WL;             // 25.6 px per game unit (same in both axes)
+
+      const tex = new BABYLON.DynamicTexture('pt', {width:CW, height:CH}, scene, false);
+      const ctx = tex.getContext();
+      const img = ctx.createImageData(CW, CH);
+      const d   = img.data;
+      const dk  = new Float32Array(CW * CH);
+
+      // ── Large mud blobs (R 0.65-1.1 game units, ~17-28px canvas radius) ──────
+      for (let i = 0; i < 45; i++) {
+        const lp  = hash(i*3.7+0.1) * WL;     // 0-80 along length → canvas X
+        const wp  = hash(i*5.1+0.9) * WW;     // 0-5  across width → canvas Y
+        const r   = 0.65 + hash(i*7.3+1.5) * 0.45;
+        const str = 0.07 + hash(i*9.1+2.3) * 0.09;
+        const ang = hash(i*11.7+3.1) * Math.PI;
+        const ax  = 0.6 + hash(i*13.3+4.7) * 0.8;
+        const ay  = 0.6 + hash(i*15.1+5.3) * 0.8;
+        const ca  = Math.cos(ang), sa = Math.sin(ang);
+        const rp  = r * P * 1.5;
+        const x0  = Math.max(0, Math.floor(lp*P - rp));
+        const x1  = Math.min(CW-1, Math.ceil(lp*P + rp));
+        const y0  = Math.max(0, Math.floor(wp*P - rp));
+        const y1  = Math.min(CH-1, Math.ceil(wp*P + rp));
+        for (let cy=y0; cy<=y1; cy++) {
+          const gy=cy/P;
+          for (let cx=x0; cx<=x1; cx++) {
+            const dx=(cx/P)-lp, dy=gy-wp;
+            const lx=(dx*ca+dy*sa)/(r*ax), ly=(-dx*sa+dy*ca)/(r*ay);
+            const t=lx*lx+ly*ly;
+            if (t<1.0) { const f=1-t; dk[cy*CW+cx]+=str*f*f; }
+          }
+        }
+      }
+
+      // ── Medium pocks (R 0.2-0.45 game units, ~5-12px canvas radius) ──────────
+      for (let i = 0; i < 90; i++) {
+        const lp  = hash(i*4.3+50.2) * WL;
+        const wp  = hash(i*6.7+51.8) * WW;
+        const r   = 0.2 + hash(i*8.9+52.4) * 0.25;
+        const str = 0.04 + hash(i*10.3+53.6) * 0.06;
+        const ang = hash(i*12.1+54.2) * Math.PI;
+        const ax  = 0.5 + hash(i*14.3+55.3) * 1.0;
+        const ay  = 0.5 + hash(i*16.7+56.1) * 1.0;
+        const ca  = Math.cos(ang), sa = Math.sin(ang);
+        const rp  = r * P * 1.5;
+        const x0  = Math.max(0, Math.floor(lp*P - rp));
+        const x1  = Math.min(CW-1, Math.ceil(lp*P + rp));
+        const y0  = Math.max(0, Math.floor(wp*P - rp));
+        const y1  = Math.min(CH-1, Math.ceil(wp*P + rp));
+        for (let cy=y0; cy<=y1; cy++) {
+          const gy=cy/P;
+          for (let cx=x0; cx<=x1; cx++) {
+            const dx=(cx/P)-lp, dy=gy-wp;
+            const lx=(dx*ca+dy*sa)/(r*ax), ly=(-dx*sa+dy*ca)/(r*ay);
+            const t=lx*lx+ly*ly;
+            if (t<1.0) dk[cy*CW+cx]+=str*(1-t);
+          }
+        }
+      }
+
+      // ── Base color — gentle large-scale variation in game-unit coordinates ────
+      for (let cy=0; cy<CH; cy++) {
+        const gy=cy/P;
+        for (let cx=0; cx<CW; cx++) {
+          const gx    = cx/P;
+          const base  = vnoise(gx*0.18, gy*0.18)*0.025 - 0.010;
+          const total = Math.min(0.28, dk[cy*CW+cx] + base);
+          const br=Math.min(255,Math.max(0,Math.round((0.75-total)*255)));
+          const bg=Math.min(255,Math.max(0,Math.round((0.63-total*0.88)*255)));
+          const bb=Math.min(255,Math.max(0,Math.round((0.48-total*0.68)*255)));
+          const idx=(cy*CW+cx)*4;
+          d[idx]=br; d[idx+1]=bg; d[idx+2]=bb; d[idx+3]=255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      tex.update();
+      tex.wrapU = tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+      pMat.diffuseTexture = tex;
+      pMat.diffuseColor   = new BABYLON.Color3(1,1,1);
+      activePTex = tex;
+      activePTex.uScale = 1;
+      activePTex.vScale = 1;
+    }
+  }
+];
+
+// ── Build UI ─────────────────────────────────────────────────────────────────
+const ui   = document.getElementById('ui');
+const desc = document.createElement('div');
+desc.id = 'desc'; ui.appendChild(desc);
+
+const btns = approaches.map((a,i) => {
+  const btn = document.createElement('button');
+  btn.textContent = a.label;
+  btn.onclick = () => {
+    btns.forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    desc.innerHTML = a.desc;
+    a.apply();
+  };
+  ui.insertBefore(btn, desc);
+  return btn;
+});
+btns[0].classList.add('on');
+approaches[0].apply();
+desc.innerHTML = approaches[0].desc;
+
+// path divider
+const div = document.createElement('div');
+div.style.cssText='color:#4a6b72;font-size:9px;letter-spacing:2px;padding:6px 12px;background:rgba(0,8,20,0.88);border:1px solid #00e5ff11;margin-top:4px';
+div.textContent='── PATH ──';
+ui.insertBefore(div, desc);
+
+const pbtns = pathApproaches.map((a,i) => {
+  const btn = document.createElement('button');
+  btn.textContent = a.label;
+  btn.style.borderColor='#00aa6633';
+  btn.onclick = () => {
+    pbtns.forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    desc.innerHTML = a.desc;
+    a.apply();
+  };
+  ui.insertBefore(btn, desc);
+  return btn;
+});
+pbtns[0].classList.add('on');
+
+engine.runRenderLoop(() => scene.render());
+window.addEventListener('resize', () => engine.resize());
+</script>
+</body>
+</html>
