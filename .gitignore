@@ -11,3 +11,29 @@ architecture/verify-screenshots/
 .obsidian/
 __pycache__/
 refs/
+
+# ─── Dev-only files: kept local + in history, never deployed ───────────────
+# (Vercel now builds from git, so anything untracked here won't ship.)
+# Docs & design
+_docs/
+docs/
+CLAUDE.md
+# Asset/model tooling
+architecture/
+blender/
+# Scripts: keep only the CI staleness gate, drop the heavy model/texture gen
+scripts/*
+!scripts/pre-deploy-check.mjs
+# Separate Vercel project (tanking-timelapse) — not part of the game build
+timelapse/
+# In-browser dev editors & mockups (not part of the shipped game)
+tuner.html
+texture-studio.html
+ground-explorer.html
+poster-concepts.html
+world1-mockup.html
+map-mockup.html
+map-editor.html
+lounge-editor.html
+radio-editor.html
+radio-mockup.html
