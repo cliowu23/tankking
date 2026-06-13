@@ -21,7 +21,8 @@ import { makeBlobMat, addBlob } from '../../hub/HangarProps.js';
 
 export function buildWorld1(scene, zone) {
   const root = new TransformNode('world1', scene);
-  const obstacles = [];
+  const obstacles    = [];
+  const shadowCasters = [];
   const PLAY = zone.bounds.half;     // 140
   const EXT  = zone.bounds.visual;   // 170
 
@@ -159,6 +160,7 @@ export function buildWorld1(scene, zone) {
       sph(g, 'puff', 4.4, (k % 2 ? 0.5 : -0.4), 1.9, zz, (k % 2 ? M.foliage : M.foliage2), 1, 0.72, 1.15);
     }
     chainObstacles(h.x, h.z, h.len, h.ry, 1.5);
+    for (const m of g.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── stone walls ────────────────────────────────────────────────────────────
@@ -217,6 +219,7 @@ export function buildWorld1(scene, zone) {
     const t = trunkSrc.createInstance('w1-tt' + i); t.position.set(x, y, z); t.scaling.setAll(sc); t.parent = root;
     const b = blobSrc.createInstance('w1-tb' + i); b.position.set(x, y, z); b.scaling.setAll(sc);
     b.rotation.y = (i * 1.3) % Math.PI; b.parent = root;
+    shadowCasters.push(t, b);
     if (y === 0) {                                   // playable-field trees ground + block
       addBlob(scene, blobMat, x, z, 2.6 * sc, 2.6 * sc, { parent: root });
       obstacles.push({ position: { x, z }, halfW: 0.6 * sc, halfD: 0.6 * sc });
@@ -228,6 +231,7 @@ export function buildWorld1(scene, zone) {
     const r = rockSrc.createInstance('w1-rk' + i);
     r.position.set(x, 0.5, z); r.rotation.y = i * 0.9;
     const sc = 0.7 + (i % 4) * 0.35; r.scaling.scaleInPlace(sc); r.parent = root;
+    shadowCasters.push(r);
     addBlob(scene, blobMat, x, z, 1.8 * sc, 1.5 * sc, { parent: root });
     obstacles.push({ position: { x, z }, halfW: 1.0 * sc, halfD: 1.0 * sc });
   });
@@ -315,6 +319,7 @@ export function buildWorld1(scene, zone) {
     scorch.rotation.x = Math.PI / 2; scorch.position.set(p.x + 1, 0.04, p.z + 1);
     scorch.material = M.burnt; scorch.isPickable = false; scorch.parent = root;
     obstacles.push({ position: { x: p.x, z: p.z }, halfW: 4.2, halfD: 3.8 });
+    for (const m of store.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── POI: crashed outsider machine (MID west) ───────────────────────────────
@@ -331,6 +336,7 @@ export function buildWorld1(scene, zone) {
     ws.rotation.x = Math.PI / 2; ws.position.set(p.x, 0.04, p.z);
     ws.material = M.burnt; ws.isPickable = false; ws.parent = root;
     obstacles.push({ position: { x: p.x, z: p.z }, halfW: 2.8, halfD: 3.0 });
+    for (const m of wreck.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── POI: farmstead (MID east) ──────────────────────────────────────────────
@@ -349,6 +355,7 @@ export function buildWorld1(scene, zone) {
     addBlob(scene, blobMat, p.x, p.z, 6, 5, { parent: root });
     obstacles.push({ position: { x: p.x, z: p.z }, halfW: 4.4, halfD: 3.8 });
     obstacles.push({ position: { x: p.x - 5.6, z: p.z + 0.4 }, halfW: 1.8, halfD: 2.4 }); // hay
+    for (const m of farm.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── POI: ruined watchtower (DEEP west, guarded) ────────────────────────────
@@ -367,6 +374,7 @@ export function buildWorld1(scene, zone) {
     box(tower, 'arch', 2.0, 3.0, 0.8, 0, 1.5, -3.0, M.burnt);
     addBlob(scene, blobMat, p.x, p.z, 4.5, 4.5, { parent: root });
     obstacles.push({ position: { x: p.x, z: p.z }, halfW: 3.2, halfD: 3.2 });
+    for (const m of tower.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── POI: Tankford checkpoint (DEEP east, guarded) ──────────────────────────
@@ -388,6 +396,7 @@ export function buildWorld1(scene, zone) {
       t.position.set(tx, 0.75, tz); t.parent = root;
       obstacles.push({ position: { x: tx, z: tz }, halfW: 0.9, halfD: 0.9 });
     }
+    for (const m of ckpt.getChildMeshes()) shadowCasters.push(m);
   }
 
   // ── VILLAGE (DEEP band) ────────────────────────────────────────────────────
@@ -402,6 +411,7 @@ export function buildWorld1(scene, zone) {
       box(g, 'chimney', 0.7, 1.6, 0.7, w * 0.3, 3.6, -d * 0.2, M.stoneD);
       addBlob(scene, blobMat, x, z, w * 0.7, d * 0.7, { parent: root });
       obstacles.push({ position: { x, z }, halfW: w / 2 + 0.3, halfD: d / 2 + 0.3 });
+      for (const m of g.getChildMeshes()) shadowCasters.push(m);
     };
     cottage(24, 86, 0.15);
     cottage(37, 95, -1.35, 7, 5);
@@ -455,5 +465,5 @@ export function buildWorld1(scene, zone) {
   for (const m of Object.values(M)) m.freeze();
   blobMat.freeze();
 
-  return { obstacles, root };
+  return { obstacles, root, shadowCasters };
 }

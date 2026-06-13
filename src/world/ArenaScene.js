@@ -94,8 +94,10 @@ export default class ArenaScene {
     this.dirLight.intensity = this.zone ? 0.65 : 1.1;
     this.dirLight.position  = new Vector3(12, 20, 12);
 
-    this.shadowGen = new ShadowGenerator(1024, this.dirLight);
+    this.shadowGen = new ShadowGenerator(2048, this.dirLight);
     this.shadowGen.useBlurExponentialShadowMap = true;
+    this.shadowGen.bias       = 0.0001;
+    this.shadowGen.normalBias = 0.02;
 
     // Warm green bounce from below — grass reflection
     const fillLight = new HemisphericLight('fill', new Vector3(0, -1, 0), this.scene);
@@ -110,6 +112,7 @@ export default class ArenaScene {
       // Its AABBs feed the existing obstacle collision system.
       const built = buildWorld1(this.scene, this.zone);
       this._obstacles.push(...built.obstacles);
+      for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
       return;
     }
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100, subdivisions: 1 }, this.scene);
@@ -180,7 +183,11 @@ export default class ArenaScene {
     if (this.zone) {
       const [r, g, b] = this.zone.palette.sky;
       this.scene.clearColor = new Color4(r, g, b, 1.0);
-      return;   // zone clouds come with the builder (M3), placed for the bigger map
+      // Atmospheric haze — colour matches sky horizon so far terrain fades naturally
+      this.scene.fogMode    = Scene.FOGMODE_EXP2;
+      this.scene.fogColor   = new Color3(Math.min(1, r + 0.04), Math.min(1, g + 0.02), b);
+      this.scene.fogDensity = 0.004;
+      return;   // sky dome + clouds live in the zone builder
     }
     this.scene.clearColor = new Color4(0.48, 0.78, 1.0, 1.0);
 
