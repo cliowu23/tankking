@@ -149,7 +149,7 @@ export function buildWorld1(scene, zone) {
   buildPath(zone.paths.main);
   buildPath(zone.paths.storeSpur, 4);
 
-  // ── hedgerows (cover + obstacles) ──────────────────────────────────────────
+  // ── hedgerows (visual cover only — PASSABLE) ───────────────────────────────
   for (const h of zone.hedgerows) {
     const g = new TransformNode('w1-hedge', scene);
     g.parent = root; g.position.set(h.x, 0, h.z); g.rotation.y = h.ry;
@@ -159,7 +159,8 @@ export function buildWorld1(scene, zone) {
       const zz = -h.len / 2 + (k + 0.5) * (h.len / n);
       sph(g, 'puff', 4.4, (k % 2 ? 0.5 : -0.4), 1.9, zz, (k % 2 ? M.foliage : M.foliage2), 1, 0.72, 1.15);
     }
-    chainObstacles(h.x, h.z, h.len, h.ry, 1.5);
+    // No chainObstacles — solid hedges made the zone too hard to drive through.
+    // Hedges are now passable visual cover; stone walls below still block.
     for (const m of g.getChildMeshes()) shadowCasters.push(m);
   }
 
