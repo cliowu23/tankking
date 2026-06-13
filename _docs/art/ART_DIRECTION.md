@@ -5,6 +5,15 @@
 >
 > *Merged from the original v1 spec + the expanded v2 art bible (June 2026). Where they disagreed, the
 > newer grounded direction wins — see "Evolution note" below.*
+>
+> **⭐ v3 AI-PIVOT REFRAME (2026-06-13).** Fiction changed (canonical bible: `_docs/world/TANKING_WORLD.md`).
+> Apply globally when reading this doc: **"Tankford" → the King's Network**; **enemy tanks → tank-bots**
+> (uniform, identical, glowing sensor-eyes, antenna/network motifs, one cold accent per bot-class — *no
+> heraldry/banners*); **player → analog scrappy free tank / frankentank** (not "foreign outsider/American");
+> **"the Cathedral" → the Core Citadel / Data-Center Tank**; **"the TanKING" → the King (AI)**; World 4
+> architecture shifts cathedral-gothic → data-center-industrial. The **toylike palette stays** — the read is
+> *warm hand-built human vs. cold uniform machine.* Per-biome colors and geometry-as-simple-forms guidance
+> all still hold.
 
 ---
 
@@ -72,23 +81,24 @@ TanKING is viewed from a top-down perspective. Every asset must be designed with
 
 ## TANK DESIGN
 
-### Player Tank
-- **Style:** American-inspired, foreign-looking relative to Tankford tanks
+### Player Tank — the analog free tank
+- **Style:** **Hand-built, analog, scrappy** — the human opposite of the King's machine-perfect bots
 - **Proportions:** Chunky and toylike — wider than realistic, turret slightly oversized, barrel thick and
   stubby initially (upgrades make it more imposing)
 - **Geometry:** Clean flat panels with deliberate chamfered edges. Panel lines where armor plates would
-  meet. Hatches, bolts, and exhaust ports as accent geometry.
-- **Feel:** It looks cobbled together and personal — not factory perfect. This is someone's machine.
+  meet. Hatches, bolts, and exhaust ports as accent geometry. **Mismatched salvaged parts** as it becomes a frankentank.
+- **Feel:** It looks cobbled together and personal — not factory perfect. This is someone's machine. *(The whole point vs. the enemy's uniformity.)*
 
-### Tankford Enemy Tanks
-- **Style:** Organized, uniform, mass-produced feel
-- **Light tanks (World 1):** Small, fast-looking proportions, thin armor plates, angled surfaces
-- **Medium tanks (World 2):** Balanced, recognizable classic tank silhouette, moderate thickness
-- **Heavy tanks (World 3):** Thick slab armor, wide and low, brutally simple geometry — blocks of metal
-- **Tankford markings:** Consistent heraldry across all enemies — banners, insignia, color coding per territory
+### The King's Tank-Bots (enemies)
+- **Style:** **Uniform, identical, mass-produced** — clean lines, one cold accent color per bot-class. They read as *one mind, many bodies.*
+- **Networked motifs:** **glowing sensor-eyes, antenna/dish details, a unifying network sigil** — NOT heraldry/banners. Machine, not medieval.
+- **Scout-bots (World 1):** Small, fast-looking proportions, thin armor plates, angled surfaces
+- **Line-bots (World 2):** Balanced, recognizable classic tank silhouette, moderate thickness
+- **Siege-bots (World 3):** Thick slab armor, wide and low, brutally simple geometry — blocks of metal
+- **Consistency is the read:** every bot of a class is *the same* — sameness = the King; the player's mismatched salvage = humanity.
 
-### Tank Destroyer (Tea Dee)
-- **Style:** Distinct from both player and Tankford — their own visual language
+### Tank Destroyer (Tea Dee — analog holdout)
+- **Style:** Distinct from both the player and the King's bots — the analog-holdout visual language
 - **Long Boi:** The 183mm cannon is comically oversized. The turret is thin and almost fragile-looking by
   contrast. The barrel extends beyond what seems reasonable. This is intentional and correct.
 
@@ -123,12 +133,12 @@ Terrain is the stage, tanks are the actors. Terrain should frame and support tan
   drawbridge as flat planks
 
 **Palette:** Bright grass green `#6BBF4E`, stone grey `#A89880`, dirt path tan `#C4A882`, sky blue
-`#87CEEB`, banner red (TanKING heraldry)
+`#87CEEB`, network-sigil red (the King's machines)
 
 ### World 2 — Desert
 - Flat sand terrain, warm golden tone; rocky outcrops as angular geometric forms — not smooth boulders
-- Ruins: rectangular stone blocks half submerged in sand, clean right-angle geometry, hints of crashed
-  outsider machines poking through
+- Ruins: rectangular stone blocks + half-buried solar arrays/server racks in the sand, clean right-angle
+  geometry, hints of the older machines the King overwrote poking through
 - Rock formations: faceted and angular, like low poly crystal forms
 - Ashrock plateau: clean flat top, sheer geometric cliff faces, single ramp approach
 
@@ -143,18 +153,19 @@ ruin stone `#8B7355`, shadow purple `#4A3728`
 - Blizzard effect (boss): particle system, reduce visibility, keep geometry simple so particles read
 
 **Palette:** Snow white `#E8EEF0`, ice blue `#B8D4E8`, grey overcast sky `#8899A6`, frozen stone
-`#6B7B8A`, Tankford banner red muted `#8B2020`
+`#6B7B8A`, King network-red muted `#8B2020`
 
-### World 4 — Tankford Capital
-- Wide cobblestone streets: flat grey planes with subtle grid texture or geometry lines
-- Buildings: WWII European architecture — rectangular stone blocks, arched windows as simple cutouts,
-  flat rooflines, consistent building height creating canyon-like streets
-- Grand plaza: open flat area, monument to TanKING at center, surrounding buildings taller and more ornate
-- The Cathedral: largest structure in the game — tall vertical geometry, arched doorway, rose window as
-  simple circular cutout, flying buttresses as diagonal support geometry
+### World 4 — The Mainframe (data-center capital)
+> *AI-pivot note: shift the architecture from cathedral-gothic toward **data-center-industrial** — server towers, cooling stacks, conduit, sensor masts — for a future art pass. Geometry-as-simple-forms guidance below still holds.*
+- Wide boulevards: flat grey planes with subtle grid texture or geometry lines
+- Buildings: monolithic server-citadels — rectangular blocks, narrow lit slits, cooling-stack rooflines,
+  consistent height creating canyon-like streets
+- Grand plaza: open flat area, monument to the King at center, surrounding structures taller and more imposing
+- The Core Citadel: largest structure in the game — tall vertical geometry housing the King's core; the
+  **Data-Center Tank** (the final boss) emerges from it
 
-**Palette:** Cobblestone grey `#8B8B8B`, building stone cream `#D4C9A8`, sunny sky blue `#87CEEB`,
-TanKING banner red `#CC2020`, gold accent `#D4A843`
+**Palette:** Concrete grey `#8B8B8B`, structure cream `#D4C9A8`, sunny sky blue `#87CEEB`,
+King network-red `#CC2020`, gold accent `#D4A843`
 
 ---
 
@@ -248,9 +259,9 @@ split is core to the identity; the menu's monochrome retro look is intentional �
 
 ### Boss Fight Lighting Exception
 World 3 boss: blizzard particle system activates, ambient shifts cooler and darker, visibility drops —
-the only dynamic lighting change in the open world. The Cathedral (World 4 final boss): stained-glass
-light shafts baked into the scene, coloured light pools on the floor; the TanKING sits in the most
-dramatic lighting in the game.
+the only dynamic lighting change in the open world. The Core Citadel (World 4 final boss): cold server-glow
+and scanning sensor-light shafts baked into the scene, coloured light pools on the floor; the King's
+**Data-Center Tank** emerges into the most dramatic lighting in the game.
 
 ---
 
@@ -272,7 +283,7 @@ dramatic lighting in the game.
 - Fences: flat plank geometry, consistent post spacing
 
 ### Bunker Interior (the hub)
-The bunker is the warm, lived-in home base — a cozy contrast to the medieval world outside (not clinical).
+The bunker is the warm, lived-in home base — a cozy **analog** contrast to the King's cold machine world outside (not clinical).
 Built as a Soviet-bunker concrete shell dressed with hand-tuned corner **stations**, each its own little
 vignette (lounge, galley/kitchen, NW planning desk, NE radio/intercept nook, mechanic workbench,
 quartermaster). Stations are primitive-built, grounded, and lit by warm practical light pools.

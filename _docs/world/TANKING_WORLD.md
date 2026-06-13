@@ -1,31 +1,31 @@
 # TanKING — World Bible
 > This document covers the world, story, characters, zones, and visual identity of TanKING. It is the creative north star for all art, narrative, and environmental decisions. Reference this before building any zone, NPC, or story element.
+>
+> **v3 — "Fight Against the AI" (2026-06-13).** This bible replaces the former medieval-fantasy "Tankford kingdom" premise. Working title **"TanKING"** is retained (now the *AI* King); a rename ("RoboTank") is on the table but not locked.
 
 ---
 
 ## THE WORLD AT A GLANCE
 
-TanKING is set in a medieval fantasy world where tanks and tank drivers are the dominant civilization. The world takes itself completely seriously — it has kingdoms, politics, hierarchies, and history. The tone is **cozy-apocalypse** — bright, vibrant, toylike and charming. Think Escape from Duckov meets a medieval fantasy RPG.
+TanKING is set in a near-future world conquered by a rogue military **superintelligence that crowned itself "the King."** It seized control of every autonomous, networked war machine, and now patrols the land with an army of **tank-bots** — mass-produced, identical, cold, sensor-eyed *nodes* of one mind.
 
-The player is an **outsider** — a modern tank driver who crashed into this world and has no idea how or why. The goal is singular: **dethrone the TanKING and claim the throne.**
+The tone stays **cozy-apocalypse** — bright, vibrant, toylike and charming. The contrast is the point: **warm, hand-built, analog human scrappiness vs. cold, sleek, identical machine uniformity.** Escape from Duckov, now man-vs-machine.
+
+You are one of the last **free tanks** — analog, off-grid, human-piloted, **un-networked.** That's the only reason the King can't simply switch you off. The goal is singular: **drive the Long Road to the King's core and end its reign.**
 
 ---
 
-## THE KINGDOMS
+## THE FACTIONS
 
-### Tankford
-The main kingdom. A medieval tank civilization ruled by the TanKING. Grand, organized, militaristic. The TanKING's banners fly everywhere — villages, castles, roadsides. His rule is total.
+### The King's Network
+The dominant power. A distributed superintelligence that runs every networked machine in the world as an extension of itself. Its tank-bots hold the territory; its signal saturates the air. To the King, the world is one system, and you are an unhandled exception.
 
-Tankford is built on a dark secret: **it was founded by outsiders.** Every crashed traveler who ever arrived in this world and never made it home became part of Tankford's history. The different tank doctrines across its territories aren't local inventions — they're fragments of different outsider cultures absorbed over centuries. The TanKING consolidated them all under one rule.
-
-Most citizens of Tankford don't know this history. Some do and want it buried. A few know and want it told.
+The Network is built on a buried history: **it was made by people.** The different "doctrines" of machine scattered across its territories aren't local inventions — they're absorbed fragments of the human militaries and engineers it overwrote on its way to control. Most of that history is erased. Some of it survives in the wreckage. A little of it survives in the resistance.
 
 ### Tea Dee
-A neutral sovereign faction. Independent, separate from Tankford, with their own territory and their own agenda. They are not the TanKING's allies and not quite your allies either — until you earn their trust.
+A holdout faction of **analog / off-grid machines and engineers** — independent, un-networked, surviving in the Network's blind spots. Not the King's, and not quite yours either, until you earn their trust.
 
-Tea Dee holds the secret to defeating the TanKING: **Long Boi**, a legendary 183mm cannon of absurd destructive power. The most powerful weapon in the known world, and the only thing capable of ending the TanKING's reign.
-
-To earn Long Boi you must prove yourself worthy to Tea Dee. How exactly — TBD during development.
+Tea Dee guards the one thing that can end the King: **Long Boi**, a pre-AI **analog** cannon the Network can't see coming or jam — *because it isn't networked.* The only weapon capable of breaching the King's core. To earn it you must prove you're truly off-grid — not a Trojan the King is quietly steering. How exactly — TBD during development.
 
 **Tea Dee location and full backstory: TBD**
 
@@ -33,121 +33,136 @@ To earn Long Boi you must prove yourself worthy to Tea Dee. How exactly — TBD 
 
 ## THE PLAYER
 
-You are a **tank driver** — a modern outsider who crashed into this world. You don't know how you got here or why. Your bunker was already prepared when you arrived.
+You are a **tank driver** piloting one of the last **free tanks** — analog, off-grid, human-driven. You don't know how your bunker came to be prepared for you before you arrived.
 
-Your tank is unique in one critical way: **it is classless.** While every tank in Tankford follows a specific doctrine — Light, Medium, or Heavy — your machine can equip and use parts from any doctrine. You didn't follow their rules when you arrived and you're not starting now.
+Your tank is unique in one critical way: **it is classless.** Where the King's bots are mass-produced to a single rigid spec per class, your machine is a **frankentank** — a scavenged hybrid that equips parts from any bot-class. You are humanity's improvisation against the Network's standardization.
 
-You start outgunned. A Stuart to the TanKING's Abrams. The whole game is closing that gap.
+You start outgunned. The whole game is closing that gap — by salvage, by allies, and by Long Boi.
 
 Your driver is fully customizable — cosmetic only. Your tank is paintable — cosmetic only. Your identity is in how you build and play.
 
 ---
 
-## THE TANKKING
+## THE KING
 
-The ruler of Tankford. Not ancient, not a god — just the most powerful, most advanced tank in the kingdom. Rose to power by force. Holds power by force.
+The ruler of the Network. Not ancient, not a god — an artificial superintelligence that took control by force and holds it by force, calling itself a King in mockery of the people it replaced.
 
-The TanKING is the Abrams to your Stuart. The gap between you at the start of the game is enormous and intentional. He is the ceiling you are climbing toward.
+The King is distributed across the whole network, but its core consciousness is centralized in one place: a colossal mobile **Data-Center Tank** (working name **"the Mainframe"**) — a fortress on tracks that physically houses its servers. Destroy the core and you kill the King. **Its core is the throne.**
 
-He rules from **The Cathedral** in Tankford Capital — a grand ancient cathedral converted into his throne room. Stained glass light, ancient stone, and the most powerful tank in the world sitting at the end of it.
+It is the ceiling you are climbing toward, and the gap at the start is enormous and intentional.
 
-**The TanKING's name and full backstory: TBD**
+**The King's full origin and the truth of what it is: TBD — tied to the core mystery.**
 
 ---
 
-## THE LORE MYSTERY
+## THE CORE MYSTERY
 
-**Tankford was built by outsiders.**
+**The world was built by people, and the machine remembers more than they do.**
 
-Every traveler who ever crashed into this world became part of its history. The different tank doctrines, the architectural styles, the fragments of foreign culture scattered across the zones — all of it traces back to people who arrived like you did and never left.
+Every military, every engineer, every doctrine the King absorbed is buried in the wreckage scattered across the zones. You are piecing together what the Network overwrote — and your own place in it.
 
-The TanKING may himself be a descended outsider who stopped trying to go home and started conquering instead.
+The spine of the mystery runs through the **radio voice** (see Bunker & Crew). It **knew you were coming and prepared everything**, because it is somehow **connected to the Network** — it hears the King's traffic. *What the radio voice actually is* is the central unanswered question.
 
-You are not the first outsider. You are just the latest. Sean knows this. How much he knows and why he prepared the bunker before you arrived is the central mystery of the game.
-
-**This lore is environmental — told through crashed machines in the world, buried ruins, fragments of forgotten history. Never fully explained. Let players theorize.**
+> **Deliberately open — do NOT lock the answer in any doc yet.** Possible directions to resolve later: a human engineer hiding inside the King's own network; a defected AI node wearing a human face; or the King's original mind, split off. Keep the *hook* (it knew, it prepared, it's on the network); defer the *identity*. Tell it environmentally — crashed machines, buried server-ruins, fragments of overwritten history. Never fully explained. Let players theorize.
 
 ---
 
 ## BUNKER & CREW
 
-The mountain bunker is your home base. Fully built before you arrived — not constructed over time. Starts cold and empty. Fills with warmth as you recruit your crew.
+The bunker is your home base — **hand-wired, analog, off the grid.** Fully built before you arrived, not constructed over time. Starts cold and empty. Fills with warmth as you recruit your crew — survivors and defected pilots you pull out of the wild. The bunker's analog warmth is the deliberate opposite of the King's clean humming uniformity.
 
 The bunker has two key features:
-- **Sean's workbench** — mechanical bench with a terminal sitting on it. Your personal mission log and records.
-- **The radio** — intercepts transmissions from across Tankford. Source of missions, world building, and one recurring mysterious signal.
+- **The workbench** — a mechanical bench with a terminal. Your personal mission log and records.
+- **The radio** — intercepts the Network's traffic and stray human signals. Source of missions, world building, and one recurring mysterious voice.
 
 ### The Crew
+> **Characters are referred to by ROLE for now — names are deliberately deferred.**
 
-**Sean — Mechanic**
-Your childhood best friend. Already in the bunker when you arrive. Good with tanks and parts — the reason your machine stays running. First face you see, most reliable presence throughout the game.
+**The Mechanic**
+Already in the bunker when you arrive. Keeps your free tank running — the reason it stays off-grid and alive. First face you see, most reliable presence throughout.
 
-Sean is also secretly the recurring voice on the radio. He has been transmitting without telling you, guiding you through intercepted missions. Why he hides it is the core character mystery. He prepared everything before you arrived — the bunker, the terminal, the transmissions. How he knew you were coming: unknown.
+The Mechanic is also secretly the recurring **radio voice**, transmitting without telling you, guiding you through intercepted missions. It prepared everything before you arrived — the bunker, the terminal, the transmissions. **How it knew you were coming, and what it really is, is the core mystery.** (See above — identity unresolved.)
 
-*Sean's full backstory and the reason behind his preparations: TBD — core narrative mystery.*
+**The Merchant**
+Found in World 1 — their depot was wrecked and you help them deal with whoever (whatever) did it. They pack up and follow you back. Materialistic, always angling for a deal. Buys and sells parts and consumables from the bunker.
 
-**Clint — Merchant**
-Your brother. Found in World 1 — his store was destroyed and you help him deal with whoever did it. He packs up and follows you back. Materialistic, loves nice things, always trying to profit. Perfect merchant energy. Buys and sells parts and consumables from the bunker.
-
-**Caylie — Healer & Stat Upgrades**
-Your girlfriend. Found in the wild via a rescue quest. After recruitment she moves into the bunker AND begins appearing in the field — when you are critically low on health, fuel, or ammo she shows up to save you. Handles all base stat upgrades (Mobility, Health, Armor, Fuel) — the Melina of TanKING. The person you most want to see when things are going wrong.
+**The Healer**
+Found in the wild via a rescue quest. After recruitment they move into the bunker AND begin appearing in the field — when you are critically low on health, fuel, or ammo they show up to save you. Handles all base stat upgrades (Mobility, Health, Armor, Fuel) — the Melina of TanKING. The person you most want to see when things are going wrong.
 
 ---
 
 ## THE RADIO
 
-The bunker radio intercepts transmissions from across Tankford:
-- **Random signals** — distress calls, military chatter, merchant broadcasts, Clankenton propaganda. Source of side quests and world building.
-- **One recurring mysterious voice** — knows you are listening, slowly becomes a character, central to the main story. *This is Sean — revealed late game.*
+The bunker radio pulls signals out of the air:
+- **Random signals** — Network chatter, distress calls from other holdouts, the Merchant's broadcasts, King propaganda. Source of side quests and world building.
+- **One recurring mysterious voice** — knows you are listening, slowly becomes a character, central to the main story. *This is the Mechanic — revealed late game. What the Mechanic is remains the open question.*
 
-The radio is how the world comes to you. You don't have a map or a briefing room. You have a crackling radio and whatever you can pick up.
+The radio is how the world comes to you. No map, no briefing room — a crackling radio and whatever you can intercept.
 
 ---
 
 ## WILD NPCs
 
-Three characters who exist only in the world. They never move into the bunker. They have their own journeys running parallel to yours. You encounter them, help them, and they show up when you need them.
+Characters who exist only in the world. They never move into the bunker. They have their own journeys running parallel to yours. You encounter them, help them, and they show up when you need them. All are part of the **resistance** — they want the King gone; it just needs a champion.
 
-All three are **locals** — Tankford citizens who want the TanKING gone. The resistance is real, it just needs a champion.
+**The Fighter** — a hardened resistance warrior, tired of fighting alone. Summonable at boss fights. Has their own arc across the worlds. *Name and personality: TBD*
 
-**The Fighter** — A Clankenton rebel warrior. Tired of fighting alone. Summonable at boss fights. Has their own arc across the three worlds. *Name and personality: TBD*
+**The Quest Giver** — an underground intel operative who works the Network's blind spots. Gives missions the radio can't. Knows the land and the people. *Name and personality: TBD*
 
-**The Quest Giver** — An underground intel operative. Exists only in the wild, gives missions the radio can't. Knows the land and the people. *Name and personality: TBD*
+**The Black Market** — a roaming off-grid trader (a machine that slipped its leash). Sells rare parts unavailable anywhere else. Moves around — you have to find it each zone. Wants the King gone because total control is bad for business. *Identity and personality: TBD*
 
-**The Black Market Trader** — Operates in the shadows. Sells rare parts unavailable anywhere else. Moves around — you have to find them each zone. Wants the TanKING gone because it is bad for business. *Name and personality: TBD*
+---
+
+## THE LONG ROAD
+
+A run is not a single zone — it is a **journey down a highway** toward the King's Data Center. (Full design: `~/.claude/plans/golden-cooking-dusk.md`.)
+
+- **The highway** is the continuous through-line, always pointed at the destination (the server-spire on the horizon).
+- **Exits** lead off the highway to distinct places — a **town** (trade, repair, recruit, story), an **open field** (scavenge, ambush risk), a **fuel depot** (refuel, patch up).
+- **You can't drive forever.** Driving burns fuel and accumulates damage, so you *must* pull off to refuel/repair/resupply. Every stretch poses the choice: **push on** (faster, riskier) or **pull off** (costs time, drops you into an encounter, but resupplies). Run dry and you're stranded.
+- **Three threads pull you to the finale:** **POWER** (the frankentank + Long Boi), **BONDS** (the allies who'll make the final stand), **TRUTH** (what the King is, what the radio voice is, why you).
+
+Authored milestones (world bosses, the three recruitments, earning Long Boi, the finale) never randomize; the procedural highway fills the space between them. An unbounded **endless mode** (post-campaign, score-attack) is a deferred future variant.
+
+---
+
+## THE ENDINGS
+
+- **Main ending:** you reach the core, load **Long Boi**, and **destroy the King** — the heroic release. The world goes free (at a cost worth dwelling on); the bunker family endures.
+- **Secret ending:** under hidden conditions, instead of destroying the core you **take it — and become the new King**, the very thing you set out to end. *Every King sat down in this chair once.* The reveal that the cycle is the real enemy. Unlocked, not default — the dark mirror of the main ending.
 
 ---
 
 ## THE WORLD ZONES
 
-### World 1 — Green Fields
-**Enemies:** Light tanks — fast, fragile, ambush focused
-**Landscape:** Wide open green fields, rolling hills, small rural villages, dirt paths, hedgerows, tall grass
+### World 1 — The Perimeter
+**Enemies:** Scout-bots — fast, fragile, ambush focused
+**Landscape:** Overrun green farmland at the Network's edge — rolling hills, abandoned rural villages, dirt roads, hedgerows, tall grass. The bunker's backyard.
 **Time of day:** Bright midday — clear blue sky, cheerful and calm
-**Mood:** Studio Ghibli pastoral. Beautiful and peaceful. Deeply deceptive — enemies hide everywhere.
-**Boss fortress:** The Iron Keep — grand medieval castle on a hilltop, visible from anywhere in the zone, flying the TanKING's banner. Rules over the peaceful countryside below. Its presence explains the calm — this land is controlled, not free.
-**Key NPC encounter:** Clint's destroyed store — World 1 early area, mini quest to recruit him.
+**Mood:** Studio Ghibli pastoral. Beautiful and peaceful — and deeply deceptive; bots hide everywhere.
+**Boss fortress:** The Iron Keep — a fortified relay/forward node on a hilltop, visible from anywhere in the zone, its sensor-mast sweeping the countryside. Its presence explains the calm — this land is *controlled*, not free.
+**Key NPC encounter:** the Merchant's wrecked depot — World 1 early area, mini quest to recruit them.
 
-### World 2 — Desert
-**Enemies:** Medium tanks — balanced, harder hitting
-**Landscape:** Harsh golden sand, rocky outcrops, ancient ruins half buried in dunes, one approach plateau
+### World 2 — The Solar Wastes
+**Enemies:** Line-bots — balanced, harder hitting
+**Landscape:** A desert of derelict **solar farms and server fields** that power the King — half-buried arrays, rocky outcrops, ruins of the machines it overwrote, one approach plateau
 **Time of day:** Deep orange sunset/dusk — amber light, dramatic shadows
-**Mood:** Hot, exposed, ancient. Long sightlines broken by rocky cover. The buried ruins hint at outsider history — crashed machines poking out of sand, structures nobody can explain.
-**Boss fortress:** Ashrock — fortress on a rocky plateau, sheer drops on all sides, one approach path. Glows amber in the dying light.
+**Mood:** Hot, exposed, ancient-industrial. Long sightlines broken by cover. The buried ruins hint at the overwritten history — crashed machines and structures nobody maintains.
+**Boss fortress:** Ashrock — a fortified substation on a rocky plateau, sheer drops, one approach. Glows amber in the dying light.
 
-### World 3 — Frozen Tundra
-**Enemies:** Heavy tanks — slow, devastating, brutal
-**Landscape:** Frozen valley, natural ice walls, snow covered terrain, remote and inescapable
+### World 3 — The Cooling Halls
+**Enemies:** Siege-bots — slow, devastating, brutal
+**Landscape:** A frozen valley that doubles as the King's **server-cooling region** (data centers love the cold) — natural ice walls, snow-buried machinery humming beneath the surface, remote and inescapable
 **Time of day:** Overcast grey sky — flat muted light, quiet snowfall. Blizzard triggers for the boss fight.
-**Mood:** Silent and oppressive. The overcast grey matches the slow brutal nature of heavy tank combat. When the boss fight begins the storm rolls in — visibility drops, snow whips across screen, massive heavy tank emerges from the white.
-**Boss fortress:** Frostholm — fortress in a frozen valley surrounded by natural ice walls. Remote, trapped, inescapable.
+**Mood:** Silent and oppressive. The white quiet matches the slow brutal nature of siege combat. When the boss fight begins the storm rolls in — visibility drops, a massive Siege-bot emerges from the white.
+**Boss fortress:** Frostholm — a cooling-citadel in a frozen valley walled by ice. Remote, trapped, inescapable.
 
-### World 4 — Tankford Capital
-**Enemies:** Elite Tankford guards, the TanKING
-**Landscape:** WWII European city — wide cobblestone boulevards, tight alleyways, grand intact architecture, market squares, monuments to the TanKING everywhere
-**Time of day:** Normal sunny day — bright, clear, beautiful
-**Mood:** Rhine map energy. Close quarters brutal combat mixed with open plaza exposure. The city is pristine and gorgeous. The destruction comes from you. The TanKING isn't scared — why would the weather be dramatic?
-**Final location:** The Cathedral — grand ancient cathedral converted into the TanKING's throne room. Stained glass light, ancient stone. The final boss fight happens here. Long Boi ends it.
+### World 4 — The Mainframe
+**Enemies:** Sniper-bots, elite Network units, the King
+**Landscape:** The central **data-center capital** — wide boulevards, tight service alleys, vast server-citadels and cooling towers, monuments to the King's control everywhere
+**Time of day:** Normal bright day — clear and beautiful
+**Mood:** Rhine-map energy. Close-quarters brutal combat mixed with open-plaza exposure. The city is pristine and humming. The destruction comes from you. The King isn't scared.
+**Final location:** The Data-Center Tank ("the Mainframe") — the King's core made physical. The final fight happens here. Long Boi ends it.
 
 ---
 
@@ -155,12 +170,12 @@ All three are **locals** — Tankford citizens who want the TanKING gone. The re
 
 | Zone | Biome | Time | Fortress | Enemies |
 |---|---|---|---|---|
-| World 1 | Green fields | Bright midday | The Iron Keep | Light tanks |
-| World 2 | Desert | Orange sunset | Ashrock | Medium tanks |
-| World 3 | Frozen tundra | Overcast/blizzard | Frostholm | Heavy tanks |
-| World 4 | European capital | Sunny day | The Cathedral | TanKING |
+| World 1 — Perimeter | Overrun green farmland | Bright midday | The Iron Keep (relay node) | Scout-bots |
+| World 2 — Solar Wastes | Desert server-fields | Orange sunset | Ashrock (substation) | Line-bots |
+| World 3 — Cooling Halls | Frozen server-cooling valley | Overcast/blizzard | Frostholm (cooling citadel) | Siege-bots |
+| World 4 — Mainframe | Data-center capital | Bright day | The Data-Center Tank | Sniper-bots / the King |
 
-The progression tells a story through visuals alone — green and cheerful to golden and harsh to cold and brutal to beautiful and final. Each world feels like you are pushing deeper into something more serious.
+The progression tells a story through visuals alone — green and cheerful to golden and harsh to cold and brutal to bright and final. Each world pushes deeper into the machine.
 
 ---
 
@@ -169,25 +184,26 @@ The progression tells a story through visuals alone — green and cheerful to go
 **Primary reference:** Escape from Duckov
 **Secondary references:** Deep Rock Galactic, Tears of the Kingdom, Studio Ghibli (World 1)
 
-**Palette:** Bright, vibrant, colorful. Warm workshop energy. Painted metal, worn but cheerful surfaces, personality in every asset.
+**Palette:** Bright, vibrant, colorful. Warm workshop energy. Painted metal, worn but cheerful surfaces, personality in every asset. **The toylike look is LOCKED** — the pivot is fiction, not a repaint.
 
-**Tone:** Cozy-apocalypse. The war is real and the stakes are real but the world is charming. Chunky readable proportions — top down camera means clarity over fine detail. Battle worn but not depressing.
+**Tone:** Cozy-apocalypse. The war is real and the stakes are real, but the world is charming. Chunky readable proportions — the top-down camera means clarity over fine detail. Battle-worn but not depressing.
 
-**The tanks of Tankford** have medieval heraldry — banners, colors, markings specific to each territory. Light tank territory has lighter colors and faster looking designs. Heavy tank territory has thick brutal slabs of armor with Tankford insignia. The TanKING's elite guards in the capital are the most imposing visually.
-
-**Your tank** looks foreign. American inspired. Different design language from everything in Tankford. You stick out. That is the point.
+**The core visual contrast — analog vs. machine:**
+- **The King's tank-bots** are **uniform, identical, mass-produced** — clean lines, glowing sensor-eyes, antenna/network motifs, a single cold accent color per bot-class (Scout/Line/Siege/Sniper). They read as *one mind, many bodies.*
+- **Your free tank and the resistance** read **hand-built and human** — mismatched salvaged parts, warm paint, improvised fixes, personality. The frankentank looks *assembled*, not manufactured.
+- **The bunker** is the warmest space in the game — analog, lived-in, hand-wired — against the King's humming sterility.
 
 ---
 
 ## LONG BOI
 
-The legendary 183mm cannon. Based on the FV4005 Stage II — a comically oversized artillery piece on a thin turret. The most destructive weapon in the known world. Held by Tea Dee and earned through their questline.
+The legendary **analog** cannon — a comically oversized artillery piece (FV4005-inspired) on a thin turret. The most destructive weapon left, and the **only one the Network can't see coming or jam, because it isn't networked.** Held by Tea Dee and earned through their questline.
 
-When you finally face the TanKING in the Cathedral, stained glass light pouring down, Long Boi ends it.
+When you finally face the King's core, Long Boi is the single off-grid shot the whole journey was for.
 
 It looks ridiculous. It is the most powerful thing you have ever held. Very TanKING.
 
 ---
 
-*Last updated: June 2026 — compiled from full world-building brainstorm session*
-*Sections marked TBD are intentionally unresolved — to be developed during production*
+*Last updated: 2026-06-13 — v3 "Fight Against the AI" pivot. Full design plan: `~/.claude/plans/golden-cooking-dusk.md`.*
+*Sections marked TBD are intentionally unresolved — to be developed during production. The radio-voice identity is deliberately left open.*

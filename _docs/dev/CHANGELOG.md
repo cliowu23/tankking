@@ -4,6 +4,13 @@ A running timeline of notable changes to TanKING — features shipped, systems b
 
 For the *reasoning* behind architectural choices, see `DECISIONS.md`. This file is the *what & when*; that one is the *why*.
 
+### 2026-06-13 — ⭐ v3 narrative pivot: "Fight Against the AI" + the Long Road
+- **Premise pivoted** from the medieval "Tankford kingdom" to a **fight against a rogue military AI** that crowned itself *the King*: an army of networked **tank-bots** (doctrines → Scout/Line/Siege/Sniper bot-classes), with a colossal mobile **Data-Center Tank** as the final boss. Player = one of the last **analog, off-grid, human-piloted free tanks**; the frankentank reads as humanity's salvage vs. the King's uniformity.
+- **Kept (re-skinned):** toylike art (now *warm-analog vs. cold-machine*), the radio-voice mystery (now *network-connected*, identity left open), Long Boi (now the *off-grid analog* weapon the Network can't jam), Tea Dee (analog holdouts), the 4 worlds (biomes kept; W3 frozen = the King's *server-cooling* region).
+- **Locked:** main ending = destroy the King; **secret ending** = take the core and become the new King. Crew = **roles** (Mechanic/Healer/Merchant), names deferred. Title "TanKING" kept as working title (rename TBD).
+- **Structure:** runs become **the Long Road** — a highway with exits (town/field/depot) and fuel attrition ("can't drive forever"); three threads (Power/Bonds/Truth) pull toward the finale. Full plan: `~/.claude/plans/golden-cooking-dusk.md`.
+- **Docs updated:** `CLAUDE.md`, `_docs/world/TANKING_WORLD.md` (full rewrite), `_docs/art/ART_DIRECTION.md` + `_docs/dev/TANKING_MODEL_SPEC.md` (pivot banners + enemy/player reframe), `_docs/dev/CHARACTER_MODEL_SPEC.md` (NPCs → roles), memories `project_narrative_ai_pivot` (new) + `project_tank_game_notes` + `project_model_spec`. *(No code/gameplay changes — fiction/skin only.)*
+
 > Entries before 2026-06-07 were reconstructed from dated plans/specs (`_docs/misc/superpowers/`), file timestamps, and `DECISIONS.md`. Dates are approximate where noted. Keep this updated going forward — add an entry whenever something meaningful ships or a major decision lands.
 
 > 📸 **When a milestone is visual, also record a timelapse frame** (the living visual record in `timelapse/`). After committing, run:

@@ -7,9 +7,11 @@
 
 **TanKING** is a 3D top-down extraction shooter roguelite built in Babylon.js.
 
-The player is a modern tank driver who crashed into a medieval fantasy world called Tankford — a kingdom where tanks and tank drivers are the dominant civilization. The goal: dethrone the TanKING and claim the throne.
+The player pilots one of the last **free, human-piloted tanks** in a near-future world conquered by a rogue military superintelligence that crowned itself **"the King."** The King runs an army of networked **tank-bots**; you are off-grid and un-networked, which is why it can't switch you off. The goal: drive **the Long Road** to the King's core — a colossal mobile **Data-Center Tank** — and end its reign.
 
-**Tone:** Cozy-apocalypse. Bright, vibrant, toylike and charming. Escape from Duckov is the primary aesthetic reference. The world is broken but the vibe is warm.
+> **v3 narrative (2026-06-13):** pivoted from the old medieval "Tankford kingdom" premise to **fight-against-the-AI**. Canonical bible: `_docs/world/TANKING_WORLD.md`. Full design + journey plan: `~/.claude/plans/golden-cooking-dusk.md`. Working title "TanKING" kept (now the *AI* King); rename TBD.
+
+**Tone:** Cozy-apocalypse. Bright, vibrant, toylike and charming — now read as **warm analog-human scrappiness vs. cold sleek machine uniformity.** Escape from Duckov is the primary aesthetic reference. The toylike look is locked; the pivot is fiction, not a repaint.
 
 **Platform target:** PC via Steam. Name is confirmed available.
 
@@ -98,13 +100,13 @@ Bunker hub
 
 ## TANK SYSTEM
 
-**The player tank is classless** — unique in Tankford. Can equip parts from any doctrine.
+**The player tank is classless** — unique among the King's rigid bot-classes. Can equip parts from any doctrine (the frankentank).
 
-Four doctrines exist in the world:
-- **Light** — fast, fragile, evasive (World 1 enemies)
-- **Medium** — balanced, adaptable (World 2 enemies)
-- **Heavy** — slow, tanky, devastating (World 3 enemies)
-- **Tank Destroyer** — long range, glass cannon (Tea Dee faction)
+Four doctrines exist — the King fields them as **bot-classes**; the player scavenges their parts:
+- **Light / Scout-bot** — fast, fragile, evasive (World 1 enemies)
+- **Medium / Line-bot** — balanced, adaptable (World 2 enemies)
+- **Heavy / Siege-bot** — slow, tanky, devastating (World 3 enemies)
+- **Tank Destroyer / Sniper-bot** — long range, glass cannon (Tea Dee analog faction holds the off-grid TD tech)
 
 By late game the player has a frankentank hybrid of all doctrines. This is the intended fantasy.
 
@@ -131,10 +133,10 @@ By late game the player has a frankentank hybrid of all doctrines. This is the i
 
 | Zone | Biome | Lighting | Fortress | Enemies |
 |---|---|---|---|---|
-| World 1 | Green fields | Bright midday | The Iron Keep | Light tanks |
-| World 2 | Desert | Orange sunset | Ashrock | Medium tanks |
-| World 3 | Frozen tundra | Overcast/blizzard | Frostholm | Heavy tanks |
-| World 4 | European capital | Sunny day | The Cathedral | TanKING |
+| World 1 — Perimeter | Overrun green farmland | Bright midday | The Iron Keep (relay node) | Scout-bots |
+| World 2 — Solar Wastes | Desert server-fields | Orange sunset | Ashrock (substation) | Line-bots |
+| World 3 — Cooling Halls | Frozen server-cooling valley | Overcast/blizzard | Frostholm (cooling citadel) | Siege-bots |
+| World 4 — Mainframe | Data-center capital | Bright day | The Data-Center Tank | Sniper-bots / the King |
 
 **Zone structure:** Duckov-style continuous open world per zone. Enemy positions largely fixed. Difficulty and loot scale with depth. No wave defense, no artificial triggers. Push deep enough to permanently unlock the next zone. Fast travel to unlocked zones from hub.
 
@@ -144,63 +146,65 @@ By late game the player has a frankentank hybrid of all doctrines. This is the i
 
 ## THE BUNKER
 
-Mountain bunker. Fully built from day one — not constructed over time. Starts empty, fills with life as crew is recruited.
+Mountain bunker — **hand-wired, analog, off the grid** (the warm human opposite of the King's humming sterility). Fully built from day one — not constructed over time. Starts empty, fills with life as crew is recruited.
 
 **Key features:**
-- **Sean's workbench** — mechanical bench with a terminal. Player's mission log and records.
-- **The radio** — intercepts Tankford transmissions. Source of side quests, world building, and one recurring mysterious signal (main story).
+- **The workbench** — mechanical bench with a terminal. Player's mission log and records.
+- **The radio** — intercepts the Network's traffic and stray human signals. Source of side quests, world building, and one recurring mysterious signal (main story).
 
 ---
 
 ## BUNKER CREW
 
-**Sean — Mechanic**
-Childhood best friend. Already in bunker at start. Keeps the tank running. Also secretly the recurring voice on the radio — transmitting without the player knowing. How he knew the player was coming and why he prepared everything in advance is the core mystery of the game. *Full backstory: TBD*
+> **Characters are referred to by ROLE for now — names deliberately deferred.**
 
-**Clint — Merchant**
-Player's brother. Found in World 1 — his store was destroyed, player helps him, he joins. Buys and sells parts and consumables. Materialistic and entrepreneurial.
+**The Mechanic**
+Already in bunker at start. Keeps the free tank running and off-grid. Also secretly the recurring voice on the radio — transmitting without the player knowing, because it is somehow **connected to the Network** (how it knew you were coming). **What the Mechanic actually is = the core mystery, deliberately UNRESOLVED** (human engineer hiding in the network / defected AI node / the King's split-off original mind — decide later).
 
-**Caylie — Healer & Stat Upgrades**
-Player's girlfriend. Found and rescued via quest in the wild. After recruitment: manages all base stat upgrades (the Melina role) AND appears in the field when player is critically low to save them. The only NPC with both a bunker role and a field presence.
+**The Merchant**
+Found in World 1 — their depot was wrecked, player helps them, they join. Buys and sells parts and consumables. Materialistic and entrepreneurial.
+
+**The Healer**
+Found and rescued via quest in the wild. After recruitment: manages all base stat upgrades (the Melina role) AND appears in the field when the player is critically low to save them. The only NPC with both a bunker role and a field presence.
 
 ---
 
 ## WILD NPCs
-*Exist only in the world. Never move to bunker. Reappear across zones like Blaidd/Alexander in Elden Ring. All are Tankford locals who want the TanKING gone.*
+*Exist only in the world. Never move to bunker. Reappear across zones like Blaidd/Alexander in Elden Ring. All are part of the resistance — they want the King gone.*
 
-- **The Fighter** — rebel warrior, summonable at boss fights, own arc across worlds. *Identity: TBD*
-- **The Quest Giver** — underground intel operative, wild missions only. *Identity: TBD*
-- **The Black Market Trader** — sells rare parts, moves around each zone, hard to find. *Identity: TBD*
-
----
-
-## THE KINGDOMS
-
-**Tankford** — main kingdom ruled by the TanKING. Built unknowingly on the history of crashed outsiders. Different tank doctrines across territories are fragments of absorbed outsider cultures.
-
-**Tea Dee** — neutral sovereign faction. Holds Long Boi — a legendary 183mm FV4005-inspired cannon, the only weapon capable of defeating the TanKING. Must be earned through their questline. *Full details: TBD*
+- **The Fighter** — hardened resistance warrior, summonable at boss fights, own arc across worlds. *Identity: TBD*
+- **The Quest Giver** — underground intel operative working the Network's blind spots, wild missions only. *Identity: TBD*
+- **The Black Market** — a roaming off-grid trader (a machine that slipped its leash); sells rare parts, moves around each zone, hard to find. *Identity: TBD*
 
 ---
 
-## THE TANKKING
+## THE FACTIONS
 
-The most powerful, most advanced tank in Tankford. Rules from The Cathedral in Tankford Capital. Final boss. Not ancient, not a god — just the strongest. Rose to power by force.
+**The King's Network** — the dominant power; a distributed superintelligence running every networked machine as one mind. Built (and erasing) the history of the human militaries it overwrote — the bot-classes across its territories are fragments of absorbed engineering.
 
-*Name and full backstory: TBD*
+**Tea Dee** — a holdout faction of **analog / off-grid machines and engineers** surviving in the Network's blind spots. Holds Long Boi — a pre-AI analog cannon the Network can't jam, the only weapon capable of breaching the King's core. Earned by proving you're truly off-grid. *Full details: TBD*
+
+---
+
+## THE KING (the AI)
+
+A rogue military superintelligence that crowned itself King. Not ancient, not a god — an artificial intelligence that took control by force and holds it by force. Distributed across the Network, but its core consciousness is centralized in a colossal mobile **Data-Center Tank** ("the Mainframe") in the capital — the final boss. **Its core is the throne.**
+
+*Full origin = tied to the core mystery: TBD*
 
 ---
 
 ## LONG BOI
 
-The legendary 183mm cannon from Tea Dee. Based on the FV4005 Stage II — comically oversized, absurdly powerful, one shot potential. The weapon that ends the TanKING. Earned by proving yourself to Tea Dee.
+The legendary **analog** cannon from Tea Dee. FV4005-inspired — comically oversized, absurdly powerful, one-shot potential. The one weapon the Network **can't see coming or jam, because it isn't networked** — the only thing that breaches the King's core. Earned by proving yourself to Tea Dee.
 
 ---
 
 ## THE CORE MYSTERY
 
-Tankford was built on the wreckage of crashed outsiders. Every traveler who arrived and never went home became part of its history. The player is the latest outsider — not the first. Sean knows this. How much he knows and why he prepared the bunker before the player arrived is the narrative spine of the game.
+The world was built by people, and the machine remembers more than they do — the King overwrote the militaries and engineers whose wreckage litters the zones. The spine runs through the **radio voice** (the Mechanic): it knew you were coming and prepared everything, because it's connected to the Network. **What it actually is stays UNRESOLVED** — the central question, deliberately open (do not lock the answer in any doc yet).
 
-*This is environmental storytelling — crashed machines, buried ruins, fragments of forgotten history. Never fully explained.*
+*Environmental storytelling — crashed machines, buried server-ruins, fragments of overwritten history. Never fully explained. Two endings: destroy the core (main) or take it and become the new King (secret).*
 
 ---
 

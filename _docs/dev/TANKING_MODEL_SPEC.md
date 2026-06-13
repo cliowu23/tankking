@@ -1,7 +1,19 @@
 # TANKING_MODEL_SPEC.md
 # Tank Model & World Asset Specification for Claude Code / Fable 5
-# Last updated: June 2026
+# Last updated: 2026-06-13
 # Purpose: Reference document for procedural asset generation via Blender MCP
+
+---
+
+> **⭐ v3 AI-PIVOT REFRAME (2026-06-13).** Fiction changed — canonical bible: `_docs/world/TANKING_WORLD.md`.
+> Apply globally when reading this doc: **"Tankford" → the King's Network**; the three enemy doctrines are now
+> **bot-classes** — Scout (light) / Line (medium) / Siege (heavy) / Sniper (TD) — built **uniform, identical,
+> mass-produced**, with glowing sensor-eyes + antenna/network motifs and one cold accent color per class
+> (*no heraldry/banners*). The **player tank** is the **analog scrappy free tank / frankentank** (NOT a
+> "foreign American outsider" — it's *humanity's improvisation*, mismatched salvaged parts). **"the TanKING"
+> → the King (AI)**, a colossal mobile **Data-Center Tank** (final boss); **"the Cathedral" → the Core
+> Citadel**. Per-doctrine armor silhouettes, biome colors, and proportions below **still apply** — only the
+> heraldry/foreign-outsider *framing* changes. Toylike look LOCKED.
 
 ---
 
@@ -168,7 +180,7 @@ see `src/utils/modelPaint.js`). Therefore:
 
 ## TANK DOCTRINES
 
-There are three tank doctrines in Tankford. Each has a distinct visual language.
+There are three enemy bot-classes the King fields (plus the player's free tank). Each has a distinct visual language.
 The player's tank can equip parts from any doctrine — that's what makes them unique.
 Enemy tanks in each zone use that zone's doctrine exclusively.
 
@@ -178,7 +190,7 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 
 **Fantasy:** Fast, fragile, dangerous at range. Scouts, skirmishers, glass cannons.
 **Real-world inspiration:** Stuart M3, BT-7, Panzerkampfwagen II — small, wheeled or narrow-tracked, low profile.
-**Tankford visual language:** Lighter colors, faster-looking shapes, exposed components, lighter heraldry markings.
+**Scout-bot visual language:** Lighter colors, faster-looking shapes, exposed components, light sensor/antenna details (no heraldry).
 
 #### Light Hull variants:
 
@@ -227,9 +239,9 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 
 ### DOCTRINE 2: MEDIUM (World 2 — Ashrock)
 
-**Fantasy:** Balanced. Can fight at any range. The backbone of Tankford's army.
+**Fantasy:** Balanced. Can fight at any range. The backbone of the King's army.
 **Real-world inspiration:** Sherman M4, T-34, Panzer IV — medium weight, versatile, readable turrets.
-**Tankford visual language:** Warm desert tones, sand-dusted surfaces, campaign markings, more armor bulk than Light but still mobile.
+**Line-bot visual language:** Warm desert tones, sand-dusted surfaces, network markings, more armor bulk than Scout but still mobile.
 
 #### Medium Hull variants:
 
@@ -279,7 +291,7 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 
 **Fantasy:** Slow, devastating, near-impenetrable. Rolling fortresses.
 **Real-world inspiration:** Tiger I, IS-2, Churchill — massive, angular, slab-sided armor.
-**Tankford visual language:** Cold grays and deep blues, frost-dusted surfaces, imposing Tankford insignia, thick slab armor geometry.
+**Siege-bot visual language:** Cold grays and deep blues, frost-dusted surfaces, imposing network sigil, thick slab armor geometry.
 
 #### Heavy Hull variants:
 
@@ -326,11 +338,11 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 
 ---
 
-### DOCTRINE 4: PLAYER TANK (Outsider / American-inspired)
+### DOCTRINE 4: PLAYER TANK (the analog free tank / frankentank)
 
-**Fantasy:** The player is a foreign outsider. Their tank looks *wrong* for Tankford. That's the point.
-**Visual language:** American WWII/Cold War aesthetic. M4 Sherman meets M48 Patton. Clearly foreign. Different design language from everything in Tankford.
-**Key visual distinction:** Rounded, welded, practical. Less ornate than Tankford tanks. More utilitarian. Clearly manufactured elsewhere.
+**Fantasy:** The player pilots the last kind of **human-built, analog, off-grid** tank. It looks *hand-made* next to the King's machine-perfect bots. That's the point.
+**Visual language:** American WWII/Cold War aesthetic — M4 Sherman meets M48 Patton — read now as *the last human-made machine*: warm, welded, practical. Different design language from the bots' clean uniformity. Becomes a **frankentank** of mismatched salvaged parts over the run.
+**Key visual distinction:** Rounded, welded, lived-in. Less uniform than any bot. Clearly assembled by hand, not stamped out.
 
 #### Player Hull:
 
@@ -340,14 +352,14 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 - Visible weld lines on hull sides.
 - Round-headed bolts along armor plate edges (distinctive American detail).
 - Hull hatches on top (driver + co-driver positions).
-- Unique identifier: **no Tankford heraldry**. Plain painted surfaces. Foreign.
-- Top-down shape: rectangle with noticeably rounded front corners vs. Tankford tanks.
+- Unique identifier: **no network sigil, no sensor-eyes** — hand-painted surfaces, human.
+- Top-down shape: rectangle with noticeably rounded front corners vs. the angular bots.
 
 #### Player Turret (starting):
 
 **`player_turret_base`**
 - Round cast turret. M4A3 feel.
-- Clear foreign silhouette — wider and rounder than any Tankford turret.
+- Clear hand-built silhouette — wider and rounder than any bot turret.
 - Single hatch top-center.
 - Simple gun mantlet.
 - Should look like it came from somewhere else entirely.
@@ -371,13 +383,11 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 - This is intentionally funny AND epic. Lean into both.
 - Color: Tea Dee navy and silver.
 
-### TanKING Boss Tank
-- The most advanced, most imposing tank in Tankford. Abrams equivalent in this world.
-- Must visually dwarf all other tanks.
-- **Heavy doctrine base** but with unique royal additions: gold trim, Tankford royal insignia, elaborate gun mantlet.
-- Stained glass-inspired color accents (World 4 environment reference).
-- Should feel like a final boss — unmistakably the most powerful thing in the game.
-- Top-down footprint: ~20% larger than any Heavy hull.
+### The King — Data-Center Tank (final boss)
+- The King made physical: a colossal mobile **data-center on tracks** housing the AI's core. Must visually dwarf all other tanks.
+- **Siege (heavy) doctrine base** scaled up, fused with **server/data-center motifs**: stacked server-rack panels, cooling stacks, a sensor-mast cluster, the unifying network sigil writ large, cold core-glow.
+- Should feel like a final boss — unmistakably the most powerful thing in the game, and unmistakably *the network itself.*
+- Top-down footprint: ~20%+ larger than any Siege hull (it's a fortress).
 
 ---
 
@@ -388,13 +398,13 @@ Enemy tanks in each zone use that zone's doctrine exclusively.
 | World 1 — The Iron Keep | Green fields, rolling hills | Bright midday sun | Bright greens, warm golds, clear sky blue | Light |
 | World 2 — Ashrock | Desert, rock formations | Orange sunset | Deep orange, burnt sienna, long purple shadows | Medium |
 | World 3 — Frostholm | Frozen tundra, snowdrifts | Overcast grey (blizzard near fortress) | Cold whites, deep greys, ice blue | Heavy |
-| World 4 — The Cathedral | WWII European city, cobblestones, grand buildings | Bright sunny day | Warm stone, cream facades, TanKING red+gold banners | TanKING |
+| World 4 — The Mainframe | Data-center capital, boulevards, server-citadels | Bright sunny day | Concrete + cream facades, King network-red+gold | Sniper-bots / the King |
 
 ### Zone environment assets needed (per zone):
 - Ground tile (terrain surface — zone-specific material)
 - Destructible cover object x2 (e.g., stone wall, sand berm, snowbank, market stall)
 - Ambient scatter props x2 (barrels, crates, banners — zone-flavored)
-- Zone fortress gate (World 1–3) or Cathedral entrance (World 4)
+- Zone fortress gate (World 1–3) or Core Citadel entrance (World 4)
 
 ---
 

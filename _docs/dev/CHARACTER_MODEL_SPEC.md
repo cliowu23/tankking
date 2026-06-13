@@ -87,8 +87,9 @@ rotation about bone-local **X** everywhere.
 ONE parametric generator (`scripts/modelgen/char_mini.py`) + one params JSON per
 character (`scripts/modelgen/params/char_<id>.json`): skin tone, hair style + color,
 outfit (jacket/pants/boots/cap colors), build (height/width factors), face params.
-The 12 crew presets = 12 small JSONs. Named NPCs (Sean, Clint, Caylie) = the same
-system + their signature accessory/outfit params.
+The 12 crew presets = 12 small JSONs. The role-NPCs (the Mechanic, the Merchant, the
+Healer — names deferred per the v3 AI pivot) = the same system + their signature
+accessory/outfit params.
 
 ## WORKFLOW (same loop as tanks)
 
@@ -108,7 +109,7 @@ commit canon + GLB.
   keep CC0 assets (legal fallback).
 - **C2**: 12 crew preset JSONs; swap `DRIVER_CHARACTERS`; retire Kenney GLBs.
 - **C3**: original accessories (glasses, shades, mask + new: cap, headset, beanie).
-- **C4**: named NPCs (Sean/Clint/Caylie) for the bunker.
+- **C4**: the role-NPCs (Mechanic/Merchant/Healer — names deferred) for the bunker.
 - **Cleanup**: delete dormant KayKit pack (unused by code).
 
 ## TRAP LOG (seeded by C0 — append every new trap)
