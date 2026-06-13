@@ -89,7 +89,7 @@ export const WORLD1 = {
 
   // Landmark POIs (geometry built by the zone builder; no quest logic yet).
   pois: {
-    clintStore: { x:-45, z:-70, ry:0.25 },          // burnt-out store, NEAR band
+    merchantStore: { x:-45, z:-70, ry:0.25 },       // the Merchant's burnt-out store, NEAR band
     wreck:      { x:-95, z:18,  ry:0.7  },          // crashed outsider machine, MID west
     farmstead:  { x:88,  z:28,  ry:-0.2 },          // barn + hay bales, MID east
     watchtower: { x:-92, z:100 },                   // broken turret, DEEP west (guarded)

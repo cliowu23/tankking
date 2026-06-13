@@ -15,7 +15,7 @@
 
 import {
   MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, Mesh, Matrix,
-  VertexBuffer, VertexData, Quaternion,
+  VertexBuffer, VertexData, Quaternion, Texture,
 } from '@babylonjs/core';
 import { makeBlobMat, addBlob } from '../../hub/HangarProps.js';
 
@@ -70,6 +70,55 @@ export function buildWorld1(scene, zone) {
     m.backFaceCulling  = false;
     m.emissiveColor    = new Color3(0.16, 0.20, 0.07);
   }
+
+  // Blender-baked tileable textures (seamless diffuse + normal, authored
+  // procedurally via scripts/texgen/textures.py — 100% IP-clean). The helper
+  // applies a diffuse+normal pair at a given tile density; diffuseColor=white so
+  // the texture carries the colour.
+  const surf = (m, name, tile, dir = 'world1') => {
+    const base = `/assets/textures/${dir}/${name}`;
+    const d = new Texture(base + '_diff.png', scene);
+    const n = new Texture(base + '_nrm.png',  scene);
+    d.uScale = d.vScale = tile; n.uScale = n.vScale = tile;
+    m.diffuseTexture = d; m.diffuseColor = new Color3(1, 1, 1); m.bumpTexture = n;
+  };
+  // World-space planar (triplanar-lite) UVs: texel density stays constant in WORLD
+  // units regardless of mesh size/shape, so textures never stretch. Pair with the
+  // material's uScale = 1. `tile` = world units per texture repeat.
+  const worldUV = (mesh, tile) => {
+    mesh.computeWorldMatrix(true);
+    const pos = mesh.getVerticesData(VertexBuffer.PositionKind);
+    const nor = mesh.getVerticesData(VertexBuffer.NormalKind);
+    if (!pos || !nor) return;
+    const wm = mesh.getWorldMatrix();
+    const wp = new Vector3(), wn = new Vector3();
+    const uv = new Float32Array(pos.length / 3 * 2);
+    for (let i = 0; i < pos.length / 3; i++) {
+      Vector3.TransformCoordinatesFromFloatsToRef(pos[i*3], pos[i*3+1], pos[i*3+2], wm, wp);
+      Vector3.TransformNormalFromFloatsToRef(nor[i*3], nor[i*3+1], nor[i*3+2], wm, wn);
+      const ax = Math.abs(wn.x), ay = Math.abs(wn.y), az = Math.abs(wn.z);
+      let u, v;
+      if (ay >= ax && ay >= az) { u = wp.x; v = wp.z; }    // horizontal → XZ
+      else if (ax >= az)        { u = wp.z; v = wp.y; }    // x-facing  → ZY
+      else                      { u = wp.x; v = wp.y; }    // z-facing  → XY
+      uv[i*2] = u / tile; uv[i*2+1] = v / tile;
+    }
+    mesh.setVerticesData(VertexBuffer.UVKind, uv);
+  };
+  surf(M.grass,    'grass', 16);   // ground plane — 0-1 UVs tile fine (square)
+  surf(M.path,     'dirt',   1);   // worldUV-driven (no stretch on the long path)
+  surf(M.stone,    'stone',  2);   // rocks (spheres)
+  surf(M.stoneD,   'stoneblock', 1);  // stone-block walls / rubble / merlons
+  surf(M.hedge,    'hedge',  1);   // hedge trunk — worldUV-driven
+  surf(M.foliage,  'hedge',  2);   // hedge puffs (spheres)
+  surf(M.foliage2, 'hedge',  2);
+  // structures — textured boxes auto-get worldUV via box() below
+  surf(M.cream,    'plaster',  1);              // building walls (light stucco)
+  surf(M.concrete, 'concrete', 1, 'hangar');    // tunnel headwall, dragon teeth, checkpoint
+  surf(M.wood,     'wood',     1, 'hangar');    // signs, doors, posts
+  surf(M.crate,    'wood',     1, 'hangar');    // crates
+  surf(M.roof,     'rooftile', 1);              // tiled roofs (barn, etc.)
+
   const blobMat = makeBlobMat(scene);
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -77,6 +126,7 @@ export function buildWorld1(scene, zone) {
     const b = MeshBuilder.CreateBox(n, { width: w, height: h, depth: d }, scene);
     b.position.set(x, y, z); b.rotation.set(rx, ry, rz);
     b.material = m; b.isPickable = false; b.parent = p ?? root;
+    if (m && m.diffuseTexture) worldUV(b, 3);   // textured boxes → world UVs, no stretch
     return b;
   };
   const cyl = (p, n, dia, h, x, y, z, m, t = 12, o = {}) => {
@@ -138,13 +188,30 @@ export function buildWorld1(scene, zone) {
   ground.receiveShadows = true;
   ground.parent = root;
 
-  // ── dirt paths (flat hard-edged strips) ────────────────────────────────────
+  // ── dirt path — one SMOOTH continuous ribbon (Catmull-Rom through the
+  // waypoints), not box segments → no spiky corners. World-space UVs so the dirt
+  // flows at constant density without stretching. ──────────────────────────────
+  const PATH_Y = 0.055, SEG = 14;
   const buildPath = (wps, w = 5) => {
-    for (let i = 0; i < wps.length - 1; i++) {
-      const [x1, z1] = wps[i], [x2, z2] = wps[i + 1];
-      const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
-      box(root, 'w1-path', w, 0.08, len + w * 0.8, (x1 + x2) / 2, 0.05, (z1 + z2) / 2, M.path, Math.atan2(dx, dz));
+    if (!wps || wps.length < 2) return;
+    const ctrl = wps.map(([x, z]) => new Vector3(x, PATH_Y, z));
+    const center = [];
+    for (let i = 0; i < ctrl.length - 1; i++) {
+      const p0 = ctrl[Math.max(0, i-1)], p1 = ctrl[i], p2 = ctrl[i+1], p3 = ctrl[Math.min(ctrl.length-1, i+2)];
+      for (let s = 0; s < SEG; s++) center.push(Vector3.CatmullRom(p0, p1, p2, p3, s / SEG));
     }
+    center.push(ctrl[ctrl.length - 1]);
+    const L = [], R = [];
+    for (let i = 0; i < center.length; i++) {
+      const a = center[Math.max(0, i-1)], b = center[Math.min(center.length-1, i+1)];
+      const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+      const px = -tz / tl, pz = tx / tl;                       // perpendicular in XZ
+      L.push(new Vector3(center[i].x + px*w/2, PATH_Y, center[i].z + pz*w/2));
+      R.push(new Vector3(center[i].x - px*w/2, PATH_Y, center[i].z - pz*w/2));
+    }
+    const ribbon = MeshBuilder.CreateRibbon('w1-path', { pathArray: [L, R] }, scene);
+    ribbon.material = M.path; ribbon.parent = root; ribbon.receiveShadows = true; ribbon.isPickable = false;
+    worldUV(ribbon, 6);
   };
   buildPath(zone.paths.main);
   buildPath(zone.paths.storeSpur, 4);
@@ -302,9 +369,9 @@ export function buildWorld1(scene, zone) {
     }
   }
 
-  // ── POI: Clint's ruined store (NEAR band) ──────────────────────────────────
+  // ── POI: the Merchant's ruined store (NEAR band) ───────────────────────────
   {
-    const p = zone.pois.clintStore;
+    const p = zone.pois.merchantStore;
     const store = new TransformNode('w1-store', scene);
     store.parent = root; store.position.set(p.x, 0, p.z); store.rotation.y = p.ry;
     box(store, 'slab', 8, 0.25, 7, 0, 0.12, 0, M.stoneD);
@@ -345,9 +412,9 @@ export function buildWorld1(scene, zone) {
     const p = zone.pois.farmstead;
     const farm = new TransformNode('w1-farm', scene);
     farm.parent = root; farm.position.set(p.x, 0, p.z); farm.rotation.y = p.ry;
-    box(farm, 'barn', 8, 4.2, 6.5, 0, 2.1, 0, M.roof);
-    box(farm, 'roof-l', 5.4, 0.22, 7.3, -1.9, 4.9, 0, M.burnt, 0, 0, 0.55);
-    box(farm, 'roof-r', 5.4, 0.22, 7.3, 1.9, 4.9, 0, M.burnt, 0, 0, -0.55);
+    box(farm, 'barn', 8, 3.0, 6.5, 0, 1.5, 0, M.roof);                        // lower body — walls no longer poke through the roof
+    box(farm, 'roof-l', 5.6, 0.22, 7.6, -1.9, 4.5, 0, M.burnt, 0, 0, 0.55);   // eaves seated on the walls, slight overhang
+    box(farm, 'roof-r', 5.6, 0.22, 7.6, 1.9, 4.5, 0, M.burnt, 0, 0, -0.55);
     box(farm, 'door', 2.6, 2.6, 0.12, 0, 1.3, 3.3, M.wood);
     for (const [hx, hy, hz] of [[-5.5, 0.8, 2.0], [-5.0, 0.8, -1.2], [-6.4, 2.0, 0.4]]) {
       const hay = cyl(farm, 'hay', 2.2, 1.6, hx, hy, hz, M.tgrass, 14);
@@ -384,7 +451,7 @@ export function buildWorld1(scene, zone) {
     const ckpt = new TransformNode('w1-ckpt', scene);
     ckpt.parent = root; ckpt.position.set(p.x, 0, p.z); ckpt.rotation.y = p.ry;
     box(ckpt, 'hut', 3.4, 2.6, 2.8, 0, 1.3, 0, M.cream);
-    box(ckpt, 'hut-roof', 4.0, 0.18, 3.4, 0, 2.75, 0, M.roofS, 0, 0, 0.06);
+    box(ckpt, 'hut-roof', 4.2, 0.18, 3.6, 0, 2.95, 0, M.roofS, 0, 0, 0.06);   // raised so the hut walls don't clip through
     cyl(ckpt, 'barrier-post', 0.3, 1.2, -2.2, 0.6, 2.2, M.stoneD, 8);
     box(ckpt, 'barrier', 5.5, 0.18, 0.18, 0.5, 1.15, 2.2, M.banner, 0, 0, 0.08);
     box(ckpt, 'bpole', 0.22, 5.5, 0.22, 2.4, 2.75, -1.8, M.wood);

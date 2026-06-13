@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TanKING — Texture & Depth Studio</title>
+<!--
+  Texture/depth studio — see a surface go from flat colour → stylized diffuse →
+  + normal-map relief → + ambient occlusion → + post pipeline, on the real ground
+  + a stand-in tank + a rock, lit like the arena.
+  Run: cd game && python3 -m http.server 8788  →  http://localhost:8788/texture-studio.html
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a0c10;font-family:monospace}
+  #c{display:block;width:100%;height:100%}
+  #ui{position:absolute;top:14px;left:14px;z-index:10;display:flex;flex-direction:column;gap:5px;width:236px}
+  h1{color:#00e5ff;font-size:11px;letter-spacing:3px;margin:0 0 4px;background:rgba(0,8,20,.93);border:1px solid #00e5ff44;padding:8px 12px}
+  .grp{background:rgba(0,8,20,.9);border:1px solid #00e5ff22;padding:8px 10px}
+  .grp h2{color:#7fc8d4;font-size:9px;letter-spacing:2px;margin:0 0 6px;font-weight:normal}
+  button{background:rgba(0,8,20,.6);color:#7fc8d4;border:1px solid #00e5ff22;font-family:monospace;font-size:10px;letter-spacing:1px;padding:6px 9px;cursor:pointer;text-align:left;width:100%;margin-bottom:3px}
+  button:hover{background:rgba(0,40,60,.9);color:#ddfff8}
+  button.on{background:rgba(0,80,45,.9);color:#6eff9b;border-color:#6eff9b88}
+  .row{display:flex;gap:3px}
+  .row button{margin-bottom:0}
+  label{display:block;color:#9bdfe8;font-size:9px;margin:6px 0 2px}
+  input[type=range]{width:100%}
+  #hint{position:absolute;bottom:12px;left:14px;color:#4a6b72;font-size:9px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>TEXTURE STUDIO</h1>
+  <div class="grp">
+    <h2>SURFACE</h2>
+    <div class="row" id="surf"></div>
+  </div>
+  <div class="grp">
+    <h2>LAYERS — click to toggle</h2>
+    <button id="bDiff" class="on">① Diffuse texture</button>
+    <button id="bNorm" class="on">② Normal map (relief)</button>
+    <button id="bAO"   class="on">③ Ambient occlusion</button>
+    <button id="bShad" class="on">④ Real shadows</button>
+    <button id="bPost" class="on">⑤ Post: bloom + grade + vignette</button>
+  </div>
+  <div class="grp">
+    <h2>DEPTH STRENGTH</h2>
+    <label>Normal relief <span id="nL">1.0</span></label>
+    <input id="nStr" type="range" min="0" max="3" step="0.1" value="1">
+    <label>Bloom <span id="blL">0.25</span></label>
+    <input id="bl" type="range" min="0" max="1" step="0.05" value="0.25">
+  </div>
+</div>
+<div id="hint">drag orbit · scroll zoom · compare ① flat vs all layers on</div>
+<canvas id="c"></canvas>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const engine = new BABYLON.Engine(canvas, true, { antialias:true, adaptToDeviceRatio:true });
+const scene  = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0.48,0.78,1.0,1);
+
+const cam = new BABYLON.ArcRotateCamera('cam', -Math.PI/2, 0.62, 26, BABYLON.Vector3.Zero(), scene);
+cam.lowerRadiusLimit=10; cam.upperRadiusLimit=60; cam.attachControl(canvas,true);
+cam.useInputToRestoreState=false;
+
+// ── lighting — match ArenaScene ─────────────────────────────────────────────
+const amb = new BABYLON.HemisphericLight('amb', new BABYLON.Vector3(0,1,0), scene);
+amb.intensity=0.85; amb.diffuse=new BABYLON.Color3(1,0.97,0.88); amb.groundColor=new BABYLON.Color3(0.28,0.52,0.10);
+const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(0.15,-1,0.12), scene);
+sun.intensity=0.75; sun.position=new BABYLON.Vector3(14,22,14);
+const shadowGen = new BABYLON.ShadowGenerator(2048, sun);
+shadowGen.usePoissonSampling=true; shadowGen.bias=0.0001; shadowGen.normalBias=0.02; shadowGen.darkness=0.45;
+
+// ── noise helpers ────────────────────────────────────────────────────────────
+function hash(n){let s=Math.sin(n*127.1+n*0.5)*43758.5453;return s-Math.floor(s);}
+function h2(x,y){return hash(x*127.1+y*311.7);}
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const ux=xf*xf*(3-2*xf),uy=yf*yf*(3-2*yf);
+  const a=h2(xi,yi),b=h2(xi+1,yi),c=h2(xi,yi+1),d=h2(xi+1,yi+1);
+  return a+(b-a)*ux+(c-a)*uy+(a-b-c+d)*ux*uy;}
+function fbm(x,y,oct=4){let v=0,a=1,f=1,m=0;for(let i=0;i<oct;i++){v+=vnoise(x*f,y*f)*a;m+=a;a*=0.5;f*=2.0;}return v/m;}
+
+// height (R channel of array h) → tangent-space normal RGBA array (Sobel)
+function heightToNormal(h, S, strength){
+  const out=new Uint8ClampedArray(S*S*4);
+  const H=(x,y)=>{x=(x+S)%S;y=(y+S)%S;return h[(y*S+x)*4]/255;};
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const dx=(H(x-1,y)-H(x+1,y))*strength, dy=(H(x,y-1)-H(x,y+1))*strength;
+    let nx=dx,ny=dy,nz=1.0; const l=Math.hypot(nx,ny,nz); nx/=l;ny/=l;nz/=l;
+    const i=(y*S+x)*4; out[i]=(nx*0.5+0.5)*255; out[i+1]=(ny*0.5+0.5)*255; out[i+2]=(nz*0.5+0.5)*255; out[i+3]=255;
+  }
+  return out;
+}
+
+// Each surface fills diffuse array d (RGBA) + height array h (grey in R), 0..S.
+const SURFACES = {
+  grass(S,d,h){
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+      const i=(y*S+x)*4;
+      const blade=Math.max(0,vnoise(x*0.9,y*0.22)-0.45);
+      const patch=fbm(x*0.03,y*0.03,4);
+      const grain=vnoise(x*0.5,y*0.5)*0.1;
+      const lum=0.42+patch*0.28+blade*0.5-0.05+grain;
+      d[i]=(0.26+lum*0.25)*255; d[i+1]=(0.55+lum*0.4)*255; d[i+2]=(0.16+lum*0.15)*255; d[i+3]=255;
+      const ht=Math.max(0,Math.min(1,patch*0.6+blade*0.8))*255; h[i]=h[i+1]=h[i+2]=ht; h[i+3]=255;
+    }
+  },
+  dirt(S,d,h){
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+      const i=(y*S+x)*4;
+      const clods=fbm(x*0.06,y*0.06,4);
+      const peb=vnoise(x*0.7,y*0.7)>0.78?0.25:0;
+      const crack=Math.max(0,0.5-Math.abs(fbm(x*0.04,y*0.05,3)-0.5))*0.4;
+      const lum=0.5+clods*0.3+peb-crack;
+      d[i]=(0.55+lum*0.2)*255; d[i+1]=(0.42+lum*0.18)*255; d[i+2]=(0.30+lum*0.12)*255; d[i+3]=255;
+      const ht=Math.max(0,Math.min(1,clods*0.7+peb*1.5-crack*1.2))*255; h[i]=h[i+1]=h[i+2]=ht; h[i+3]=255;
+    }
+  },
+  stone(S,d,h){
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+      const i=(y*S+x)*4;
+      const cell=fbm(x*0.05,y*0.05,3);
+      const grain=vnoise(x*0.6,y*0.6)*0.12;
+      const lum=0.55+cell*0.3+grain-0.08;
+      d[i]=(0.55+lum*0.18)*255; d[i+1]=(0.54+lum*0.18)*255; d[i+2]=(0.52+lum*0.2)*255; d[i+3]=255;
+      const ht=Math.max(0,Math.min(1,cell*0.8+grain))*255; h[i]=h[i+1]=h[i+2]=ht; h[i+3]=255;
+    }
+  },
+  metal(S,d,h){
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+      const i=(y*S+x)*4;
+      const panel=((Math.floor(x/64)+Math.floor(y/64))%2)*0.04;
+      const seamX=((x%64)<2||(x%64)>61)?0.25:0;
+      const seamY=((y%64)<2||(y%64)>61)?0.25:0;
+      const scratch=vnoise(x*0.4,y*1.6)*0.08;
+      const lum=0.55+panel+scratch-Math.max(seamX,seamY);
+      d[i]=(0.20+lum*0.2)*255; d[i+1]=(0.36+lum*0.25)*255; d[i+2]=(0.62+lum*0.3)*255; d[i+3]=255; // cobalt
+      const ht=Math.max(0,Math.min(1,0.6-Math.max(seamX,seamY)*1.5+scratch))*255; h[i]=h[i+1]=h[i+2]=ht; h[i+3]=255;
+    }
+  },
+};
+
+// Build diffuse DynamicTexture (single getContext + single putImageData — Babylon
+// returns a FRESH context per getContext() call, so multiple calls scatter draws).
+let matUID=0;
+function buildMatset(key, tile){
+  const S=256;
+  const dt=new BABYLON.DynamicTexture('diff_'+key+'_'+(matUID++), {width:S,height:S}, scene, false);
+  const ctx=dt.getContext();
+  const dimg=ctx.createImageData(S,S);
+  const hData=new Uint8ClampedArray(S*S*4);
+  SURFACES[key](S, dimg.data, hData);
+  if(state.ao){ const d=dimg.data; for(let i=0;i<d.length;i+=4){ const f=0.55+0.45*(hData[i]/255); d[i]*=f; d[i+1]*=f; d[i+2]*=f; } }
+  ctx.putImageData(dimg,0,0);
+  dt.update();
+  dt.wrapU=dt.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; dt.uScale=dt.vScale=tile;
+  return { dt, hData, S, key, tile };
+}
+function makeNormalTex(set){
+  const nt=new BABYLON.DynamicTexture('norm_'+set.key+'_'+(matUID++), {width:set.S,height:set.S}, scene, false);
+  const ctx=nt.getContext();
+  const nimg=ctx.createImageData(set.S,set.S);
+  nimg.data.set(heightToNormal(set.hData, set.S, 2.2*state.nStr));
+  ctx.putImageData(nimg,0,0);
+  nt.update();
+  nt.wrapU=nt.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; nt.uScale=nt.vScale=set.tile;
+  return nt;
+}
+
+// ── scene objects: ground, a stand-in tank, a rock ──────────────────────────
+const ground = BABYLON.MeshBuilder.CreateGround('g',{width:30,height:30,subdivisions:1},scene);
+ground.receiveShadows=true;
+const gMat = new BABYLON.StandardMaterial('gMat',scene);
+gMat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);
+ground.material=gMat;
+
+function boxMesh(w,h,d,x,y,z){const m=BABYLON.MeshBuilder.CreateBox('b',{width:w,height:h,depth:d},scene);m.position.set(x,y,z);shadowGen.addShadowCaster(m);return m;}
+const tankMat=new BABYLON.StandardMaterial('tMat',scene); tankMat.specularColor=new BABYLON.Color3(0.16,0.17,0.19); tankMat.specularPower=48;
+const hull=boxMesh(3,1,4.6, -6,0.6,0); hull.material=tankMat;
+const turret=boxMesh(2,0.8,2.4, -6,1.4,-0.3); turret.material=tankMat;
+const gun=BABYLON.MeshBuilder.CreateCylinder('gun',{diameter:0.28,height:3.4},scene);gun.rotation.x=Math.PI/2;gun.position.set(-6,1.55,1.6);gun.material=tankMat;shadowGen.addShadowCaster(gun);
+const rockMat=new BABYLON.StandardMaterial('rMat',scene); rockMat.specularColor=new BABYLON.Color3(0.04,0.04,0.04);
+const rock=BABYLON.MeshBuilder.CreateSphere('rock',{diameter:3.4,segments:3},scene);rock.scaling.set(1.3,0.8,1.1);rock.position.set(6,0.9,2);rock.material=rockMat;shadowGen.addShadowCaster(rock);
+
+// ── state + apply ────────────────────────────────────────────────────────────
+const state={surf:'grass', diff:true, norm:true, ao:true, shadow:true, post:true, nStr:1.0, bloom:0.25};
+let groundSet, tankSet, rockSet, pipeline=null;
+
+function applyAll(){
+  for(const mat of [gMat,tankMat,rockMat]){ mat.diffuseTexture?.dispose(); mat.bumpTexture?.dispose(); mat.diffuseTexture=null; mat.bumpTexture=null; }
+  groundSet = buildMatset(state.surf, 6);
+  tankSet   = buildMatset('metal', 1);
+  rockSet   = buildMatset('stone', 1.4);
+  for(const [mat,set,base] of [[gMat,groundSet,[0.42,0.75,0.31]],[tankMat,tankSet,[0.12,0.42,0.88]],[rockMat,rockSet,[0.6,0.58,0.54]]]){
+    if(state.diff){ mat.diffuseTexture=set.dt; mat.diffuseColor=new BABYLON.Color3(1,1,1); }
+    else { mat.diffuseColor=new BABYLON.Color3(...base); set.dt.dispose(); }
+    mat.bumpTexture = (state.diff && state.norm) ? makeNormalTex(set) : null;
+  }
+  shadowGen.getShadowMap().renderList = state.shadow ? [hull,turret,gun,rock] : [];
+  if(pipeline){ pipeline.dispose(); pipeline=null; }
+  if(state.post){
+    pipeline=new BABYLON.DefaultRenderingPipeline('post', true, scene, [cam]);
+    pipeline.bloomEnabled=true; pipeline.bloomThreshold=0.85; pipeline.bloomWeight=state.bloom; pipeline.bloomKernel=48;
+    pipeline.imageProcessingEnabled=true;
+    pipeline.imageProcessing.vignetteEnabled=true; pipeline.imageProcessing.vignetteWeight=1.1;
+    pipeline.imageProcessing.contrast=1.08; pipeline.imageProcessing.exposure=1.0;
+    pipeline.fxaaEnabled=true;
+  }
+}
+applyAll();
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+const surfDiv=document.getElementById('surf');
+['grass','dirt','stone','metal'].forEach(k=>{
+  const b=document.createElement('button'); b.textContent=k; if(k===state.surf)b.classList.add('on');
+  b.onclick=()=>{state.surf=k;[...surfDiv.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');applyAll();};
+  surfDiv.appendChild(b);
+});
+function tog(id,key){const b=document.getElementById(id);b.onclick=()=>{state[key]=!state[key];b.classList.toggle('on',state[key]);applyAll();};}
+tog('bDiff','diff');tog('bNorm','norm');tog('bAO','ao');tog('bShad','shadow');tog('bPost','post');
+document.getElementById('nStr').oninput=e=>{state.nStr=+e.target.value;document.getElementById('nL').textContent=state.nStr.toFixed(1);applyAll();};
+document.getElementById('bl').oninput=e=>{state.bloom=+e.target.value;document.getElementById('blL').textContent=state.bloom.toFixed(2);if(pipeline)pipeline.bloomWeight=state.bloom;};
+
+engine.runRenderLoop(()=>scene.render());
+addEventListener('resize',()=>engine.resize());
+</script>
+</body>
+</html>
