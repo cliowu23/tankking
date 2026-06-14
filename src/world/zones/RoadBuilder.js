@@ -13,10 +13,12 @@ import {
   VertexBuffer, Texture, DynamicTexture,
 } from '@babylonjs/core';
 
-const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 64;
+const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 300;
 
 // Duckov-style dirt mask: solid worn centre, organic ragged edge feathering to grass.
-function makePathMask(scene) {
+// Seeded per-leg (so each run's dirt differs) with LONG lattices over a long tile, so the
+// edge wander is varied and non-repeating along the whole road (not a stamped 64u repeat).
+function makePathMask(scene, seed = 1) {
   const W = 176, H = 768;
   const mul  = (a) => () => { a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
   const smoo = (f) => f*f*(3-2*f);
@@ -25,14 +27,15 @@ function makePathMask(scene) {
   const n1   = (t,L) => { const n=L.length, x=(((t%1)+1)%1)*n, i0=Math.floor(x)%n, i1=(i0+1)%n, f=smoo(x-Math.floor(x)); return L[i0]*(1-f)+L[i1]*f; };
   const lat2 = (w,h,seed) => { const r=mul(seed); const a=new Float32Array(w*h); for(let i=0;i<w*h;i++)a[i]=r(); a.w=w; a.h=h; return a; };
   const n2   = (u,v,L) => { const w=L.w,h=L.h,x=(((u%1)+1)%1)*w,y=(((v%1)+1)%1)*h, i0=Math.floor(x)%w,i1=(i0+1)%w,j0=Math.floor(y)%h,j1=(j0+1)%h,fx=smoo(x-Math.floor(x)),fy=smoo(y-Math.floor(y)); const a=L[j0*w+i0],b=L[j0*w+i1],c=L[j1*w+i0],d=L[j1*w+i1]; return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy; };
-  const warp=lat1(20,7), wide=lat1(20,19), edge=lat2(14,24,53);
+  // Long lattices (≈one value per ~5u over the 300u tile) sampled at integer freq 1 → a
+  // varied, NON-repeating edge wander that still tiles seamlessly (wrapV) for long legs.
+  const s = seed >>> 0;
+  const warp=lat1(56, (s^0x9e3779b1)>>>0), wide=lat1(56, (s^0x85ebca77)>>>0), edge=lat2(20,40,(s^0xc2b2ae35)>>>0);
   const tex = new DynamicTexture('road-pathmask', { width:W, height:H }, scene, false);
   const ctx = tex.getContext(); const id = ctx.createImageData(W,H), d = id.data;
-  // v-frequencies MUST be integers so the mask tiles seamlessly along the road length
-  // (wrapV). Non-integer freqs made the pattern hard-jump every tile = the seam stutter.
   for (let j=0;j<H;j++){ const v=j/H;
-    const ePos = 0.5 + (n1(v*1,warp)-0.5)*0.20;
-    const halfW = 0.32 + (n1(v*1,wide)-0.5)*0.14;
+    const ePos = 0.5 + (n1(v*1,warp)-0.5)*0.24;
+    const halfW = 0.32 + (n1(v*1,wide)-0.5)*0.15;
     for (let i=0;i<W;i++){ const u=i/W; const dist=Math.abs(u-ePos);
       const distP = dist + (n2(u*1.5,v,edge)-0.5)*0.09;
       let a = ss(halfW, halfW-0.13, distP); a=Math.max(0,Math.min(1,a));
@@ -90,7 +93,7 @@ export function buildRoadLeg(scene, zone) {
   ground.material = M.grass; ground.receiveShadows = true; ground.parent = root;
 
   // ── textured dirt road (game's buildPath: Catmull-Rom ribbon + patchy mask) ───
-  M.path.opacityTexture = makePathMask(scene);
+  M.path.opacityTexture = makePathMask(scene, leg.seed);
   M.path.transparencyMode = 2;  // ALPHABLEND
   const buildPath = (wps, w=7) => {
     if (!wps || wps.length < 2) return;
