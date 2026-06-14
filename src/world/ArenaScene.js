@@ -23,6 +23,7 @@ import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
 import { buildWorld1 } from './zones/World1Builder.js';
+import { buildRoadLeg } from './zones/RoadBuilder.js';
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -138,6 +139,14 @@ export default class ArenaScene {
   }
 
   _setupGround() {
+    if (this.zone?.kind === 'road') {
+      // The Long Road: a procedural, textured road leg (RoadBuilder) instead of the
+      // bounded World1 field. Same art pipeline (dirt-path ribbon, grass, trees).
+      const built = buildRoadLeg(this.scene, this.zone);
+      this._obstacles.push(...built.obstacles);
+      for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
+      return;
+    }
     if (this.zone) {
       // The zone builder constructs the whole environment: sculpted terrain,
       // biome dressing, POIs, the south tunnel + safe zone, the Keep vista.
