@@ -45,7 +45,8 @@
   side-spurs → a checkpoint outpost · seeded, different every time</div>
   <div class="hint">
     <b>W</b> drive · <b>S</b> reverse · <b>A/D</b> steer<br>
-    Follow the road to the checkpoint. Take a fork side or grab a POI spur on the way.
+    Follow the road to the checkpoint. <b>Move the mouse</b> to peek that way (world-locked
+    cam — north stays up; it eases toward your aim to reveal threats/loot, like the game).
   </div>
   <div id="readout">SEED: <span id="seed">—</span><br><span id="dist">—</span></div>
   <button id="regen">⟲ REGENERATE LEG</button>
@@ -56,8 +57,8 @@
   <div class="sub">tweak live, then tell me values to bake</div>
   <div class="tune"><label>cam radius</label><input id="k-rad" type="number" step="2" value="58"></div>
   <div class="tune"><label>cam tilt (β)</label><input id="k-beta" type="number" step="0.03" value="0.72"></div>
-  <div class="tune"><label>cam lead</label><input id="k-lead" type="number" step="2" value="14"></div>
-  <div class="tune"><label>cam turn-follow</label><input id="k-cf" type="number" step="0.01" value="0.05"></div>
+  <div class="tune"><label>travel lead</label><input id="k-lead" type="number" step="2" value="6"></div>
+  <div class="tune"><label>aim reveal</label><input id="k-aim" type="number" step="1" value="7"></div>
   <div class="tune"><label>max speed</label><input id="k-spd" type="number" step="1" value="15"></div>
   <div class="tune"><label>accel</label><input id="k-acc" type="number" step="1" value="11"></div>
   <div class="tune"><label>turn rate</label><input id="k-rot" type="number" step="0.1" value="2.2"></div>
@@ -74,10 +75,10 @@ const scene  = new Scene(engine);
 scene.clearColor = new Color4(0.53, 0.81, 0.92, 1.0);
 
 // ── live knobs ────────────────────────────────────────────────────────────────
-const K = { rad:58, beta:0.72, lead:14, cf:0.05, spd:15, acc:11, rot:2.2 };
+const K = { rad:58, beta:0.72, lead:6, aim:7, spd:15, acc:11, rot:2.2 };
 const bind = (id,key)=>{ const el=document.getElementById(id);
   el.addEventListener('input',()=>{ const v=parseFloat(el.value); if(!Number.isNaN(v)) K[key]=v; }); };
-bind('k-rad','rad'); bind('k-beta','beta'); bind('k-lead','lead'); bind('k-cf','cf');
+bind('k-rad','rad'); bind('k-beta','beta'); bind('k-lead','lead'); bind('k-aim','aim');
 bind('k-spd','spd'); bind('k-acc','acc'); bind('k-rot','rot');
 
 // ── camera + lights ─────────────────────────────────────────────────────────--
@@ -259,13 +260,26 @@ scene.onBeforeRenderObservable.add(()=>{
   tank.position.z += Math.cos(rotY)*speed*dt;
   tank.rotation.y = rotY;
 
-  // chase cam: lead AHEAD along the tank's facing; ease the angle to follow heading
-  const fx=Math.sin(rotY), fz=Math.cos(rotY);
-  camTarget.x += (tank.position.x + fx*K.lead - camTarget.x)*0.12;
-  camTarget.z += (tank.position.z + fz*K.lead - camTarget.z)*0.12;
+  // WORLD-LOCKED top-down cam (orientation FIXED — north stays up, bearings kept),
+  // matching the game's _updateCamera: ease toward the cursor to reveal world in the
+  // aim direction (×0.3, clamped) + a small travel-lead, exponentially smoothed.
+  cam.alpha = -Math.PI/2; cam.radius = K.rad; cam.beta = K.beta;
+  let aimX = 0, aimZ = 0;
+  const ray = scene.createPickingRay(scene.pointerX, scene.pointerY, null, cam);
+  if (ray && Math.abs(ray.direction.y) > 1e-4) {
+    const tt = -ray.origin.y / ray.direction.y;
+    const cx = ray.origin.x + tt*ray.direction.x, cz = ray.origin.z + tt*ray.direction.z;
+    let rx = (cx - tank.position.x)*0.3, rz = (cz - tank.position.z)*0.3;
+    const l = Math.hypot(rx,rz) || 1, sc = Math.min(l, K.aim)/l;
+    aimX = rx*sc; aimZ = rz*sc;
+  }
+  const fx = Math.sin(rotY), fz = Math.cos(rotY);
+  const desiredX = tank.position.x + aimX + fx*K.lead;
+  const desiredZ = tank.position.z + aimZ + fz*K.lead;
+  const smooth = 1 - Math.exp(-7*dt);
+  camTarget.x += (desiredX - camTarget.x)*smooth;
+  camTarget.z += (desiredZ - camTarget.z)*smooth;
   cam.setTarget(camTarget);
-  cam.alpha += ((-Math.PI/2 - rotY) - cam.alpha)*K.cf;
-  cam.radius = K.rad; cam.beta = K.beta;
 
   // readout
   const dx=checkpoint.x-tank.position.x, dz=checkpoint.z-tank.position.z; const d=Math.hypot(dx,dz);
