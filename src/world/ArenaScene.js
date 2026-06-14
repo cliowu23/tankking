@@ -10,6 +10,11 @@ import { hpColor, yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
+import * as Journey from '../journey/journeyState.js';
+
+// Long Road: journey fuel burned per world-unit driven. Tuned so a ~55-cost leg
+// roughly empties one tank; refuel at exits. Idle costs nothing — only motion burns.
+const FUEL_PER_UNIT = 0.06;
 import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import Tank from '../tank/Tank.js';
 import Enemy from './Enemy.js';
@@ -53,6 +58,10 @@ export default class ArenaScene {
     this._camZ = zone?.spawn.z ?? 0;
 
     this._paused = false;
+
+    // Long Road fuel attrition: last sampled position + stranded latch.
+    this._lastFuelPos = null;
+    this._stranded    = false;
 
     this._obstacles = [];
     this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
@@ -785,6 +794,19 @@ export default class ArenaScene {
 
       this.tank.update(dt);
 
+      // Long Road fuel attrition — only with an active journey, and only while
+      // the tank is actually moving. Empty = stranded (forced leg-end).
+      if (Journey.getJourney() && this.tank.alive && !this._extracting) {
+        if (this._lastFuelPos) {
+          const dx = this.tank.position.x - this._lastFuelPos.x;
+          const dz = this.tank.position.z - this._lastFuelPos.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 0) Journey.drainFuel(dist * FUEL_PER_UNIT);
+        }
+        this._lastFuelPos = { x: this.tank.position.x, z: this.tank.position.z };
+        if (Journey.isStranded()) this._onStranded();
+      }
+
       for (const enemy of this.enemies) {
         enemy.update(dt, this.tank.position);
         if (enemy.shells) for (const s of enemy.shells) s.update(dt);
@@ -816,6 +838,7 @@ export default class ArenaScene {
       this._updateAimIndicator();
       this._updateCamera(dt);
       this._updateHUD();
+      this._updateFuelHUD();
     });
   }
 
@@ -1012,6 +1035,8 @@ export default class ArenaScene {
     this._extractZone.reset();
     this._runSalvage = 0;
     this._extracting = false;
+    this._lastFuelPos = null;
+    this._stranded    = false;
   }
 
   _setupExtraction() {
@@ -1191,6 +1216,33 @@ export default class ArenaScene {
       const { red, green } = hpColor(hpRatio);
       hpFill.style.background = `rgb(${Math.round(red*220)},${Math.round(green*220)},40)`;
     }
+  }
+
+  // Long Road journey-fuel gauge (separate from BOOST above). Shown only during
+  // an active journey; turns red when low.
+  _updateFuelHUD() {
+    const j = Journey.getJourney();
+    const label = document.getElementById('hud-fuel-label');
+    const track = document.getElementById('hud-fuel-track');
+    const fill  = document.getElementById('hud-fuel-fill');
+    if (!label || !track || !fill) return;
+    if (!j) { label.style.display = 'none'; track.style.display = 'none'; return; }
+    label.style.display = 'block';
+    track.style.display = 'block';
+    const ratio = j.fuel / j.maxFuel;
+    fill.style.width = `${Math.max(0, ratio * 100)}%`;
+    fill.style.backgroundColor = ratio < 0.25 ? '#ff5a3a' : '#ffb14a';
+  }
+
+  // Fuel hit zero mid-drive: forced leg-end. main.js routes the {stranded} flag
+  // to the fork as a "bad" arrival (no salvage banked from this leg).
+  _onStranded() {
+    if (this._stranded) return;
+    this._stranded = true;
+    this._paused   = true;
+    window.__state = 'STRANDED';
+    if (this._aimEl) this._aimEl.style.display = 'none';
+    if (this._onExtract) this._onExtract(0, null, { stranded: true });
   }
 
   _setupFiring() {
