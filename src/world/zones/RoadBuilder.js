@@ -13,7 +13,7 @@ import {
   VertexBuffer, Texture, DynamicTexture,
 } from '@babylonjs/core';
 
-const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 48;
+const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 64;
 
 // Duckov-style dirt mask: solid worn centre, organic ragged edge feathering to grass.
 function makePathMask(scene) {
@@ -28,9 +28,11 @@ function makePathMask(scene) {
   const warp=lat1(20,7), wide=lat1(20,19), edge=lat2(14,24,53);
   const tex = new DynamicTexture('road-pathmask', { width:W, height:H }, scene, false);
   const ctx = tex.getContext(); const id = ctx.createImageData(W,H), d = id.data;
+  // v-frequencies MUST be integers so the mask tiles seamlessly along the road length
+  // (wrapV). Non-integer freqs made the pattern hard-jump every tile = the seam stutter.
   for (let j=0;j<H;j++){ const v=j/H;
-    const ePos = 0.5 + (n1(v*1.4,warp)-0.5)*0.20;
-    const halfW = 0.32 + (n1(v*1.2,wide)-0.5)*0.14;
+    const ePos = 0.5 + (n1(v*1,warp)-0.5)*0.20;
+    const halfW = 0.32 + (n1(v*1,wide)-0.5)*0.14;
     for (let i=0;i<W;i++){ const u=i/W; const dist=Math.abs(u-ePos);
       const distP = dist + (n2(u*1.5,v,edge)-0.5)*0.09;
       let a = ss(halfW, halfW-0.13, distP); a=Math.max(0,Math.min(1,a));
@@ -143,24 +145,52 @@ export function buildRoadLeg(scene, zone) {
   const flag= MeshBuilder.CreateBox('road-flag',{width:5,height:3,depth:0.2},scene); flag.position.set(cp.x+10.4,9.5,cp.z); flag.material=M.flag; flag.parent=root;
   shadowCasters.push(hut, roof);
 
-  // ── south bunker tunnel — the tank rolls OUT of here (no magic spawn) ─────────
-  // The leg always starts at the origin heading +Z, so a fixed mouth opening north works.
+  // ── SOUTH MOUNTAIN WALL + flush bunker tunnel ────────────────────────────────
+  // The map's south edge is a big sloped grass mountain; the bunker is a tunnel bored
+  // flush into it, with mountain mass overhanging the mouth (the visible ceiling). The
+  // tank rolls OUT onto the road. Leg always starts at the origin heading +Z.
   {
-    const tun = new TransformNode('road-tunnel', scene); tun.parent = root;
-    const MZ = -3;   // mouth z (headwall plane); bore extends south (−Z) behind it
-    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:7, height:16, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
-    bore.rotation.x = Math.PI/2; bore.position.set(0, 1.6, MZ-8); bore.material = M.dark; bore.isPickable=false; bore.parent=tun;
-    const plug = MeshBuilder.CreateBox('road-plug', { width:6.8, height:7, depth:0.3 }, scene); plug.position.set(0,2,MZ-15.5); plug.material=M.dark; plug.parent=tun;
-    for (const z of [MZ-0.6, MZ-4, MZ-7.5, MZ-11]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:6.6,thickness:0.45,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,1.6,z); rib.material=M.concrete; rib.parent=tun; }
-    const ht=MeshBuilder.CreateBox('road-htop',{width:15,height:3.2,depth:1.2},scene); ht.position.set(0,6.3,MZ); ht.material=M.concrete; ht.parent=tun; worldUV(ht,3);
-    const hl=MeshBuilder.CreateBox('road-hl',{width:4.2,height:7.8,depth:1.2},scene); hl.position.set(-5.6,3.9,MZ); hl.material=M.concrete; hl.parent=tun; worldUV(hl,3);
-    const hr=MeshBuilder.CreateBox('road-hr',{width:4.2,height:7.8,depth:1.2},scene); hr.position.set(5.6,3.9,MZ); hr.material=M.concrete; hr.parent=tun; worldUV(hr,3);
-    const mound=(d,x,y,z,sx,sy,sz)=>{ const s=MeshBuilder.CreateSphere('road-mound',{diameter:d,segments:7},scene); s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=M.grass; s.parent=tun; };
-    mound(30,0,-2.5,MZ-13,1.15,0.42,0.9); mound(22,-12,-2,MZ-9,1,0.45,0.9); mound(22,12,-2,MZ-9,1,0.45,0.9);
-    buildPath([[0,MZ+1],[0,4],[0,10]], 8);   // dirt apron blending the mouth into the road start
-    shadowCasters.push(ht,hl,hr);
-    // headwall pillars block driving back into the bunker face
-    obstacles.push({ position:{x:-5.6,z:MZ}, halfW:2.1, halfD:0.8 }, { position:{x:5.6,z:MZ}, halfW:2.1, halfD:0.8 });
+    const tun = new TransformNode('road-bunker', scene); tun.parent = root;
+    const MZ = -7;            // mountain north face / tunnel mouth plane
+    const mound = (d,x,y,z,sx,sy,sz) => { const s=MeshBuilder.CreateSphere('road-mtn',{diameter:d,segments:8},scene);
+      s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=M.grass; s.parent=tun; s.receiveShadows=true; return s; };
+
+    // dark bore drilled into the mountain (interior visible through the mouth)
+    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:9, height:24, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
+    bore.rotation.x = Math.PI/2; bore.position.set(0, 2.2, MZ-12); bore.material=M.dark; bore.isPickable=false; bore.parent=tun;
+    const plug = MeshBuilder.CreateBox('road-plug', { width:9, height:9, depth:0.3 }, scene); plug.position.set(0,2.6,MZ-24); plug.material=M.dark; plug.parent=tun;
+    // concrete liner ribs (depth cue down the bore)
+    for (const z of [MZ-2, MZ-6, MZ-10, MZ-15]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:8.6,thickness:0.5,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,2.2,z); rib.material=M.concrete; rib.parent=tun; }
+    // reinforced portal ring, FLUSH in the mountain face (lies in the XY plane around the bore)
+    const portal = MeshBuilder.CreateTorus('road-portal', { diameter:10.5, thickness:1.3, tessellation:24 }, scene);
+    portal.rotation.x = Math.PI/2; portal.position.set(0, 2.6, MZ); portal.material=M.concrete; portal.parent=tun;
+    // tilted concrete lintel just inside the top of the mouth → its underside reads as the
+    // tunnel CEILING to the south-high camera
+    const lintel = MeshBuilder.CreateBox('road-lintel', { width:10, height:1.0, depth:5 }, scene);
+    lintel.position.set(0, 7.0, MZ-1.5); lintel.rotation.x = -0.5; lintel.material=M.concrete; lintel.parent=tun; worldUV(lintel,3);
+
+    // THE MOUNTAIN: a sloped grass ridge that rises to the SIDES (the behind-the-tank
+    // camera has only ~19u of room, so mass in the centre would bury it / hide the tank).
+    // The centre stays OPEN so you see the tank roll out; the mouth ceiling is the lintel
+    // above + a small grass cap. Thin in Z (a wall, not a blob).
+    // Narrow (sx ~0.9) + thin-in-Z (sz ~0.42, so the camera at z≈−19 isn't buried), and the
+    // nearest centre is far enough out (≥38) that the mound's own x-radius (~22) still clears
+    // the centre. Slopes up to the edges.
+    const RIDGE_Z = MZ;
+    for (let x=-150; x<=150; x+=24) {
+      if (Math.abs(x) < 38) continue;                      // clear centre for the tunnel + road
+      const sy = 1.05 + (Math.abs(x)/150) * 0.7;           // slope up toward the edges
+      mound(50, x, -6, RIDGE_Z, 0.95, sy, 0.42);
+    }
+    // small grass cap above the lintel — a little mountain over the mouth (the ceiling),
+    // kept small/thin so it never blocks the emerging tank
+    mound(14, 0, 7, MZ-1, 1.3, 0.55, 0.45);
+
+    // dirt apron blending the mouth into the road start (road already begins at z=0)
+    buildPath([[0,MZ+2],[0,2],[0,12]], 8);
+    shadowCasters.push(portal, lintel);
+    // block driving south through the mountain wall (obstacle row, gap at the tunnel)
+    for (let x=-150; x<=150; x+=16) { if (Math.abs(x) < 26) continue; obstacles.push({ position:{x,z:RIDGE_Z}, halfW:9, halfD:9 }); }
   }
 
   return { obstacles, shadowCasters, root };
