@@ -5,7 +5,14 @@ import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { openEncounter } from '../journey/EncounterScene.js';
+import { openFork } from '../journey/ForkScreen.js';
 import * as Journey from '../journey/journeyState.js';
+import { assembleJourney } from '../journey/sequencer.js';
+import { MAX_FUEL } from '../journey/legs.js';
+
+// ZONE_VARIANTS arrives in Task 6; fall back to {} so legZone() uses base WORLD1.
+let ZONE_VARIANTS = {};
+import('../world/zones/world1.js').then(m => { if (m.ZONE_VARIANTS) ZONE_VARIANTS = m.ZONE_VARIANTS; });
 
 window.__journey = Journey; // debug hook + shared run-state handle
 
@@ -172,10 +179,37 @@ const DEPLOY_TIPS = [
   'LOCK-ON (HOLD F) ALERTS THE TARGET — MANUAL AIM KEEPS YOU QUIET',
 ];
 
-// Deploy uses the loading screen, not the checker transition: the overlay goes
-// up instantly, the arena builds + the tank GLB loads behind it (arenaScene.ready),
-// then it fades into the world. _tBusy still guards against double-deploys.
-function deployToArena() {
+// ── The Long Road orchestration ───────────────────────────────────────────────
+// A "deploy" from the hangar starts a multi-leg journey. Each leg reuses the
+// arena (one ArenaScene per leg); between legs the player picks an exit at a fork.
+let _journeyLegs    = null;   // ordered legs from the sequencer
+let _fuelAtLegStart = 0;      // fuel when the current leg began (mandatory-stop math)
+let _nextExitKind   = 'town'; // POI kind for the leg about to deploy (set by the fork)
+
+function startJourneyRun() {
+  if (_tBusy) return;
+  Journey.startJourney({ totalLegs: 3, maxFuel: MAX_FUEL });
+  _journeyLegs  = assembleJourney({ seed: Date.now() & 0xffff, count: 3 });
+  _nextExitKind = 'town';
+  deployCurrentLeg();
+}
+
+function currentLeg() { return _journeyLegs[Journey.getJourney().legIndex]; }
+
+function legZone(leg) {
+  const base = (ZONE_VARIANTS && ZONE_VARIANTS[leg.zoneVariant]) || WORLD1;
+  if (!leg.exits.length) return base;   // final leg: no roadside exit
+  // Roadside POI placed off the path, mid-field; kind chosen at the prior fork.
+  return { ...base, poi: { x: 28, z: 20, radius: 10, kind: _nextExitKind } };
+}
+
+function deployCurrentLeg() {
+  _fuelAtLegStart = Journey.getJourney()?.fuel ?? MAX_FUEL;
+  _deployZone(legZone(currentLeg()));
+}
+
+// Loading-screen deploy of one zone (was deployToArena; now zone-parameterized).
+function _deployZone(zone) {
   if (_tBusy) return;
   _tBusy = true;
 
@@ -189,24 +223,23 @@ function deployToArena() {
   document.getElementById('hangar-prompt').style.display  = 'none';
   document.getElementById('hangar-panel').style.display   = 'none';
   document.getElementById('hangar-salvage').style.display = 'none';
+  document.getElementById('fork-screen').style.display    = 'none';
   engine.stopRenderLoop();
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
 
-  // Build on the next frame so the overlay paints before the heavy work starts.
   requestAnimationFrame(() => {
     canvas.style.display = 'block';
-    arenaScene = new ArenaScene(engine, onExtractFromArena, WORLD1);
+    arenaScene = new ArenaScene(engine, onExtractFromArena, zone);
     window.__arena = arenaScene;
 
-    const MIN_MS = 900;   // let the loading screen breathe even on instant loads
+    const MIN_MS = 900;
     const t0 = performance.now();
     arenaScene.ready.then(() => {
-      lo.classList.add('done');   // bar snaps full
+      lo.classList.add('done');
       const wait = Math.max(250, MIN_MS - (performance.now() - t0));
       setTimeout(() => {
         document.getElementById('hud').style.display = 'block';
         engine.runRenderLoop(() => arenaScene.scene.render());
-        // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
         if (!controlsSeen) {
           controlsSeen = true;
           arenaScene._paused = true;
@@ -215,6 +248,7 @@ function deployToArena() {
         } else {
           window.__state = 'GAME';
         }
+        refreshThreadMeters();
         lo.style.opacity = '0';
         setTimeout(() => { lo.style.display = 'none'; _tBusy = false; }, 500);
       }, wait);
@@ -222,13 +256,62 @@ function deployToArena() {
   });
 }
 
-function onExtractFromArena(gained, banked) {
+// Hangar "DEPLOY" begins the journey.
+function deployToArena() { startJourneyRun(); }
+
+// End of a leg (extraction or stranded). Routes to fork or final bank.
+function onExtractFromArena(gained, banked, meta = {}) {
   document.getElementById('hud').style.display = 'none';
   document.getElementById('extract-indicator').style.display = 'none';
-  document.getElementById('extract-summary-gained').textContent = `+${gained} SALVAGE`;
-  document.getElementById('extract-summary-banked').textContent = `BANKED: ${banked}`;
-  document.getElementById('extract-summary').style.display = 'flex';
+
+  if (!Journey.getJourney()) {
+    // Standalone arena (no journey) — original behavior.
+    document.getElementById('extract-summary-gained').textContent = `+${gained} SALVAGE`;
+    document.getElementById('extract-summary-banked').textContent = `BANKED: ${banked}`;
+    document.getElementById('extract-summary').style.display = 'flex';
+    return;
+  }
+
+  if (meta.stranded) {
+    // Ran dry mid-leg: forced fork, no leg salvage banked beyond what was carried.
+    showFork(currentLeg().exits.length ? currentLeg().exits : ['town']);
+    return;
+  }
+
+  // Successful leg: enforce the leg's minimum fuel cost (mandatory-stop guarantee).
+  const spent = _fuelAtLegStart - Journey.getJourney().fuel;
+  const leg = currentLeg();
+  if (spent < leg.fuelCost) Journey.drainFuel(leg.fuelCost - spent);
+
+  const exits = leg.exits;
+  Journey.advanceLeg();
+  refreshThreadMeters();
+
+  if (Journey.isComplete()) {
+    const runTotal = Journey.getJourney().runSalvage;
+    const bankedTotal = Journey.bankJourney();
+    document.getElementById('extract-summary-gained').textContent = `+${runTotal} SALVAGE`;
+    document.getElementById('extract-summary-banked').textContent = `BANKED: ${bankedTotal}`;
+    document.getElementById('extract-summary').style.display = 'flex';
+  } else {
+    showFork(exits.length ? exits : ['town']);
+  }
 }
+
+// Between-leg fork: pick the next exit, apply its effect, deploy the next leg.
+// The fork is a plain opaque overlay over the frozen (paused) arena — no transition,
+// so it never entangles _tBusy with the deploy loading screen that follows.
+function showFork(exitKinds) {
+  window.__state = 'JOURNEY_FORK';
+  openFork(exitKinds).then((choice) => {
+    _nextExitKind = choice;
+    if (choice === 'town') { Journey.refuel(40); Journey.tickThread('truth', 20); }
+    refreshThreadMeters();
+    document.getElementById('fork-screen').style.display = 'none';
+    deployCurrentLeg(); // its own loading screen handles the visual handoff
+  });
+}
+
 document.getElementById('extract-return').addEventListener('click', () => {
   document.getElementById('extract-summary').style.display = 'none';
   startHangar();

@@ -360,6 +360,12 @@ export default class ArenaScene {
     this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 
+    // Long Road: carry hull damage from the previous leg (null = full hull, leg 1).
+    const j = Journey.getJourney();
+    if (j && j.hpCarry != null) {
+      this.tank.hp = Math.max(1, Math.round(this.tank.maxHp * j.hpCarry));
+    }
+
     // One unified enemy array. Zone: every spawn in the config becomes a
     // Chaffee-style light tank with its band's tuning (ambushers start hidden
     // in the tall grass). Legacy arena: the old 5 statics + orange AI.
@@ -1116,9 +1122,20 @@ export default class ArenaScene {
     this._extracting = true;
     this._paused     = true;
     window.__state   = 'EXTRACTED';
-    const banked = bankSalvage(this._runSalvage);
     if (this._aimEl) this._aimEl.style.display = 'none';
-    if (this._onExtract) this._onExtract(this._runSalvage, banked);
+
+    const j = Journey.getJourney();
+    if (j) {
+      // Long Road: this is the end of ONE leg. Fold the leg's salvage + carry the
+      // hull state into the journey; main.js decides fork-vs-final-bank.
+      Journey.addSalvage(this._runSalvage);
+      Journey.setHpCarry(this.tank.hp / this.tank.maxHp);
+      if (this._onExtract) this._onExtract(this._runSalvage, null, { legEnd: true });
+    } else {
+      // Standalone arena (no journey): bank immediately, as before.
+      const banked = bankSalvage(this._runSalvage);
+      if (this._onExtract) this._onExtract(this._runSalvage, banked);
+    }
   }
 
   _updateExtractionHUD(inside) {
