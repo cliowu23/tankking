@@ -77,7 +77,6 @@ export function buildRoadLeg(scene, zone) {
     concrete: mat('road-concrete', 0.42,0.40,0.37),
     roof:  mat('road-roof',  0.55,0.28,0.20),
     flag:  mat('road-flag',  0.0,0.85,0.78),
-    dark:  mat('road-dark',  0.05,0.05,0.06),   // tunnel bore interior
   };
   surf(M.grass,'grass',16); surf(M.path,'dirt',1); surf(M.foliage,'hedge',2);
   surf(M.wood,'wood',1,'hangar');
@@ -145,46 +144,8 @@ export function buildRoadLeg(scene, zone) {
   const flag= MeshBuilder.CreateBox('road-flag',{width:5,height:3,depth:0.2},scene); flag.position.set(cp.x+10.4,9.5,cp.z); flag.material=M.flag; flag.parent=root;
   shadowCasters.push(hut, roof);
 
-  // ── SOUTH MOUNTAIN WALL + flush bunker tunnel ────────────────────────────────
-  // The map's south edge is a big sloped grass mountain; the bunker is a tunnel bored
-  // flush into it, with mountain mass overhanging the mouth (the visible ceiling). The
-  // tank rolls OUT onto the road. Leg always starts at the origin heading +Z.
-  {
-    const tun = new TransformNode('road-bunker', scene); tun.parent = root;
-    const MZ = -6;            // portal face / berm face (tunnel mouth plane)
-    const mound = (d,x,y,z,sx,sy,sz) => { const s=MeshBuilder.CreateSphere('road-mtn',{diameter:d,segments:8},scene);
-      s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=M.grass; s.parent=tun; s.receiveShadows=true; return s; };
-
-    // dark bore behind the portal (interior visible through the mouth)
-    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:9, height:18, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
-    bore.rotation.x = Math.PI/2; bore.position.set(0, 2.3, MZ-9); bore.material=M.dark; bore.isPickable=false; bore.parent=tun;
-    const plug = MeshBuilder.CreateBox('road-plug', { width:9, height:9, depth:0.3 }, scene); plug.position.set(0,2.7,MZ-18); plug.material=M.dark; plug.parent=tun;
-    for (const z of [MZ-2, MZ-5, MZ-9, MZ-13]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:8.4,thickness:0.5,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,2.3,z); rib.material=M.concrete; rib.parent=tun; }
-
-    // CONCRETE PORTAL FRAME, flush in the berm — the hero element that reads as a tunnel
-    // entrance even from above: two jambs + a forward-tilted lintel (its underside = the
-    // visible ceiling), around the dark bore.
-    const jambL = MeshBuilder.CreateBox('road-jambL', { width:3, height:9, depth:3.2 }, scene); jambL.position.set(-5.8,4.5,MZ); jambL.material=M.concrete; jambL.parent=tun; worldUV(jambL,3);
-    const jambR = MeshBuilder.CreateBox('road-jambR', { width:3, height:9, depth:3.2 }, scene); jambR.position.set( 5.8,4.5,MZ); jambR.material=M.concrete; jambR.parent=tun; worldUV(jambR,3);
-    const lintel = MeshBuilder.CreateBox('road-lintel', { width:15, height:3, depth:4.5 }, scene); lintel.position.set(0,9.2,MZ-0.5); lintel.rotation.x=-0.35; lintel.material=M.concrete; lintel.parent=tun; worldUV(lintel,3);
-
-    // LOW grass berm nestling the portal into the south — seen from above as a hill band.
-    // Low + thin so it never buries the (z≈−19) camera; narrow + far enough out to clear
-    // the portal/road centre.
-    for (let x=-100; x<=100; x+=20) {
-      if (Math.abs(x) < 24) continue;
-      const sy = 0.5 + (Math.abs(x)/100) * 0.35;
-      mound(44, x, -3, MZ-2, 0.8, sy, 0.5);
-    }
-    mound(20, 0, 8, MZ-3, 1.7, 0.5, 0.6);   // low grass cap burying the lintel top into the berm
-
-    // dirt apron blending the mouth into the road start (road already begins at z=0)
-    buildPath([[0,MZ+2],[0,2],[0,12]], 8);
-    shadowCasters.push(jambL, jambR, lintel);
-    // block driving south through the berm + portal jambs (gap at the mouth)
-    for (let x=-100; x<=100; x+=16) { if (Math.abs(x) < 16) continue; obstacles.push({ position:{x,z:MZ-2}, halfW:8, halfD:7 }); }
-    obstacles.push({ position:{x:-5.2,z:MZ}, halfW:1.5, halfD:1.6 }, { position:{x:5.2,z:MZ}, halfW:1.5, halfD:1.6 });
-  }
+  // (No bunker tunnel — the tank simply starts at the road's south end. A future "tank
+  // drives out to the location" intro animation is the planned replacement.)
 
   return { obstacles, shadowCasters, root };
 }
