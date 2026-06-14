@@ -39,6 +39,18 @@ export function generateRoadLeg(seed = 1) {
   }
   run(34, 0);                                  // outro straight into the checkpoint
 
+  // Smooth the centerline. The per-segment constant-curvature walk leaves curvature
+  // kinks at segment boundaries (straight→curve), which read as "stutters" even though
+  // position is continuous. A few binomial low-pass passes round curvature into
+  // continuity so the single Catmull-Rom ribbon is genuinely seamless. Endpoints pinned.
+  for (let pass=0; pass<4; pass++){
+    const src = pts.map(p=>({x:p.x,z:p.z}));
+    for (let i=1;i<pts.length-1;i++){
+      pts[i].x = 0.25*src[i-1].x + 0.5*src[i].x + 0.25*src[i+1].x;
+      pts[i].z = 0.25*src[i-1].z + 0.5*src[i].z + 0.25*src[i+1].z;
+    }
+  }
+
   const total = pts.length;
   const bandFor = (frac) => frac < 0.34 ? 'near' : frac < 0.67 ? 'mid' : 'deep';
   const valueFor = (band) => band === 'near' ? 25 : band === 'mid' ? 50 : 100;

@@ -75,6 +75,7 @@ export function buildRoadLeg(scene, zone) {
     concrete: mat('road-concrete', 0.42,0.40,0.37),
     roof:  mat('road-roof',  0.55,0.28,0.20),
     flag:  mat('road-flag',  0.0,0.85,0.78),
+    dark:  mat('road-dark',  0.05,0.05,0.06),   // tunnel bore interior
   };
   surf(M.grass,'grass',16); surf(M.path,'dirt',1); surf(M.foliage,'hedge',2);
   surf(M.wood,'wood',1,'hangar');
@@ -141,6 +142,26 @@ export function buildRoadLeg(scene, zone) {
   const pole= MeshBuilder.CreateCylinder('road-pole',{diameter:0.4,height:11},scene); pole.position.set(cp.x+8,5.5,cp.z); pole.material=M.wood; pole.parent=root;
   const flag= MeshBuilder.CreateBox('road-flag',{width:5,height:3,depth:0.2},scene); flag.position.set(cp.x+10.4,9.5,cp.z); flag.material=M.flag; flag.parent=root;
   shadowCasters.push(hut, roof);
+
+  // ── south bunker tunnel — the tank rolls OUT of here (no magic spawn) ─────────
+  // The leg always starts at the origin heading +Z, so a fixed mouth opening north works.
+  {
+    const tun = new TransformNode('road-tunnel', scene); tun.parent = root;
+    const MZ = -3;   // mouth z (headwall plane); bore extends south (−Z) behind it
+    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:7, height:16, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
+    bore.rotation.x = Math.PI/2; bore.position.set(0, 1.6, MZ-8); bore.material = M.dark; bore.isPickable=false; bore.parent=tun;
+    const plug = MeshBuilder.CreateBox('road-plug', { width:6.8, height:7, depth:0.3 }, scene); plug.position.set(0,2,MZ-15.5); plug.material=M.dark; plug.parent=tun;
+    for (const z of [MZ-0.6, MZ-4, MZ-7.5, MZ-11]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:6.6,thickness:0.45,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,1.6,z); rib.material=M.concrete; rib.parent=tun; }
+    const ht=MeshBuilder.CreateBox('road-htop',{width:15,height:3.2,depth:1.2},scene); ht.position.set(0,6.3,MZ); ht.material=M.concrete; ht.parent=tun; worldUV(ht,3);
+    const hl=MeshBuilder.CreateBox('road-hl',{width:4.2,height:7.8,depth:1.2},scene); hl.position.set(-5.6,3.9,MZ); hl.material=M.concrete; hl.parent=tun; worldUV(hl,3);
+    const hr=MeshBuilder.CreateBox('road-hr',{width:4.2,height:7.8,depth:1.2},scene); hr.position.set(5.6,3.9,MZ); hr.material=M.concrete; hr.parent=tun; worldUV(hr,3);
+    const mound=(d,x,y,z,sx,sy,sz)=>{ const s=MeshBuilder.CreateSphere('road-mound',{diameter:d,segments:7},scene); s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=M.grass; s.parent=tun; };
+    mound(30,0,-2.5,MZ-13,1.15,0.42,0.9); mound(22,-12,-2,MZ-9,1,0.45,0.9); mound(22,12,-2,MZ-9,1,0.45,0.9);
+    buildPath([[0,MZ+1],[0,4],[0,10]], 8);   // dirt apron blending the mouth into the road start
+    shadowCasters.push(ht,hl,hr);
+    // headwall pillars block driving back into the bunker face
+    obstacles.push({ position:{x:-5.6,z:MZ}, halfW:2.1, halfD:0.8 }, { position:{x:5.6,z:MZ}, halfW:2.1, halfD:0.8 });
+  }
 
   return { obstacles, shadowCasters, root };
 }
