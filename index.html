@@ -989,6 +989,21 @@
       document.addEventListener('mouseleave', () => { r.style.display = 'none'; });
     })();
   </script>
+  <!-- Long Road: roadside POI prompt -->
+  <div id="poi-prompt" style="display:none; position:absolute; left:50%; bottom:160px;
+    transform:translateX(-50%); font-family:monospace; color:#00e5ff; z-index:21;
+    letter-spacing:3px; text-shadow:0 0 8px #00e5ff;">[ E ] PULL OFF AT EXIT</div>
+
+  <!-- Long Road: enterable roadside encounter (town/field) -->
+  <div id="encounter-screen" style="display:none; position:absolute; inset:0;
+    background:#000810ee; z-index:60; flex-direction:column; align-items:center;
+    justify-content:center; font-family:monospace; color:#cdefff;">
+    <h2 id="encounter-title" style="letter-spacing:4px; color:#ffd23a;">ROADSIDE</h2>
+    <div id="encounter-body" style="max-width:520px; text-align:center; margin:18px;
+      line-height:1.6;"></div>
+    <div id="encounter-actions" style="display:flex; gap:14px; margin-top:10px;"></div>
+  </div>
+
   <script type="module" src="/src/core/main.js"></script>
 </body>
 </html>

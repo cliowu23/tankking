@@ -71,6 +71,15 @@ export function addSalvage(amount) {
   _persist();
 }
 
+// Spend salvage (e.g. trader). Returns false (no-op) when there isn't enough.
+export function spendSalvage(amount) {
+  const cost = Math.max(0, Math.round(amount));
+  if (!_j || _j.runSalvage < cost) return false;
+  _j.runSalvage -= cost;
+  _persist();
+  return true;
+}
+
 export function recruitAlly(id) {
   if (!_j || _j.allies.includes(id)) return;
   _j.allies.push(id);

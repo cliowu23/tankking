@@ -4,6 +4,10 @@ import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
 import { WORLD1 } from '../world/zones/world1.js';
+import { openEncounter } from '../journey/EncounterScene.js';
+import * as Journey from '../journey/journeyState.js';
+
+window.__journey = Journey; // debug hook + shared run-state handle
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
@@ -297,6 +301,11 @@ function exitDesigner() {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // Long Road: press E at a roadside POI to take the exit encounter.
+  if (window.__state === 'GAME' && arenaScene && arenaScene._nearPoi && e.code === 'KeyE') {
+    enterEncounter(arenaScene.zone?.poi?.kind ?? 'town');
+    return;
+  }
   if (window.__state === 'HANGAR' && hangarScene) {
     if (e.code === 'KeyE') {
       if (hangarScene._panelOpen) { hangarScene.closePanel(); return; }
@@ -337,6 +346,37 @@ function resumeGame() {
   if (arenaScene) arenaScene._paused = false;
   window.__state = 'GAME';
 }
+
+// Long Road: enter a roadside encounter (town/field) — pause the arena, fade to
+// the DOM encounter, then fade back into the live world on return.
+function enterEncounter(kind) {
+  if (_tBusy || !arenaScene) return;
+  arenaScene._paused = true;
+  window.__state = 'ENCOUNTER';
+  const prompt = document.getElementById('poi-prompt');
+  if (prompt) prompt.style.display = 'none';
+  arenaScene._nearPoi = false;
+  transition(
+    () => { document.getElementById('hud').style.display = 'none'; },
+    async () => {
+      await openEncounter(kind);
+      transition(
+        () => { document.getElementById('encounter-screen').style.display = 'none'; },
+        () => {
+          document.getElementById('hud').style.display = 'block';
+          if (arenaScene) arenaScene._paused = false;
+          window.__state = 'GAME';
+          refreshThreadMeters();
+        },
+        'iris'
+      );
+    },
+    'iris'
+  );
+}
+
+// Replaced by the real implementation in Task 6 (thread-meter HUD).
+function refreshThreadMeters() {}
 
 document.getElementById('controls-start').addEventListener('click', dismissControls);
 document.getElementById('menu-designer').addEventListener('click', startDesigner);

@@ -64,6 +64,16 @@ describe('journeyState', () => {
     expect(J.getJourney().threads.truth).toBe(100);
   });
 
+  it('spendSalvage subtracts when affordable and refuses when not', async () => {
+    const J = await fresh();
+    J.startJourney({ totalLegs: 3, maxFuel: 100 });
+    J.addSalvage(50);
+    expect(J.spendSalvage(20)).toBe(true);
+    expect(J.getJourney().runSalvage).toBe(30);
+    expect(J.spendSalvage(999)).toBe(false);   // not enough → no-op
+    expect(J.getJourney().runSalvage).toBe(30);
+  });
+
   it('advanceLeg increments and isComplete fires after last leg', async () => {
     const J = await fresh();
     J.startJourney({ totalLegs: 2, maxFuel: 100 });

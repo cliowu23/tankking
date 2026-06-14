@@ -1037,6 +1037,9 @@ export default class ArenaScene {
     this._extracting = false;
     this._lastFuelPos = null;
     this._stranded    = false;
+    this._nearPoi     = false;
+    const poiPrompt = document.getElementById('poi-prompt');
+    if (poiPrompt) poiPrompt.style.display = 'none';
   }
 
   _setupExtraction() {
@@ -1053,6 +1056,21 @@ export default class ArenaScene {
     });
 
     this._extractZone = new ExtractionZone(this.scene, extract);
+
+    // Long Road roadside POI (only for legs whose zone carries a `poi`). Drive
+    // near it and press E (handled in main.js) to take the exit encounter.
+    this._poiMesh = null;
+    this._nearPoi = false;
+    if (this.zone?.poi) {
+      const m = MeshBuilder.CreateCylinder('poiMarker', { diameter: 5, height: 9 }, this.scene);
+      m.position.set(this.zone.poi.x, 4.5, this.zone.poi.z);
+      const mat = new StandardMaterial('poiMat', this.scene);
+      mat.emissiveColor = new Color3(0, 0.9, 1);
+      mat.diffuseColor  = new Color3(0, 0.3, 0.4);
+      m.material = mat;
+      m.isPickable = false;
+      this._poiMesh = m;
+    }
   }
 
   _updateExtraction(dt) {
@@ -1071,6 +1089,19 @@ export default class ArenaScene {
       if (dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
         crate.collect();
         this._runSalvage += crate.value;
+      }
+    }
+
+    // Long Road POI proximity → toggle the "Press E" prompt (main.js reads _nearPoi).
+    if (this._poiMesh) {
+      const dx = this.tank.position.x - this._poiMesh.position.x;
+      const dz = this.tank.position.z - this._poiMesh.position.z;
+      const r  = this.zone.poi.radius ?? 8;
+      const near = (dx * dx + dz * dz) <= r * r;
+      if (near !== this._nearPoi) {
+        this._nearPoi = near;
+        const p = document.getElementById('poi-prompt');
+        if (p) p.style.display = near ? 'block' : 'none';
       }
     }
 
