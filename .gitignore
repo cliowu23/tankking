@@ -21,9 +21,12 @@ CLAUDE.md
 # Asset/model tooling
 architecture/
 blender/
-# Scripts: keep only the CI staleness gate, drop the heavy model/texture gen
+# Scripts: keep the CI staleness gate + the texture generator (source recipe for
+# the tracked world1/hangar texture PNGs); drop the heavy model-gen tooling.
 scripts/*
 !scripts/pre-deploy-check.mjs
+!scripts/texgen
+!scripts/texgen/textures.py
 # Separate Vercel project (tanking-timelapse) — not part of the game build
 timelapse/
 # In-browser dev editors & mockups (not part of the shipped game)

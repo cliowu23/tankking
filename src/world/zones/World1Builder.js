@@ -15,9 +15,48 @@
 
 import {
   MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, Mesh, Matrix,
-  VertexBuffer, VertexData, Quaternion, Texture,
+  VertexBuffer, VertexData, Quaternion, Texture, DynamicTexture,
 } from '@babylonjs/core';
 import { makeBlobMat, addBlob } from '../../hub/HangarProps.js';
+
+// World units per repeat of the dirt-path opacity mask along the path length.
+const PATH_MASK_TILE = 48;
+
+// Procedural opacity mask for the dirt path (Duckov-style): solid worn centre,
+// organic ragged edge feathering into grass, NO grass islands on the path body.
+// Maps across the ribbon width (UV2.u 0..1) and tiles along its length (UV2.v).
+// Tuned in tex-preview.html (the in-browser studio) — keep the two in sync.
+function makePathMask(scene) {
+  const W = 176, H = 768;
+  const mul  = (a) => () => { a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+  const smoo = (f) => f*f*(3-2*f);
+  const ss   = (e0,e1,x) => { const t=Math.max(0,Math.min(1,(x-e0)/(e1-e0))); return t*t*(3-2*t); };
+  const lat1 = (n,seed) => { const r=mul(seed); const a=new Float32Array(n); for(let i=0;i<n;i++)a[i]=r(); return a; };
+  const n1   = (t,L) => { const n=L.length, x=(((t%1)+1)%1)*n, i0=Math.floor(x)%n, i1=(i0+1)%n, f=smoo(x-Math.floor(x)); return L[i0]*(1-f)+L[i1]*f; };
+  const lat2 = (w,h,seed) => { const r=mul(seed); const a=new Float32Array(w*h); for(let i=0;i<w*h;i++)a[i]=r(); a.w=w; a.h=h; return a; };
+  const n2   = (u,v,L) => { const w=L.w,h=L.h,x=(((u%1)+1)%1)*w,y=(((v%1)+1)%1)*h, i0=Math.floor(x)%w,i1=(i0+1)%w,j0=Math.floor(y)%h,j1=(j0+1)%h,fx=smoo(x-Math.floor(x)),fy=smoo(y-Math.floor(y)); const a=L[j0*w+i0],b=L[j0*w+i1],c=L[j1*w+i0],d=L[j1*w+i1]; return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy; };
+  const warp=lat1(20,7), wide=lat1(20,19), edge=lat2(14,24,53);
+  const tex = new DynamicTexture('w1-pathmask', { width:W, height:H }, scene, false);
+  const ctx = tex.getContext();
+  const id = ctx.createImageData(W,H), d = id.data;
+  for (let j=0;j<H;j++) { const v=j/H;
+    const ePos  = 0.5 + (n1(v*1.4,warp)-0.5)*0.20;   // gentle long side-to-side wander
+    const halfW = 0.32 + (n1(v*1.2,wide)-0.5)*0.14;  // width swells/pinches over a long rhythm
+    for (let i=0;i<W;i++) { const u=i/W;
+      const dist  = Math.abs(u-ePos);
+      const distP = dist + (n2(u*1.5,v,edge)-0.5)*0.09;  // gentle ragged, CONNECTED edge
+      let a = ss(halfW, halfW-0.13, distP);              // solid dirt centre, organic fade to grass
+      a = Math.max(0,Math.min(1,a));
+      const o=(j*W+i)*4, c=a*255; d[o]=d[o+1]=d[o+2]=c; d[o+3]=255;
+    }
+  }
+  ctx.putImageData(id,0,0); tex.update();
+  tex.getAlphaFromRGB = true;                 // luminance → alpha
+  tex.coordinatesIndex = 1;                   // sample UV2 (ribbon-space)
+  tex.wrapU = Texture.CLAMP_ADDRESSMODE;      // across width
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;       // tile along length
+  return tex;
+}
 
 export function buildWorld1(scene, zone) {
   const root = new TransformNode('world1', scene);
@@ -192,6 +231,11 @@ export function buildWorld1(scene, zone) {
   // waypoints), not box segments → no spiky corners. World-space UVs so the dirt
   // flows at constant density without stretching. ──────────────────────────────
   const PATH_Y = 0.055, SEG = 14;
+  // Patchy-path: alpha-blend the dirt into the grass via a procedural mask
+  // (solid centre, ragged feathered edges). Shared by both paths below.
+  M.path.opacityTexture = makePathMask(scene);
+  M.path.transparencyMode = 2;                // ALPHABLEND (NOT needDepthPrePass — that
+                                              // renders the frozen path material solid black)
   const buildPath = (wps, w = 5) => {
     if (!wps || wps.length < 2) return;
     const ctrl = wps.map(([x, z]) => new Vector3(x, PATH_Y, z));
@@ -201,17 +245,30 @@ export function buildWorld1(scene, zone) {
       for (let s = 0; s < SEG; s++) center.push(Vector3.CatmullRom(p0, p1, p2, p3, s / SEG));
     }
     center.push(ctrl[ctrl.length - 1]);
+    const HW = w * 1.5 / 2;                    // widen ribbon: mask feathering trims it back to ≈ w solid
     const L = [], R = [];
     for (let i = 0; i < center.length; i++) {
       const a = center[Math.max(0, i-1)], b = center[Math.min(center.length-1, i+1)];
       const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
       const px = -tz / tl, pz = tx / tl;                       // perpendicular in XZ
-      L.push(new Vector3(center[i].x + px*w/2, PATH_Y, center[i].z + pz*w/2));
-      R.push(new Vector3(center[i].x - px*w/2, PATH_Y, center[i].z - pz*w/2));
+      L.push(new Vector3(center[i].x + px*HW, PATH_Y, center[i].z + pz*HW));
+      R.push(new Vector3(center[i].x - px*HW, PATH_Y, center[i].z - pz*HW));
     }
     const ribbon = MeshBuilder.CreateRibbon('w1-path', { pathArray: [L, R] }, scene);
     ribbon.material = M.path; ribbon.parent = root; ribbon.receiveShadows = true; ribbon.isPickable = false;
-    worldUV(ribbon, 6);
+    worldUV(ribbon, 6);                                        // UV1 = world-space dirt (no stretch)
+    // UV2 = ribbon-space for the opacity mask: u across width (L=0,R=1),
+    // v = cumulative distance / PATH_MASK_TILE (tiles seamlessly along length).
+    const K = center.length;
+    let total = 0; const cum = [0];
+    for (let i = 1; i < K; i++) { total += Vector3.Distance(center[i-1], center[i]); cum.push(total); }
+    const uv2 = new Float32Array(2 * K * 2);
+    for (let i = 0; i < K; i++) {
+      const t = cum[i] / PATH_MASK_TILE;
+      uv2[i*2] = 0;       uv2[i*2+1] = t;       // L row
+      uv2[(K+i)*2] = 1;   uv2[(K+i)*2+1] = t;   // R row
+    }
+    ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
   };
   buildPath(zone.paths.main);
   buildPath(zone.paths.storeSpur, 4);
