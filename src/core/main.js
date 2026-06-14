@@ -16,7 +16,7 @@ function makeRoadZone(seed = (Date.now() & 0xffff)) {
     id: 'road-leg', kind: 'road', name: 'THE LONG ROAD — LEG',
     palette: WORLD1.palette,
     bounds: { half: leg.bbox.clampHalf, visual: leg.bbox.clampHalf + 60 },
-    spawn: leg.start,
+    spawn: leg.start,   // at the tunnel mouth (z≈0) — frames the portal in the lower view
     enemies: leg.enemies, loot: leg.loot, bandTuning: WORLD1.bandTuning,
     extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
     roadLeg: leg,

@@ -151,46 +151,39 @@ export function buildRoadLeg(scene, zone) {
   // tank rolls OUT onto the road. Leg always starts at the origin heading +Z.
   {
     const tun = new TransformNode('road-bunker', scene); tun.parent = root;
-    const MZ = -7;            // mountain north face / tunnel mouth plane
+    const MZ = -6;            // portal face / berm face (tunnel mouth plane)
     const mound = (d,x,y,z,sx,sy,sz) => { const s=MeshBuilder.CreateSphere('road-mtn',{diameter:d,segments:8},scene);
       s.position.set(x,y,z); s.scaling.set(sx,sy,sz); s.material=M.grass; s.parent=tun; s.receiveShadows=true; return s; };
 
-    // dark bore drilled into the mountain (interior visible through the mouth)
-    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:9, height:24, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
-    bore.rotation.x = Math.PI/2; bore.position.set(0, 2.2, MZ-12); bore.material=M.dark; bore.isPickable=false; bore.parent=tun;
-    const plug = MeshBuilder.CreateBox('road-plug', { width:9, height:9, depth:0.3 }, scene); plug.position.set(0,2.6,MZ-24); plug.material=M.dark; plug.parent=tun;
-    // concrete liner ribs (depth cue down the bore)
-    for (const z of [MZ-2, MZ-6, MZ-10, MZ-15]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:8.6,thickness:0.5,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,2.2,z); rib.material=M.concrete; rib.parent=tun; }
-    // reinforced portal ring, FLUSH in the mountain face (lies in the XY plane around the bore)
-    const portal = MeshBuilder.CreateTorus('road-portal', { diameter:10.5, thickness:1.3, tessellation:24 }, scene);
-    portal.rotation.x = Math.PI/2; portal.position.set(0, 2.6, MZ); portal.material=M.concrete; portal.parent=tun;
-    // tilted concrete lintel just inside the top of the mouth → its underside reads as the
-    // tunnel CEILING to the south-high camera
-    const lintel = MeshBuilder.CreateBox('road-lintel', { width:10, height:1.0, depth:5 }, scene);
-    lintel.position.set(0, 7.0, MZ-1.5); lintel.rotation.x = -0.5; lintel.material=M.concrete; lintel.parent=tun; worldUV(lintel,3);
+    // dark bore behind the portal (interior visible through the mouth)
+    const bore = MeshBuilder.CreateCylinder('road-bore', { diameter:9, height:18, tessellation:24, sideOrientation:Mesh.BACKSIDE, cap:Mesh.CAP_END }, scene);
+    bore.rotation.x = Math.PI/2; bore.position.set(0, 2.3, MZ-9); bore.material=M.dark; bore.isPickable=false; bore.parent=tun;
+    const plug = MeshBuilder.CreateBox('road-plug', { width:9, height:9, depth:0.3 }, scene); plug.position.set(0,2.7,MZ-18); plug.material=M.dark; plug.parent=tun;
+    for (const z of [MZ-2, MZ-5, MZ-9, MZ-13]) { const rib=MeshBuilder.CreateTorus('road-rib',{diameter:8.4,thickness:0.5,tessellation:20},scene); rib.rotation.x=Math.PI/2; rib.position.set(0,2.3,z); rib.material=M.concrete; rib.parent=tun; }
 
-    // THE MOUNTAIN: a sloped grass ridge that rises to the SIDES (the behind-the-tank
-    // camera has only ~19u of room, so mass in the centre would bury it / hide the tank).
-    // The centre stays OPEN so you see the tank roll out; the mouth ceiling is the lintel
-    // above + a small grass cap. Thin in Z (a wall, not a blob).
-    // Narrow (sx ~0.9) + thin-in-Z (sz ~0.42, so the camera at z≈−19 isn't buried), and the
-    // nearest centre is far enough out (≥38) that the mound's own x-radius (~22) still clears
-    // the centre. Slopes up to the edges.
-    const RIDGE_Z = MZ;
-    for (let x=-150; x<=150; x+=24) {
-      if (Math.abs(x) < 38) continue;                      // clear centre for the tunnel + road
-      const sy = 1.05 + (Math.abs(x)/150) * 0.7;           // slope up toward the edges
-      mound(50, x, -6, RIDGE_Z, 0.95, sy, 0.42);
+    // CONCRETE PORTAL FRAME, flush in the berm — the hero element that reads as a tunnel
+    // entrance even from above: two jambs + a forward-tilted lintel (its underside = the
+    // visible ceiling), around the dark bore.
+    const jambL = MeshBuilder.CreateBox('road-jambL', { width:3, height:9, depth:3.2 }, scene); jambL.position.set(-5.8,4.5,MZ); jambL.material=M.concrete; jambL.parent=tun; worldUV(jambL,3);
+    const jambR = MeshBuilder.CreateBox('road-jambR', { width:3, height:9, depth:3.2 }, scene); jambR.position.set( 5.8,4.5,MZ); jambR.material=M.concrete; jambR.parent=tun; worldUV(jambR,3);
+    const lintel = MeshBuilder.CreateBox('road-lintel', { width:15, height:3, depth:4.5 }, scene); lintel.position.set(0,9.2,MZ-0.5); lintel.rotation.x=-0.35; lintel.material=M.concrete; lintel.parent=tun; worldUV(lintel,3);
+
+    // LOW grass berm nestling the portal into the south — seen from above as a hill band.
+    // Low + thin so it never buries the (z≈−19) camera; narrow + far enough out to clear
+    // the portal/road centre.
+    for (let x=-100; x<=100; x+=20) {
+      if (Math.abs(x) < 24) continue;
+      const sy = 0.5 + (Math.abs(x)/100) * 0.35;
+      mound(44, x, -3, MZ-2, 0.8, sy, 0.5);
     }
-    // small grass cap above the lintel — a little mountain over the mouth (the ceiling),
-    // kept small/thin so it never blocks the emerging tank
-    mound(14, 0, 7, MZ-1, 1.3, 0.55, 0.45);
+    mound(20, 0, 8, MZ-3, 1.7, 0.5, 0.6);   // low grass cap burying the lintel top into the berm
 
     // dirt apron blending the mouth into the road start (road already begins at z=0)
     buildPath([[0,MZ+2],[0,2],[0,12]], 8);
-    shadowCasters.push(portal, lintel);
-    // block driving south through the mountain wall (obstacle row, gap at the tunnel)
-    for (let x=-150; x<=150; x+=16) { if (Math.abs(x) < 26) continue; obstacles.push({ position:{x,z:RIDGE_Z}, halfW:9, halfD:9 }); }
+    shadowCasters.push(jambL, jambR, lintel);
+    // block driving south through the berm + portal jambs (gap at the mouth)
+    for (let x=-100; x<=100; x+=16) { if (Math.abs(x) < 16) continue; obstacles.push({ position:{x,z:MZ-2}, halfW:8, halfD:7 }); }
+    obstacles.push({ position:{x:-5.2,z:MZ}, halfW:1.5, halfD:1.6 }, { position:{x:5.2,z:MZ}, halfW:1.5, halfD:1.6 });
   }
 
   return { obstacles, shadowCasters, root };
