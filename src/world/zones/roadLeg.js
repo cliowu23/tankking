@@ -40,38 +40,43 @@ export function generateRoadLeg(seed = 1) {
   run(34, 0);                                  // outro straight into the checkpoint
 
   const total = pts.length;
-  const fi = Math.floor(total*0.42);
-  const fj = Math.min(total-4, fi+11);
+  const bandFor = (frac) => frac < 0.34 ? 'near' : frac < 0.67 ? 'mid' : 'deep';
+  const valueFor = (band) => band === 'near' ? 25 : band === 'mid' ? 50 : 100;
 
-  // fork branches: sine-bump perpendicular offset (0→D→0) → diverge from fi, rejoin at fj
-  const span = pts.slice(fi, fj+1), L = span.length, D = 26;
-  const forkL = [], forkR = [];
-  for (let k=0;k<L;k++){
-    const t=k/(L-1), off=Math.sin(t*Math.PI)*D, p=span[k], d=dirAt(span,k);
-    const px=-d.z, pz=d.x;
-    forkL.push([p.x+px*off, p.z+pz*off]);
-    forkR.push([p.x-px*off, p.z-pz*off]);
-  }
+  // main road: ONE continuous centerline (no fork — reads as a single seamless ribbon)
+  const roadMain = pts.map(p => [p.x, p.z]);
 
-  // POI spurs: short side road off the main line, dead-ending at a loot crate
-  const spurs = [];
+  // POI spurs: a side road that peels off the main road as a CURVED off-ramp (heading
+  // blends from along-road → outward), dead-ending at guarded loot. Starting on the road
+  // + the patchy-mask edge feathering makes the junction read as a natural offshoot.
+  const spurs = [], enemies = [], loot = [];
   const nSpur = 1 + (rand()<0.6 ? 1 : 0);
+  const spurIdx = [];
   for (let s=0;s<nSpur;s++){
     let idx, tries=0;
-    do { idx = 8 + Math.floor(rand()*(total-14)); tries++; }
-    while ((idx>=fi-2 && idx<=fj+2) && tries<12);
+    do { idx = 10 + Math.floor(rand()*(total-18)); tries++; }
+    while (spurIdx.some(j => Math.abs(j-idx) < 6) && tries<14);
+    spurIdx.push(idx);
     const p=pts[idx], d=dirAt(pts,idx), side=rand()<0.5?1:-1, px=-d.z*side, pz=d.x*side;
-    const wps=[]; const SPUR_LEN=30;
-    for (let q=0;q<=SPUR_LEN;q+=STEP) wps.push([p.x+px*q, p.z+pz*q]);
-    spurs.push({ wps, loot:[p.x+px*SPUR_LEN, p.z+pz*SPUR_LEN] });
+    const SPUR_LEN=34, n=Math.round(SPUR_LEN/STEP);
+    let cx=p.x, cz=p.z; const wps=[[cx,cz]];
+    for (let q=1;q<=n;q++){
+      const t=q/n;                                   // blend along-road → outward
+      let bx=d.x*(1-t)+px*t, bz=d.z*(1-t)+pz*t; const bl=Math.hypot(bx,bz)||1;
+      cx+=bx/bl*STEP; cz+=bz/bl*STEP; wps.push([cx,cz]);
+    }
+    const lootPos=[cx,cz], band=bandFor(idx/total);
+    spurs.push({ wps, loot:lootPos });
+    loot.push({ x:lootPos[0], z:lootPos[1], value:valueFor(band) });
+    enemies.push({ x:cx-px*6, z:cz-pz*6, mode:'ambush', band });   // a guard on the loot
   }
 
-  // signs at the fork mouth (truthful contract: skull→left branch, chest→right)
-  const fp=pts[fi], fd=dirAt(pts,fi), fpx=-fd.z, fpz=fd.x;
-  const signs = [
-    { glyph:'💀', bg:'#caa', x:fp.x+fpx*9, z:fp.z+fpz*9 },
-    { glyph:'📦', bg:'#cc9', x:fp.x-fpx*9, z:fp.z-fpz*9 },
-  ];
+  // road-blockers: enemies sitting ON the centerline you must beat to pass (escalating)
+  for (const frac of [0.32, 0.55, 0.78]) {
+    const i = Math.round(frac * (total-1));
+    const p = pts[i];
+    enemies.push({ x:p.x, z:p.z, mode:'patrol', band:bandFor(frac) });
+  }
 
   // procedural roadside trees (alternating sides, kept off the road body)
   const trees = [];
@@ -81,15 +86,13 @@ export function generateRoadLeg(seed = 1) {
     trees.push([p.x+px*off, p.z+pz*off]);
   }
 
-  // main road split into A (start→fork) and B (fork→end); fork span is the two branches
-  const roadA = pts.slice(0, fi+1).map(p=>[p.x,p.z]);
-  const roadB = pts.slice(fj).map(p=>[p.x,p.z]);
   const checkpoint = { x: pts[pts.length-1].x, z: pts[pts.length-1].z };
 
-  // bounds (for ground sizing + tank clamp): bbox of everything + margin
+  // bounds (for ground sizing + tank clamp): bbox of road + spurs + margin
   let minX=0,maxX=0,minZ=0,maxZ=0;
-  for (const p of pts){ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z); }
-  for (const a of [...forkL,...forkR]){ minX=Math.min(minX,a[0]); maxX=Math.max(maxX,a[0]); }
+  const eat = (x,z) => { minX=Math.min(minX,x); maxX=Math.max(maxX,x); minZ=Math.min(minZ,z); maxZ=Math.max(maxZ,z); };
+  for (const p of pts) eat(p.x, p.z);
+  for (const sp of spurs) for (const w of sp.wps) eat(w[0], w[1]);
   const half = Math.ceil(Math.max(maxX-minX, maxZ-minZ)/2 + 80);   // extent (ground sizing)
   const center = { x:(minX+maxX)/2, z:(minZ+maxZ)/2 };
   // tank clamp is a box ±clampHalf around the ORIGIN (not the bbox centre), so it must
@@ -97,7 +100,7 @@ export function generateRoadLeg(seed = 1) {
   const clampHalf = Math.ceil(Math.max(Math.abs(minX),Math.abs(maxX),Math.abs(minZ),Math.abs(maxZ)) + 80);
 
   return {
-    seed, roadA, roadB, forkL, forkR, spurs, signs, trees, checkpoint,
+    seed, roadMain, spurs, trees, checkpoint, enemies, loot,
     start: { x: pts[0].x, z: pts[0].z, facing: 0 },
     bbox: { minX, maxX, minZ, maxZ, center, half, clampHalf },
   };

@@ -71,16 +71,14 @@ export function buildRoadLeg(scene, zone) {
     trunk: mat('road-trunk', 0.34,0.24,0.13),
     foliage: mat('road-foliage', 0.26,0.52,0.20),
     wood:  mat('road-wood',  0.42,0.30,0.16),
-    crate: mat('road-crate', 0.46,0.36,0.18),
     plaster: mat('road-plaster', 0.78,0.72,0.60),
     concrete: mat('road-concrete', 0.42,0.40,0.37),
     roof:  mat('road-roof',  0.55,0.28,0.20),
     flag:  mat('road-flag',  0.0,0.85,0.78),
   };
   surf(M.grass,'grass',16); surf(M.path,'dirt',1); surf(M.foliage,'hedge',2);
-  surf(M.wood,'wood',1,'hangar'); surf(M.crate,'wood',1,'hangar');
+  surf(M.wood,'wood',1,'hangar');
   surf(M.plaster,'plaster',1); surf(M.concrete,'concrete',1,'hangar'); surf(M.roof,'rooftile',1);
-  M.crate.emissiveColor = new Color3(0.16,0.12,0.0);
   M.flag.emissiveColor  = new Color3(0,0.3,0.28); M.flag.specularColor = new Color3(0,0,0);
 
   // ── grass ground (covers the whole leg) ──────────────────────────────────────
@@ -113,9 +111,8 @@ export function buildRoadLeg(scene, zone) {
     for (let i=0;i<K;i++){ const t=cum[i]/PATH_MASK_TILE; uv2[i*2]=0; uv2[i*2+1]=t; uv2[(K+i)*2]=1; uv2[(K+i)*2+1]=t; }
     ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
   };
-  buildPath(leg.roadA, 8); buildPath(leg.roadB, 8);
-  buildPath(leg.forkL, 7); buildPath(leg.forkR, 7);
-  for (const sp of leg.spurs) buildPath(sp.wps, 4.5);
+  buildPath(leg.roadMain, 8);                     // one continuous seamless ribbon
+  for (const sp of leg.spurs) buildPath(sp.wps, 5);
 
   // ── trees (instanced trunk + foliage blob) ───────────────────────────────────
   const trunkSrc = MeshBuilder.CreateCylinder('road-trunkSrc', { diameter:0.7, height:2.6, tessellation:7 }, scene);
@@ -133,25 +130,8 @@ export function buildRoadLeg(scene, zone) {
     shadowCasters.push(t,b);
   });
 
-  // ── POI loot crates at the spur ends ─────────────────────────────────────────
-  for (const sp of leg.spurs) {
-    const c = MeshBuilder.CreateBox('road-loot', { size:3 }, scene);
-    c.position.set(sp.loot[0], 1.5, sp.loot[1]); c.rotation.y=0.5; c.material=M.crate; c.parent=root;
-    worldUV(c, 3); shadowCasters.push(c);
-  }
-
-  // ── ambiguous skull/chest signs at the fork mouth ────────────────────────────
-  const signTex = (glyph,bg) => { const dt=new DynamicTexture('road-sign',{width:256,height:256},scene,false); const c=dt.getContext();
-    c.fillStyle=bg; c.fillRect(0,0,256,256); c.fillStyle='#0008'; c.fillRect(0,0,256,26); c.fillRect(0,230,256,26);
-    c.textAlign='center'; c.textBaseline='middle'; c.font='150px serif'; c.fillStyle='#111'; c.fillText(glyph,128,122);
-    c.font='bold 60px monospace'; c.fillStyle='#1a1a1a'; c.fillText('?',128,212); dt.update(); return dt; };
-  for (const s of leg.signs) {
-    const post=MeshBuilder.CreateCylinder('road-post',{diameter:0.5,height:4},scene); post.position.set(s.x,2,s.z); post.material=M.wood; post.parent=root;
-    const board=MeshBuilder.CreatePlane('road-board',{size:7},scene); board.position.set(s.x,5,s.z); board.parent=root;
-    board.billboardMode=Mesh.BILLBOARDMODE_ALL; const bm=new StandardMaterial('road-bm',scene);
-    bm.diffuseTexture=signTex(s.glyph,s.bg); bm.emissiveColor=new Color3(0.55,0.55,0.55); bm.specularColor=new Color3(0,0,0); board.material=bm;
-    shadowCasters.push(post);
-  }
+  // POI loot at the spur ends is the game's collectible SalvageCrate (built by
+  // ArenaScene from zone.loot), so RoadBuilder draws no loot meshes here.
 
   // ── checkpoint outpost (friendly stop at the leg end) ────────────────────────
   const cp = leg.checkpoint;
