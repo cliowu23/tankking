@@ -59,9 +59,9 @@
   <div class="tune"><label>cam tilt (β)</label><input id="k-beta" type="number" step="0.03" value="0.72"></div>
   <div class="tune"><label>travel lead</label><input id="k-lead" type="number" step="2" value="6"></div>
   <div class="tune"><label>aim reveal</label><input id="k-aim" type="number" step="1" value="7"></div>
-  <div class="tune"><label>max speed</label><input id="k-spd" type="number" step="1" value="15"></div>
-  <div class="tune"><label>accel</label><input id="k-acc" type="number" step="1" value="11"></div>
-  <div class="tune"><label>turn rate</label><input id="k-rot" type="number" step="0.1" value="2.2"></div>
+  <div class="tune"><label>max speed</label><input id="k-spd" type="number" step="1" value="30"></div>
+  <div class="tune"><label>accel</label><input id="k-acc" type="number" step="1" value="24"></div>
+  <div class="tune"><label>turn rate</label><input id="k-rot" type="number" step="0.1" value="2.4"></div>
 </div>
 
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -75,7 +75,7 @@ const scene  = new Scene(engine);
 scene.clearColor = new Color4(0.53, 0.81, 0.92, 1.0);
 
 // ── live knobs ────────────────────────────────────────────────────────────────
-const K = { rad:58, beta:0.72, lead:6, aim:7, spd:15, acc:11, rot:2.2 };
+const K = { rad:58, beta:0.72, lead:6, aim:7, spd:30, acc:24, rot:2.4 };
 const bind = (id,key)=>{ const el=document.getElementById(id);
   el.addEventListener('input',()=>{ const v=parseFloat(el.value); if(!Number.isNaN(v)) K[key]=v; }); };
 bind('k-rad','rad'); bind('k-beta','beta'); bind('k-lead','lead'); bind('k-aim','aim');
