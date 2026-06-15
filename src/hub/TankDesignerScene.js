@@ -6,6 +6,7 @@ import {
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { yRotForFacing } from '../utils/mathUtils.js';
+import { buildPrimitiveTank } from '../tank/primitiveTank.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
@@ -445,93 +446,30 @@ export default class TankDesignerScene {
 
     this._clearCurrentModel();
 
-    const hullMat = new StandardMaterial('primHull', this.scene);
-    hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
-    hullMat.specularColor = new Color3(0.05, 0.15, 0.30);
+    // Shared geometry (see src/tank/primitiveTank.js). The designer adds the real cannon
+    // GLB onto the barrel pivot below, so it opts out of the builder's simple barrel.
+    const prim = buildPrimitiveTank(this.scene, { simpleBarrel: false });
+    prim.root.position.set(0, PAD_Y + 0.01, 0);
+    this._turretPivot = prim.turretPivot;
+    this._barrelPivot = prim.barrelPivot;
+    this._turretMat   = prim.materials.turret;
 
-    const turretMat = new StandardMaterial('primTurret', this.scene);
-    turretMat.diffuseColor  = new Color3(0.08, 0.32, 0.75);
-    turretMat.specularColor = new Color3(0.03, 0.10, 0.25);
-    this._turretMat = turretMat;
-
-    const trackMat = new StandardMaterial('primTrack', this.scene);
-    trackMat.diffuseColor  = new Color3(0.12, 0.12, 0.12);
-    trackMat.specularColor = new Color3(0.04, 0.04, 0.04);
-
-    const modelRoot = new TransformNode('primRoot', this.scene);
-    modelRoot.position.set(0, PAD_Y + 0.01, 0);
-
-    const turretPivot = new TransformNode('primTurretPivot', this.scene);
-    turretPivot.position.set(0, 0.55, 0);
-    turretPivot.parent = modelRoot;
-    this._turretPivot = turretPivot;
-
-    const barrelPivot = new TransformNode('primBarrelPivot', this.scene);
-    barrelPivot.position.set(0, 0.3, 0.6);
-    barrelPivot.parent = turretPivot;
-    this._barrelPivot = barrelPivot;
-
-    const add = (mesh) => {
-      mesh.receiveShadows = true;
-      this.shadowGen.addShadowCaster(mesh);
-      this._toDispose.push(mesh);
-      return mesh;
-    };
-
-    // Hull — single rectangular prism
-    const hull = MeshBuilder.CreateBox('primHull', { width: 2.40, height: 0.65, depth: 2.50 }, this.scene);
-    hull.position.set(0, 0.325, 0); hull.material = hullMat; hull.parent = modelRoot; add(hull);
-
-    const trackL = MeshBuilder.CreateBox('primTrackL', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
-    trackL.position.set(-1.34, 0.325, 0); trackL.material = trackMat; trackL.parent = modelRoot; add(trackL);
-
-    const trackR = MeshBuilder.CreateBox('primTrackR', { width: 0.28, height: 0.65, depth: 3.25 }, this.scene);
-    trackR.position.set(1.34, 0.325, 0); trackR.material = trackMat; trackR.parent = modelRoot; add(trackR);
-
-    const skirtL = MeshBuilder.CreateBox('primSkirtL', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
-    skirtL.position.set(-1.50, 0.125, 0); skirtL.material = trackMat; skirtL.parent = modelRoot; add(skirtL);
-
-    const skirtR = MeshBuilder.CreateBox('primSkirtR', { width: 0.07, height: 0.25, depth: 2.90 }, this.scene);
-    skirtR.position.set(1.50, 0.125, 0); skirtR.material = trackMat; skirtR.parent = modelRoot; add(skirtR);
-
-    for (const wz of [-1.0, -0.33, 0.33, 1.0]) {
-      for (const wx of [-1.34, 1.34]) {
-        const w = MeshBuilder.CreateCylinder(`primWheel_${wx}_${wz}`, { height: 0.10, diameter: 0.32, tessellation: 10 }, this.scene);
-        w.rotation.z = Math.PI / 2; w.position.set(wx, 0.18, wz);
-        w.material = trackMat; w.parent = modelRoot; add(w);
-      }
-    }
-
-    // Turret
-    const turretBody = MeshBuilder.CreateBox('primTurretBody', { width: 1.15, height: 0.38, depth: 1.20 }, this.scene);
-    turretBody.position.set(0, 0.16, 0.05); turretBody.material = turretMat; turretBody.parent = turretPivot; add(turretBody);
-
-    const turretRoof = MeshBuilder.CreateBox('primTurretRoof', { width: 1.00, height: 0.12, depth: 1.00 }, this.scene);
-    turretRoof.position.set(0, 0.38, 0.00); turretRoof.material = turretMat; turretRoof.parent = turretPivot; add(turretRoof);
-
-    const turretFace = MeshBuilder.CreateBox('primTurretFace', { width: 1.10, height: 0.34, depth: 0.18 }, this.scene);
-    turretFace.position.set(0, 0.22, 0.62); turretFace.rotation.x = -Math.PI * 0.12;
-    turretFace.material = turretMat; turretFace.parent = turretPivot; add(turretFace);
-
-    const mantlet = MeshBuilder.CreateCylinder('primMantlet', { height: 0.28, diameter: 0.65, tessellation: 10 }, this.scene);
-    mantlet.rotation.x = Math.PI / 2; mantlet.position.set(0, 0.16, 0.72);
-    mantlet.material = turretMat; mantlet.parent = turretPivot; add(mantlet);
-
-    const cupola = MeshBuilder.CreateCylinder('primCupola', { height: 0.16, diameterBottom: 0.35, diameterTop: 0.28, tessellation: 8 }, this.scene);
-    cupola.position.set(0.12, 0.42, -0.10); cupola.material = turretMat; cupola.parent = turretPivot; add(cupola);
-
-    this._toDispose.push(modelRoot, turretPivot, barrelPivot, hullMat, turretMat, trackMat);
+    for (const mesh of prim.meshes) { this.shadowGen.addShadowCaster(mesh); }
+    this._toDispose.push(
+      ...prim.meshes, prim.root, prim.turretPivot, prim.barrelPivot,
+      prim.materials.hull, prim.materials.turret, prim.materials.track,
+    );
 
     // Barrel — async GLB load; fire-and-forget (appears shortly after tank loads)
     this._activeModelConfig  = { cannonOffsets: {} };  // per-cannon nudges (WT-era entries retired)
-    this._buildCannon(this._equippedCannon, turretMat).catch(e =>
+    this._buildCannon(this._equippedCannon, prim.materials.turret).catch(e =>
       console.error('[cannon] build failed:', e)
     );
 
     // Generic tank limits for the primitive placeholder
     this._barrelUp   = -20 * Math.PI / 180; // −20° (up)
     this._barrelDown =  10 * Math.PI / 180; // +10° (down)
-    barrelPivot.rotation.x = 0;
+    prim.barrelPivot.rotation.x = 0;
 
     this.camera.target = new Vector3(0, 0.8, 0);
     this.camera.radius = 10;
