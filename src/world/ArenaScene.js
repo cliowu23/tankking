@@ -30,7 +30,7 @@ import { buildRoadLeg } from './zones/RoadBuilder.js';
 // because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
 // window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
 const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
-const CAM_RADIUS         = 42;    // distance (was 39)
+const CAM_RADIUS         = 48;    // distance (zoomed out a tad from 42)
 const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
 
 export default class ArenaScene {
