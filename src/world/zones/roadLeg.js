@@ -98,20 +98,23 @@ export function generateRoadLeg(seed = 1) {
   // away from the spurs and road-blockers, and FOLD their enemies/loot into the leg's
   // existing arrays — so combat, drive-over pickups, and extraction stay unchanged.
   const pois = [];
+  const containers = [];
   const blockerIdx = [0.32, 0.55, 0.78].map(f => Math.round(f * (total - 1)));
   const usedIdx = [...spurIdx, ...blockerIdx];
   const nPoi = 1 + (rand() < 0.6 ? 1 : 0);
   for (let s = 0; s < nPoi && POI_LIST.length; s++) {
     const type = POI_LIST[Math.floor(rand() * POI_LIST.length)];
     let idx, tries = 0;
-    do { idx = 12 + Math.floor(rand() * (total - 24)); tries++; }
-    while (usedIdx.some(j => Math.abs(j - idx) < 8) && tries < 16);
+    do { idx = 14 + Math.floor(rand() * (total - 28)); tries++; }
+    while (usedIdx.some(j => Math.abs(j - idx) < 10) && tries < 16);
     usedIdx.push(idx);
     const inst = type.place({ pts, total, dirAt, bandFor, valueFor, anchorIdx: idx }, rand, {});
     if (!inst) continue;
     pois.push(inst);
-    for (const e of inst.enemies) enemies.push(e);
-    for (const l of inst.loot) loot.push(l);
+    for (const e of (inst.enemies || [])) enemies.push(e);
+    for (const l of (inst.loot || [])) loot.push(l);
+    for (const c of (inst.containers || [])) containers.push(c);
+    if (inst.spur) spurs.push(inst.spur);   // mini-camp etc. add a branch road
   }
 
   // procedural roadside trees (alternating sides, kept off the road body)
@@ -130,6 +133,7 @@ export function generateRoadLeg(seed = 1) {
   for (const p of pts) eat(p.x, p.z);
   for (const sp of spurs) for (const w of sp.wps) eat(w[0], w[1]);
   for (const poi of pois) for (const pr of poi.props) eat(pr.x, pr.z);
+  for (const c of containers) eat(c.x, c.z);
   for (const a of approach) eat(a[0], a[1]);   // include the southern approach (z down to −52)
   // full drivable centerline = approach + main (for the boundary corridor + edge fade)
   const centerline = [...approach, ...roadMain];
@@ -140,7 +144,7 @@ export function generateRoadLeg(seed = 1) {
   const clampHalf = Math.ceil(Math.max(Math.abs(minX),Math.abs(maxX),Math.abs(minZ),Math.abs(maxZ)) + 80);
 
   return {
-    seed, roadMain, approach, centerline, spurs, trees, checkpoint, enemies, loot, pois,
+    seed, roadMain, approach, centerline, spurs, trees, checkpoint, enemies, loot, pois, containers,
     start: { x: pts[0].x, z: pts[0].z, facing: 0 },
     bbox: { minX, maxX, minZ, maxZ, center, half, clampHalf },
   };

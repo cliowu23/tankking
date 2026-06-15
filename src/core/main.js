@@ -17,7 +17,7 @@ function makeRoadZone(seed = (Date.now() & 0xffff)) {
     palette: WORLD1.palette,
     bounds: { half: leg.bbox.clampHalf, visual: leg.bbox.clampHalf + 60 },
     spawn: leg.start,   // road's south start (z≈0)
-    enemies: leg.enemies, loot: leg.loot, bandTuning: WORLD1.bandTuning,
+    enemies: leg.enemies, loot: leg.loot, containers: leg.containers, bandTuning: WORLD1.bandTuning,
     extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
     // boundary corridor: stay within `half` of the road centerline (sides + front), and a
     // hard wall right behind spawn (southLimit) — no reversing down the approach you came in on.
@@ -339,6 +339,11 @@ function exitDesigner() {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // Long Road: E-loot a POI container (chest) when in range.
+  if (window.__state === 'GAME' && e.code === 'KeyE' && arenaScene && arenaScene._nearContainer) {
+    arenaScene.lootNearbyContainer();
+    return;
+  }
   if (window.__state === 'HANGAR' && hangarScene) {
     if (e.code === 'KeyE') {
       if (hangarScene._panelOpen) { hangarScene.closePanel(); return; }

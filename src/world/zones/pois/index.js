@@ -7,9 +7,13 @@
 // Add a new POI type = drop a module here and add it to the list. Nothing else changes.
 
 import treePatchCache from './treePatchCache.js';
+import roadsideHut from './roadsideHut.js';
+import miniCamp from './miniCamp.js';
 
 export const POI_LIST = [
   treePatchCache,
+  roadsideHut,
+  miniCamp,
 ];
 
 export const POI_TYPES = Object.fromEntries(POI_LIST.map((t) => [t.id, t]));

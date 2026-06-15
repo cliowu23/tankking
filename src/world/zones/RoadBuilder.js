@@ -162,21 +162,25 @@ export function buildRoadLeg(scene, zone) {
   // already in the leg's arrays (built by ArenaScene), so combat/pickups don't wait. ──────
   const propsReady = (leg.trees?.length || leg.pois?.length)
     ? (async () => {
-        const tpl  = await loadPropTemplates(scene);
+        // Merge both prop GLBs into one template map: trees/bush/rock + Hut/Chest.
+        const tpl = { ...(await loadPropTemplates(scene, 'treepatch.glb')),
+                      ...(await loadPropTemplates(scene, 'buildings.glb')) };
         const pick = (a) => a[Math.floor(Math.random() * a.length)];
         const obs = [], sc = [];
 
-        // roadside dressing trees (line the road) — now the same GLB tree variants as POIs
+        // roadside dressing trees (line the road) — the GLB tree variants
         (leg.trees ?? []).forEach(([x, z], i) => {
           const scale = ROAD_TREE_SCALE * (0.85 + ((i * 37) % 10) / 22);
           sc.push(...instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale, rotY: (i * 1.3) % Math.PI, parent: root }));
         });
 
-        // POI thickets / set-pieces
+        // POI build helpers: tree/bush/rock conveniences + a generic `prop` (Hut, Chest, …).
         const helpers = {
           makeTree: (x, z, s = 1, r = 0) => instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale: s * POI_TREE_SCALE, rotY: r, parent: root }),
           makeBush: (x, z, s = 1, r = 0) => instanceProp(tpl, 'Bush',               { x, z, scale: s * POI_BUSH_SCALE, rotY: r, parent: root }),
           makeRock: (x, z, s = 1, r = 0) => instanceProp(tpl, s >= 0.9 ? 'Rock_A' : 'Rock_B', { x, z, scale: s * POI_ROCK_SCALE, rotY: r, parent: root }),
+          prop:     (name, x, z, s = 1, r = 0) => instanceProp(tpl, name, { x, z, scale: s, rotY: r, parent: root }),
+          pickTree: () => pick(TREE_VARIANTS),
         };
         for (const inst of (leg.pois ?? [])) {
           const type = POI_TYPES[inst.poiType];

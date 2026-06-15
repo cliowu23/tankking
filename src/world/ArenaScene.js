@@ -30,7 +30,7 @@ import { buildRoadLeg } from './zones/RoadBuilder.js';
 // because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
 // window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
 const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
-const CAM_RADIUS         = 42;    // distance (was 39)
+const CAM_RADIUS         = 48;    // distance (zoomed out a tad from 42)
 const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
 
 export default class ArenaScene {
@@ -611,6 +611,7 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this.tank.fitCollisionToModel();   // fit the hitbox to the loaded GLB hull
       this._readyResolve();
     }).catch(e => {
       console.error(`[GLB] ${modelFile} load failed:`, e);
@@ -661,6 +662,7 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this.tank.fitCollisionToModel(assembled.footprint);   // authored hull footprint (fallback: measure)
       this._readyResolve();
     }).catch(e => {
       console.error('[Composed] assembly failed for', loadout, e);
@@ -846,6 +848,7 @@ export default class ArenaScene {
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
       this._updateExtraction(dt);
+      this._updateContainers();
       this.vfx.update(dt);
       this._updateLockRing(dt);
       this._updateAimIndicator();
@@ -1045,6 +1048,9 @@ export default class ArenaScene {
     this._aimEl.style.display = 'none';
     for (const crate of this._crates) crate.reset();
     this._extractZone.reset();
+    if (this._containers) for (const c of this._containers) c.looted = false;
+    this._nearContainer = null;
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
     this._runSalvage = 0;
     this._extracting = false;
   }
@@ -1063,6 +1069,55 @@ export default class ArenaScene {
     });
 
     this._extractZone = new ExtractionZone(this.scene, extract);
+
+    // E-lootable containers (POI chests): proximity prompt + E (handled in main.js) → salvage.
+    this._containers = (this.zone?.containers ?? []).map((c) => ({
+      x: c.x, z: c.z, value: c.value | 0, radius: c.radius ?? 5, looted: false,
+    }));
+    this._nearContainer = null;
+    this._lootPrompt = this._ensureLootPrompt();
+  }
+
+  // One reused DOM prompt (no per-scene listener/element leak). Built in JS so we never
+  // touch index.html (a parallel session has uncommitted edits there).
+  _ensureLootPrompt() {
+    let el = document.getElementById('loot-prompt');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loot-prompt';
+      el.textContent = '[ E ]  LOOT';
+      el.style.cssText = 'position:absolute;left:50%;bottom:150px;transform:translateX(-50%);' +
+        'font-family:monospace;font-size:18px;letter-spacing:3px;color:#ffd23a;' +
+        'text-shadow:0 0 6px #000,0 0 12px #ffb000;z-index:25;display:none;pointer-events:none;';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'none';
+    return el;
+  }
+
+  // Proximity check for E-loot containers; sets this._nearContainer + toggles the prompt.
+  _updateContainers() {
+    if (!this._containers || !this._containers.length) { this._nearContainer = null; return; }
+    let near = null;
+    if (this.tank.alive && !this._extracting) {
+      for (const c of this._containers) {
+        if (c.looted) continue;
+        const dx = this.tank.position.x - c.x, dz = this.tank.position.z - c.z;
+        if (dx * dx + dz * dz <= c.radius * c.radius) { near = c; break; }
+      }
+    }
+    this._nearContainer = near;
+    if (this._lootPrompt) this._lootPrompt.style.display = near ? 'block' : 'none';
+  }
+
+  // Called from main.js on the E key when in range of a container.
+  lootNearbyContainer() {
+    const c = this._nearContainer;
+    if (!c || c.looted) return;
+    c.looted = true;
+    this._runSalvage += c.value;
+    this._nearContainer = null;
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
   }
 
   _updateExtraction(dt) {
@@ -1097,6 +1152,7 @@ export default class ArenaScene {
     window.__state   = 'EXTRACTED';
     const banked = bankSalvage(this._runSalvage);
     if (this._aimEl) this._aimEl.style.display = 'none';
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
     if (this._onExtract) this._onExtract(this._runSalvage, banked);
   }
 
@@ -1111,52 +1167,58 @@ export default class ArenaScene {
     }
   }
 
+  // Impulse-based elastic collision over ORIENTED boxes (OBB/SAT) — the box rotates with each
+  // tank so it matches the visual hull at any angle (no more driving through when turned). Uses
+  // RELATIVE velocity, only impulses when CLOSING (so separating stops re-hitting → no stun-lock).
   _checkCollisions() {
     const t = this.tank;
-
+    const pBox = { cx: t.position.x, cz: t.position.z, hw: t.halfW, hd: t.halfD, rot: t.rotY };
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
-      const dx = t.position.x - enemy.position.x;
-      const dz = t.position.z - enemy.position.z;
+      const eBox = { cx: enemy.position.x, cz: enemy.position.z, hw: enemy.halfW, hd: enemy.halfD, rot: enemy.rotY };
+      const hit = this._obbOverlap(eBox, pBox);   // normal points enemy → player
+      if (!hit) continue;
+      const { nx, nz, pen } = hit;
 
-      const overlapX = (t.halfW + enemy.halfW) - Math.abs(dx);
-      const overlapZ = (t.halfD + enemy.halfD) - Math.abs(dz);
+      // Positional separation, split by inverse mass (lighter player moves more).
+      const mP = t.mass, mE = enemy.mass;
+      const wP = mE / (mP + mE), wE = mP / (mP + mE);
+      t.root.position.x     += nx * pen * wP;  t.root.position.z     += nz * pen * wP;
+      enemy.root.position.x -= nx * pen * wE;  enemy.root.position.z -= nz * pen * wE;
 
-      if (overlapX <= 0 || overlapZ <= 0) continue;
-
-      const impactSpeed = Math.abs(t.speed);
-
-      if (impactSpeed < enemy.staticFrictionThreshold) {
-        t.speed *= 0.4;
-        this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.5);
-        continue;
+      // Relative velocity along the normal (negative = closing).
+      const pv = { x: Math.sin(t.rotY) * t.speed + t.knockX, z: Math.cos(t.rotY) * t.speed + t.knockZ };
+      const ev = enemy.getVelocity();
+      const rvn = (pv.x - ev.x) * nx + (pv.z - ev.z) * nz;
+      if (rvn < 0) {
+        const REST = 0.25;                                  // restitution — a bumpy thud, not a bounce
+        const j = -(1 + REST) * rvn / (1 / mP + 1 / mE);
+        t.applyKnockback(nx * j / mP, nz * j / mP);         // player: a decaying bump, keeps drive control
+        enemy.vx -= nx * j / mE; enemy.vz -= nz * j / mE;   // enemy shoved back by its share
+        if (enemy.speed) enemy.speed *= 0.5;                // bleed the rammer's drive so it doesn't re-charge instantly
+        const impact = Math.min(1, Math.abs(rvn) / 8);
+        this._triggerShake(0.06 + impact * 0.06, 0.15 + impact * 0.30);
       }
-
-      const alreadyBroken = enemy.staticFrictionThreshold === 0;
-      enemy.staticFrictionThreshold = 0;
-      t.speed *= 0.2;
-
-      const pushMult = alreadyBroken ? 3.5 : 2.2;
-      const pushSpd  = impactSpeed * (t.mass / enemy.mass) * pushMult;
-      const fwd      = new Vector3(Math.sin(t.rotY), 0, Math.cos(t.rotY));
-      enemy.vx = fwd.x * pushSpd;
-      enemy.vz = fwd.z * pushSpd;
-
-      this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.7);
-      this._triggerShake(0.11, 0.4);
     }
   }
 
-  _separate(tank, enemy, dx, dz, overlapX, overlapZ, ratio) {
-    if (overlapX < overlapZ) {
-      const sep = overlapX * Math.sign(dx);
-      tank.root.position.x  +=  sep * ratio;
-      enemy.root.position.x -= sep * (1 - ratio);
-    } else {
-      const sep = overlapZ * Math.sign(dz);
-      tank.root.position.z  +=  sep * ratio;
-      enemy.root.position.z -= sep * (1 - ratio);
+  // Separating Axis Theorem for two oriented boxes. Each box: {cx,cz,hw,hd,rot} where the
+  // hull's WIDTH is along local X and LENGTH along local Z (forward = (sin rot, cos rot)).
+  // Returns { nx, nz, pen } (unit normal A→B + penetration depth) or null if not overlapping.
+  _obbOverlap(A, B) {
+    const ax = { x: Math.cos(A.rot), z: -Math.sin(A.rot) }, az = { x: Math.sin(A.rot), z: Math.cos(A.rot) };
+    const bx = { x: Math.cos(B.rot), z: -Math.sin(B.rot) }, bz = { x: Math.sin(B.rot), z: Math.cos(B.rot) };
+    const dcx = B.cx - A.cx, dcz = B.cz - A.cz;
+    let minOv = Infinity, nx = 0, nz = 0;
+    for (const L of [ax, az, bx, bz]) {
+      const rA = A.hw * Math.abs(ax.x * L.x + ax.z * L.z) + A.hd * Math.abs(az.x * L.x + az.z * L.z);
+      const rB = B.hw * Math.abs(bx.x * L.x + bx.z * L.z) + B.hd * Math.abs(bz.x * L.x + bz.z * L.z);
+      const ov = rA + rB - Math.abs(dcx * L.x + dcz * L.z);
+      if (ov <= 0) return null;                  // a separating axis exists → no collision
+      if (ov < minOv) { minOv = ov; nx = L.x; nz = L.z; }
     }
+    if (dcx * nx + dcz * nz < 0) { nx = -nx; nz = -nz; }   // point the normal A → B
+    return { nx, nz, pen: minOv };
   }
 
   _triggerShake(duration, intensity) {
@@ -1197,11 +1259,13 @@ export default class ArenaScene {
     this._camX += (desiredX - this._camX) * smooth;
     this._camZ += (desiredZ - this._camZ) * smooth;
 
-    // --- 4. Hull-follow yaw: a critically-damped spring eases the view toward the hull
-    // heading — it lags slightly and ramps its turn-rate in/out, so changing direction is
-    // smooth instead of a snap. Reversing keeps facing up-the-road (rotY doesn't flip).
-    // -PI/2 - heading maps hull-forward → up-screen. ---
-    this._camHeading  = this._smoothDampAngle(this._camHeading, this.tank.rotY, dt);
+    // --- 4. Road-aligned yaw: the view follows the ROAD's direction (centerline tangent at
+    // the tank), NOT the hull — so steering doesn't whip the camera (far less motion-sick),
+    // and it always faces up-the-road. The cursor pull above (aimX/aimZ) gives the minor
+    // dynamic framing shift. A critically-damped spring keeps the slow road curves smooth.
+    // -PI/2 - heading maps road-forward → up-screen. Falls back to hull if there's no road.
+    const roadH = this._roadHeading();
+    this._camHeading  = this._smoothDampAngle(this._camHeading, roadH != null ? roadH : this.tank.rotY, dt);
     this.camera.alpha = -Math.PI / 2 - this._camHeading;
 
     // --- Apply with shake on top ---
@@ -1233,6 +1297,24 @@ export default class ArenaScene {
     let temp = (this._camHeadingVel + omega * change) * dt;
     this._camHeadingVel = (this._camHeadingVel - omega * temp) * exp;
     return targetAdj + (change + temp) * exp;
+  }
+
+  // Heading of the ROAD at the tank: tangent of the nearest centerline segment, pointing
+  // forward (the centerline runs spawn→checkpoint). Returns null off-road zones (no corridor).
+  _roadHeading() {
+    const c = this._corridor;
+    if (!c || !c.centerline || c.centerline.length < 2) return null;
+    const pts = c.centerline, t = this.tank.position;
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const ax = pts[i][0], az = pts[i][1], dx = pts[i + 1][0] - ax, dz = pts[i + 1][1] - az;
+      const L2 = dx * dx + dz * dz || 1;
+      let s = ((t.x - ax) * dx + (t.z - az) * dz) / L2; s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const px = ax + dx * s, pz = az + dz * s, d2 = (t.x - px) ** 2 + (t.z - pz) ** 2;
+      if (d2 < best) { best = d2; bi = i; }
+    }
+    const a = pts[bi], b = pts[bi + 1];
+    return Math.atan2(b[0] - a[0], b[1] - a[1]);   // road-forward heading (game convention)
   }
 
   // Long Road invisible walls: keep the tank within `half` of the road centerline — a

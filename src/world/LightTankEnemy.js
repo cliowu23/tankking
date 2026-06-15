@@ -10,6 +10,7 @@
 import { Matrix, Vector3 } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
+import { hullFootprint } from '../utils/meshBounds.js';
 import { makePaintMaterial } from '../utils/modelPaint.js';
 
 const LOADOUT = { hull: 'light-hull-scout', turret: 'light-turret-enclosed', cannon: 'light-gun-75mm' };
@@ -24,8 +25,8 @@ export default class LightTankEnemy extends AIEnemy {
       ...opts,
       noPrimitiveVisuals: true,
     });
-    this._halfW = 0.9;
-    this._halfD = 1.2;
+    this._halfW = 1.0;   // match the composed hull footprint (~2.0 wide) — "what you see"
+    this._halfD = 1.9;   // hull is ~3.8 long; was 1.2 → you clipped deep into the enemy
     this._matStates = [];   // [{mat, d, e}] originals for death tint / revive
     this.ready = this._buildComposed(scene);
   }
@@ -70,6 +71,10 @@ export default class LightTankEnemy extends AIEnemy {
     const barY = 2.0;
     this.hpBarBg.position.y = barY;
     this.hpBarFill.position.y = barY;
+
+    // Fit the collision box to this enemy's hull: authored footprint if declared, else measure.
+    if (a.footprint) { this._halfW = a.footprint.halfW; this._halfD = a.footprint.halfD; }
+    else { const f = hullFootprint(this.root.getChildMeshes()); if (f) { this._halfW = f.halfW; this._halfD = f.halfD; } }
     return this;
   }
 
