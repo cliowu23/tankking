@@ -5,32 +5,41 @@
 // POI builders instance. The props are native low-poly models built in Blender
 // (feedback_blender_prop_loop), exported to treepatch.glb.
 
-import { SceneLoader, StandardMaterial, Color3 } from '@babylonjs/core';
+import { SceneLoader, StandardMaterial, Color3, Texture } from '@babylonjs/core';
 
 const PROP_DIR = '/assets/models/props/';
+const TEX_DIR  = '/assets/textures/props/';
+const TEX_TILE = 6;     // grain tiling across the prop UVs (higher = finer grain) — user-picked
 
-// Replace a GLB (PBR) material with a flat matte StandardMaterial of the same base color.
-// Cached per color per scene so shared parts (trunks, foliage) reuse one material.
-function flatify(scene, src) {
-  const c = (src && (src.albedoColor || src.diffuseColor)) || null;
-  const rgb = c ? [c.r, c.g, c.b] : [0.7, 0.7, 0.7];
-  const key = `propflat_${rgb.map((v) => v.toFixed(2)).join('_')}`;
+// Which subtle-grain texture set each prop part uses, picked from the GLB mesh name.
+// Trees split into 2 primitives: _primitive0 = trunk (bark), _primitive1 = canopy (foliage).
+function texFor(name) {
+  if (/^Rock/.test(name))           return 'prop_stone';
+  if (/^Bush/.test(name))           return 'prop_foliage';
+  if (/_primitive0$/.test(name))    return 'prop_bark';
+  return 'prop_foliage';            // canopies (_primitive1) + fallback
+}
+
+// Matte StandardMaterial with a subtle grain (diffuse colour + normal) — kills the flat
+// "reflective plastic" look while matching the World 1 grain pipeline. Cached per set/scene.
+function grainMat(scene, set) {
+  const key = `proptex_${set}`;
   let m = scene.getMaterialByName(key);
-  if (!m) {
-    m = new StandardMaterial(key, scene);
-    m.diffuseColor = new Color3(...rgb);
-    m.specularColor = new Color3(0.05, 0.05, 0.05);
-  }
+  if (m) return m;
+  m = new StandardMaterial(key, scene);
+  const d = new Texture(`${TEX_DIR}${set}_diff.png`, scene);
+  const n = new Texture(`${TEX_DIR}${set}_nrm.png`, scene);
+  d.uScale = d.vScale = TEX_TILE; n.uScale = n.vScale = TEX_TILE;
+  m.diffuseTexture  = d;                          // grain carries the colour
+  m.bumpTexture     = n;                          // micro-relief scatters the highlight
+  m.diffuseColor    = new Color3(1, 1, 1);
+  m.specularColor   = new Color3(0.04, 0.04, 0.04); // matte — barely any sheen
+  m.specularPower   = 32;
   return m;
 }
 
 function flattenMesh(scene, mesh) {
-  const mat = mesh.material;
-  if (mat && Array.isArray(mat.subMaterials)) {
-    mat.subMaterials = mat.subMaterials.map((sm) => (sm ? flatify(scene, sm) : sm));
-  } else if (mat) {
-    mesh.material = flatify(scene, mat);
-  }
+  mesh.material = grainMat(scene, texFor(mesh.name));
 }
 
 // Load treepatch.glb into the scene as hidden templates; returns { baseName: [meshes] }.

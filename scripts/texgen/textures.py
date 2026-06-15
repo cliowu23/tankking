@@ -141,6 +141,10 @@ MATERIALS = {
   "wood":       dict(dir="hangar", pat="planks",  base=(0.38,0.26,0.14), lite=(0.50,0.36,0.21), planks=5, nrm=2.0, seed=8),
   "fabric":     dict(dir="hangar", pat="weave",   base=(0.40,0.12,0.12), lite=(0.50,0.18,0.18), threads=12, nrm=1.6, seed=6),
   "metal":      dict(dir="hangar", pat="panel",   base=(0.40,0.42,0.46), lite=(0.50,0.52,0.56), panels=3, nrm=1.4, seed=7),
+  # Long Road POI props (treepatch.glb) — subtle grain at the approved prop palette, matted in-engine.
+  "prop_foliage": dict(dir="props", pat="leaf",   base=(0.24,0.50,0.20), lite=(0.31,0.58,0.25), grP=94, nrm=2.4, seed=21),
+  "prop_bark":    dict(dir="props", pat="planks", base=(0.36,0.25,0.14), lite=(0.46,0.33,0.20), planks=4, nrm=1.7, seed=22),
+  "prop_stone":   dict(dir="props", pat="mottle", base=(0.53,0.51,0.47), lite=(0.60,0.57,0.52), macP=5, grP=72, grAmt=0.10, nrm=2.0, seed=23),
 }
 
 def save_png(name, arr, path, is_data):
