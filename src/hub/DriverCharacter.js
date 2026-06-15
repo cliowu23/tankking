@@ -3,7 +3,8 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 
-const SPEED = 5; // units/sec
+const SPEED       = 7;   // units/sec — walk (was 5; bumped between old walk and the dropped sprint)
+const CAM_RADIUS  = 20;  // fixed follow-cam distance (locked zoom); was 24
 const MODEL_DIR = '/assets/models/characters/';
 
 // Kenney "Mini Characters" (CC0). Each character GLB is rigged on an identical
@@ -77,9 +78,9 @@ export default class DriverCharacter {
     this.modelRoot.scaling.setAll(MODEL_SCALE);
     this.modelRoot.rotation.y = MODEL_YAW;
 
-    this.camera = new ArcRotateCamera('driver-cam', -Math.PI / 2, 0.62, 24, this.mesh.position.clone(), scene);
-    this.camera.lowerRadiusLimit = 24;
-    this.camera.upperRadiusLimit = 24;
+    this.camera = new ArcRotateCamera('driver-cam', -Math.PI / 2, 0.62, CAM_RADIUS, this.mesh.position.clone(), scene);
+    this.camera.lowerRadiusLimit = CAM_RADIUS;
+    this.camera.upperRadiusLimit = CAM_RADIUS;
     scene.activeCamera = this.camera;
 
     this._keys      = {};

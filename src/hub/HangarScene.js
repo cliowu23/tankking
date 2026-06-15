@@ -707,6 +707,9 @@ export default class HangarScene {
   _setupGameLoop() {
     this._nearStation = null;
     this._panelOpen   = false;
+    // North framing offset as a fraction of cam radius (lower = character more
+    // centered, higher = more room shown above them). Tune live via window.__hangar.
+    this._camNorthRatio = 0.18;
 
     const prompt      = document.getElementById('hangar-prompt');
     const promptLabel = document.getElementById('hangar-prompt-label');
@@ -720,11 +723,13 @@ export default class HangarScene {
       if (!this._panelOpen) {
         this.driver.update(dt);
         this._checkProximity(prompt, promptLabel);
-        // Keep camera locked onto driver, offset north to frame the room well
+        // Keep camera locked onto driver, offset north to frame the room. Offset
+        // scales with zoom (_camNorthRatio * radius) so framing survives any
+        // CAM_RADIUS change — don't hardcode the offset.
         this.driver.camera.target.set(
           this.driver.mesh.position.x,
           this.driver.mesh.position.y,
-          this.driver.mesh.position.z + 8
+          this.driver.mesh.position.z + this.driver.camera.radius * this._camNorthRatio
         );
       }
     });
