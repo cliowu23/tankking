@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Props Viewer</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a1420;font-family:ui-monospace,Menlo,monospace}
+  #c{width:100vw;height:100vh;display:block}
+  .panel{position:fixed;z-index:20;background:#081830ee;border:1px solid #16385c;border-radius:10px;color:#ddfff8;padding:12px 14px;font-size:12px;line-height:1.7}
+  #hud{top:14px;left:14px;max-width:460px}
+  #hud b{color:#ffcc00} #hud .k{color:#55ffbb}
+  #title{top:14px;right:14px;color:#00eedd}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" class="panel">
+  <b id="h">PROPS VIEWER</b><br>
+  Drag to orbit · scroll to zoom. <span class="k">[G]</span> toggle ground.<br>
+  Load any prop GLB with <span class="k">?glb=buildings.glb</span> (default) or <span class="k">?glb=treepatch.glb</span>.
+</div>
+<div id="title" class="panel"></div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script>
+const C3=BABYLON.Color3;
+const params=new URLSearchParams(location.search);
+const GLB=params.get('glb')||'buildings.glb';
+document.getElementById('title').textContent=GLB;
+document.getElementById('h').textContent='PROPS VIEWER — '+GLB;
+
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{adaptToDeviceRatio:true});
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(0.42,0.62,0.85,1);
+const hemi=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0.2,1,0.1),scene); hemi.intensity=0.9; hemi.groundColor=new C3(0.28,0.5,0.12);
+const dir=new BABYLON.DirectionalLight('d',new BABYLON.Vector3(0.3,-1,0.2),scene); dir.intensity=0.6;
+
+const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2.3,1.05,18,new BABYLON.Vector3(3,1.5,0),scene);
+cam.attachControl(canvas,true); cam.wheelDeltaPercentage=0.02; cam.lowerRadiusLimit=4; cam.upperRadiusLimit=60;
+
+const ground=BABYLON.MeshBuilder.CreateGround('g',{width:60,height:60},scene);
+const gmat=new BABYLON.StandardMaterial('gm',scene); gmat.diffuseColor=new C3(0.34,0.56,0.22); gmat.specularColor=new C3(0,0,0);
+ground.material=gmat; ground.position.set(3,0,0);
+
+function matte(scene,mesh){
+  const src=mesh.material; const c=(src&&(src.albedoColor||src.diffuseColor))||null;
+  const rgb=c?[c.r,c.g,c.b]:[0.7,0.7,0.7];
+  const key='matte_'+rgb.map(v=>v.toFixed(2)).join('_');
+  let m=scene.getMaterialByName(key);
+  if(!m){m=new BABYLON.StandardMaterial(key,scene); m.diffuseColor=new C3(...rgb); m.specularColor=new C3(0.05,0.05,0.05);}
+  mesh.material=m;
+}
+BABYLON.SceneLoader.ImportMeshAsync('','/assets/models/props/',GLB,scene).then(res=>{
+  let n=0; for(const m of res.meshes){ if(m.getTotalVertices&&m.getTotalVertices()>0){ matte(scene,m); n++; } }
+  console.log('loaded meshes:',n);
+});
+addEventListener('keydown',e=>{ if(e.code==='KeyG') ground.setEnabled(!ground.isEnabled()); });
+engine.runRenderLoop(()=>scene.render());
+addEventListener('resize',()=>engine.resize());
+</script>
+</body>
+</html>
