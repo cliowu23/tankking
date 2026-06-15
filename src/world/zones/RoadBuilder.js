@@ -116,12 +116,13 @@ export function buildRoadLeg(scene, zone) {
     for (let i=0;i<K;i++){ const t=cum[i]/PATH_MASK_TILE; uv2[i*2]=0; uv2[i*2+1]=t; uv2[(K+i)*2]=1; uv2[(K+i)*2+1]=t; }
     ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
   };
-  buildPath(leg.roadMain, 8);                     // one continuous seamless ribbon
+  // Fixed southern approach (the road the tank "came in on") PREPENDED to the generated
+  // centerline so the whole thing is ONE continuous ribbon — the join is seamless (single
+  // Catmull-Rom + single mask run), not two ribbons meeting. The leg's straight northward
+  // intro keeps it collinear with the straight approach. Same every run.
+  const APPROACH = [[0,-52],[0,-36],[0,-20],[0,-6]];
+  buildPath([...APPROACH, ...leg.roadMain], 8);
   for (const sp of leg.spurs) buildPath(sp.wps, 5);
-  // fixed southern approach — the road the tank "came in on" (context behind spawn, no
-  // tunnel). Straight at x=0, joining the leg start (0,0), so it lines up with the road's
-  // northward intro. Same every run.
-  buildPath([[0,-52],[0,-36],[0,-20],[0,-6],[0,0]], 8);
 
   // ── trees (instanced trunk + foliage blob) ───────────────────────────────────
   const trunkSrc = MeshBuilder.CreateCylinder('road-trunkSrc', { diameter:0.7, height:2.6, tessellation:7 }, scene);
