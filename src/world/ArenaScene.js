@@ -29,9 +29,9 @@ import { buildRoadLeg } from './zones/RoadBuilder.js';
 // off-angle/branching roads read as "straight ahead". Reversing keeps facing up-the-road
 // because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
 // window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
-const CAM_BETA       = 0.6;   // tilt (was a fixed 0.5 top-down)
-const CAM_RADIUS     = 42;    // distance (was 39)
-const CAM_YAW_SMOOTH = 7;     // angle-lerp rate toward hull heading (higher = snappier)
+const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
+const CAM_RADIUS         = 42;    // distance (was 39)
+const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -94,8 +94,9 @@ export default class ArenaScene {
 
   _setupCamera() {
     // Hull-follow: yaw the view to keep the hull's forward up-screen (Long Road).
-    this._camHeading   = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
-    this._camYawSmooth = CAM_YAW_SMOOTH;                   // live-tunable
+    this._camHeading      = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
+    this._camHeadingVel   = 0;                               // spring velocity state
+    this._camYawSmoothTime = CAM_YAW_SMOOTH_TIME;            // live-tunable (seconds)
     this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, CAM_RADIUS,
       new Vector3(this._camX, 0, this._camZ), this.scene);
   }
@@ -1196,13 +1197,11 @@ export default class ArenaScene {
     this._camX += (desiredX - this._camX) * smooth;
     this._camZ += (desiredZ - this._camZ) * smooth;
 
-    // --- 4. Hull-follow yaw: rotate the view so the hull's forward stays up-screen.
-    // Angle-aware lerp (takes the short way) toward tank.rotY; reversing keeps facing
-    // up-the-road since rotY doesn't flip. -PI/2 - heading maps forward → up-screen. ---
-    let dHead = this.tank.rotY - this._camHeading;
-    while (dHead >  Math.PI) dHead -= 2 * Math.PI;
-    while (dHead < -Math.PI) dHead += 2 * Math.PI;
-    this._camHeading += dHead * (1 - Math.exp(-this._camYawSmooth * dt));
+    // --- 4. Hull-follow yaw: a critically-damped spring eases the view toward the hull
+    // heading — it lags slightly and ramps its turn-rate in/out, so changing direction is
+    // smooth instead of a snap. Reversing keeps facing up-the-road (rotY doesn't flip).
+    // -PI/2 - heading maps hull-forward → up-screen. ---
+    this._camHeading  = this._smoothDampAngle(this._camHeading, this.tank.rotY, dt);
     this.camera.alpha = -Math.PI / 2 - this._camHeading;
 
     // --- Apply with shake on top ---
@@ -1217,6 +1216,23 @@ export default class ArenaScene {
     } else {
       this.camera.target.set(this._camX, 0, this._camZ);
     }
+  }
+
+  // Critically-damped angle smoothing (Unity-style SmoothDampAngle). Velocity-stateful so
+  // the camera eases in AND out of turns (no initial jerk) and lags slightly. Angle-aware:
+  // always takes the short way around. `_camYawSmoothTime` ≈ seconds to settle.
+  _smoothDampAngle(current, target, dt) {
+    const st = Math.max(0.0001, this._camYawSmoothTime);
+    const omega = 2 / st;
+    const x = omega * dt;
+    const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    let change = current - target;
+    while (change >  Math.PI) change -= 2 * Math.PI;   // shortest signed delta
+    while (change < -Math.PI) change += 2 * Math.PI;
+    const targetAdj = current - change;
+    let temp = (this._camHeadingVel + omega * change) * dt;
+    this._camHeadingVel = (this._camHeadingVel - omega * temp) * exp;
+    return targetAdj + (change + temp) * exp;
   }
 
   // Long Road invisible walls: keep the tank within `half` of the road centerline — a
