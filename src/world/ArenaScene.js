@@ -1165,23 +1165,18 @@ export default class ArenaScene {
     }
   }
 
-  // Impulse-based elastic collision. Uses RELATIVE velocity (so an enemy ramming a stopped
-  // player still registers) and only applies a knock when the two are CLOSING — once they're
-  // separating we stop hitting them, which kills the old per-frame speed-crush stun-lock.
+  // Impulse-based elastic collision over ORIENTED boxes (OBB/SAT) — the box rotates with each
+  // tank so it matches the visual hull at any angle (no more driving through when turned). Uses
+  // RELATIVE velocity, only impulses when CLOSING (so separating stops re-hitting → no stun-lock).
   _checkCollisions() {
     const t = this.tank;
+    const pBox = { cx: t.position.x, cz: t.position.z, hw: t.halfW, hd: t.halfD, rot: t.rotY };
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
-      const dx = t.position.x - enemy.position.x;   // enemy → player
-      const dz = t.position.z - enemy.position.z;
-      const overlapX = (t.halfW + enemy.halfW) - Math.abs(dx);
-      const overlapZ = (t.halfD + enemy.halfD) - Math.abs(dz);
-      if (overlapX <= 0 || overlapZ <= 0) continue;
-
-      // Collision normal = axis of least penetration, pointing from enemy toward player.
-      let nx = 0, nz = 0, pen;
-      if (overlapX < overlapZ) { nx = Math.sign(dx) || 1; pen = overlapX; }
-      else                     { nz = Math.sign(dz) || 1; pen = overlapZ; }
+      const eBox = { cx: enemy.position.x, cz: enemy.position.z, hw: enemy.halfW, hd: enemy.halfD, rot: enemy.rotY };
+      const hit = this._obbOverlap(eBox, pBox);   // normal points enemy → player
+      if (!hit) continue;
+      const { nx, nz, pen } = hit;
 
       // Positional separation, split by inverse mass (lighter player moves more).
       const mP = t.mass, mE = enemy.mass;
@@ -1203,6 +1198,25 @@ export default class ArenaScene {
         this._triggerShake(0.06 + impact * 0.06, 0.15 + impact * 0.30);
       }
     }
+  }
+
+  // Separating Axis Theorem for two oriented boxes. Each box: {cx,cz,hw,hd,rot} where the
+  // hull's WIDTH is along local X and LENGTH along local Z (forward = (sin rot, cos rot)).
+  // Returns { nx, nz, pen } (unit normal A→B + penetration depth) or null if not overlapping.
+  _obbOverlap(A, B) {
+    const ax = { x: Math.cos(A.rot), z: -Math.sin(A.rot) }, az = { x: Math.sin(A.rot), z: Math.cos(A.rot) };
+    const bx = { x: Math.cos(B.rot), z: -Math.sin(B.rot) }, bz = { x: Math.sin(B.rot), z: Math.cos(B.rot) };
+    const dcx = B.cx - A.cx, dcz = B.cz - A.cz;
+    let minOv = Infinity, nx = 0, nz = 0;
+    for (const L of [ax, az, bx, bz]) {
+      const rA = A.hw * Math.abs(ax.x * L.x + ax.z * L.z) + A.hd * Math.abs(az.x * L.x + az.z * L.z);
+      const rB = B.hw * Math.abs(bx.x * L.x + bx.z * L.z) + B.hd * Math.abs(bz.x * L.x + bz.z * L.z);
+      const ov = rA + rB - Math.abs(dcx * L.x + dcz * L.z);
+      if (ov <= 0) return null;                  // a separating axis exists → no collision
+      if (ov < minOv) { minOv = ov; nx = L.x; nz = L.z; }
+    }
+    if (dcx * nx + dcz * nz < 0) { nx = -nx; nz = -nz; }   // point the normal A → B
+    return { nx, nz, pen: minOv };
   }
 
   _triggerShake(duration, intensity) {
