@@ -57,6 +57,8 @@ export function generateRoadLeg(seed = 1) {
 
   // main road: ONE continuous centerline (no fork — reads as a single seamless ribbon)
   const roadMain = pts.map(p => [p.x, p.z]);
+  // fixed southern approach (the road the tank came in on); same every run, straight at x=0
+  const approach = [[0,-52],[0,-36],[0,-20],[0,-6]];
 
   // POI spurs: a side road that peels off the main road as a CURVED off-ramp (heading
   // blends from along-road → outward), dead-ending at guarded loot. Starting on the road
@@ -105,6 +107,9 @@ export function generateRoadLeg(seed = 1) {
   const eat = (x,z) => { minX=Math.min(minX,x); maxX=Math.max(maxX,x); minZ=Math.min(minZ,z); maxZ=Math.max(maxZ,z); };
   for (const p of pts) eat(p.x, p.z);
   for (const sp of spurs) for (const w of sp.wps) eat(w[0], w[1]);
+  for (const a of approach) eat(a[0], a[1]);   // include the southern approach (z down to −52)
+  // full drivable centerline = approach + main (for the boundary corridor + edge fade)
+  const centerline = [...approach, ...roadMain];
   const half = Math.ceil(Math.max(maxX-minX, maxZ-minZ)/2 + 80);   // extent (ground sizing)
   const center = { x:(minX+maxX)/2, z:(minZ+maxZ)/2 };
   // tank clamp is a box ±clampHalf around the ORIGIN (not the bbox centre), so it must
@@ -112,7 +117,7 @@ export function generateRoadLeg(seed = 1) {
   const clampHalf = Math.ceil(Math.max(Math.abs(minX),Math.abs(maxX),Math.abs(minZ),Math.abs(maxZ)) + 80);
 
   return {
-    seed, roadMain, spurs, trees, checkpoint, enemies, loot,
+    seed, roadMain, approach, centerline, spurs, trees, checkpoint, enemies, loot,
     start: { x: pts[0].x, z: pts[0].z, facing: 0 },
     bbox: { minX, maxX, minZ, maxZ, center, half, clampHalf },
   };

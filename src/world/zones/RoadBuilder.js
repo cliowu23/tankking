@@ -87,10 +87,36 @@ export function buildRoadLeg(scene, zone) {
   M.flag.emissiveColor  = new Color3(0,0.3,0.28); M.flag.specularColor = new Color3(0,0,0);
 
   // ── grass ground (covers the whole leg) ──────────────────────────────────────
-  const size = leg.bbox.half * 2 + 200;
-  const ground = MeshBuilder.CreateGround('road-ground', { width:size, height:size }, scene);
+  // Subdivided so we can vertex-tint it: grass near the road → darker BARREN dirt beyond
+  // the playable corridor, signalling out-of-bounds (the tint lines up with the invisible
+  // wall). Vertex colors multiply the grass texture, so the edge reads as dead/barren scrub.
+  const size = leg.bbox.half * 2 + 220;
+  const SUBD = Math.max(48, Math.min(140, Math.round(size / 8)));
+  const ground = MeshBuilder.CreateGround('road-ground', { width:size, height:size, subdivisions:SUBD }, scene);
   ground.position.set(leg.bbox.center.x, -0.02, leg.bbox.center.z);
   ground.material = M.grass; ground.receiveShadows = true; ground.parent = root;
+  {
+    const cl = leg.centerline, CH = (zone.corridor?.half ?? 50), FADE = 30;
+    const BARREN = [0.46, 0.40, 0.28];          // dead/scrub tint the grass fades toward
+    const pos = ground.getVerticesData(VertexBuffer.PositionKind);
+    const cols = new Float32Array((pos.length/3) * 4);
+    const gx = ground.position.x, gz = ground.position.z;
+    for (let vi=0; vi<pos.length/3; vi++) {
+      const wx = pos[vi*3] + gx, wz = pos[vi*3+2] + gz;
+      let best = Infinity;
+      for (let i=0;i<cl.length-1;i++) {
+        const ax=cl[i][0], az=cl[i][1], dx=cl[i+1][0]-ax, dz=cl[i+1][1]-az, L2=dx*dx+dz*dz||1;
+        let s=((wx-ax)*dx+(wz-az)*dz)/L2; s = s<0?0:s>1?1:s;
+        const px=ax+dx*s, pz=az+dz*s, d2=(wx-px)**2+(wz-pz)**2; if (d2<best) best=d2;
+      }
+      const t = Math.max(0, Math.min(1, (Math.sqrt(best) - CH) / FADE));   // 0 in-bounds → 1 OOB
+      cols[vi*4]   = 1 + (BARREN[0]-1)*t;
+      cols[vi*4+1] = 1 + (BARREN[1]-1)*t;
+      cols[vi*4+2] = 1 + (BARREN[2]-1)*t;
+      cols[vi*4+3] = 1;
+    }
+    ground.setVerticesData(VertexBuffer.ColorKind, cols);
+  }
 
   // ── textured dirt road (game's buildPath: Catmull-Rom ribbon + patchy mask) ───
   M.path.opacityTexture = makePathMask(scene, leg.seed);
@@ -116,12 +142,9 @@ export function buildRoadLeg(scene, zone) {
     for (let i=0;i<K;i++){ const t=cum[i]/PATH_MASK_TILE; uv2[i*2]=0; uv2[i*2+1]=t; uv2[(K+i)*2]=1; uv2[(K+i)*2+1]=t; }
     ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
   };
-  // Fixed southern approach (the road the tank "came in on") PREPENDED to the generated
-  // centerline so the whole thing is ONE continuous ribbon — the join is seamless (single
-  // Catmull-Rom + single mask run), not two ribbons meeting. The leg's straight northward
-  // intro keeps it collinear with the straight approach. Same every run.
-  const APPROACH = [[0,-52],[0,-36],[0,-20],[0,-6]];
-  buildPath([...APPROACH, ...leg.roadMain], 8);
+  // ONE continuous ribbon over the full centerline (southern approach + generated road) —
+  // seamless join (single Catmull-Rom + single mask run).
+  buildPath(leg.centerline, 8);
   for (const sp of leg.spurs) buildPath(sp.wps, 5);
 
   // ── trees (instanced trunk + foliage blob) ───────────────────────────────────

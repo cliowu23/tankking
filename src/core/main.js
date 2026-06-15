@@ -19,6 +19,8 @@ function makeRoadZone(seed = (Date.now() & 0xffff)) {
     spawn: leg.start,   // road's south start (z≈0)
     enemies: leg.enemies, loot: leg.loot, bandTuning: WORLD1.bandTuning,
     extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
+    // boundary corridor: stay within `half` of the road centerline (rear + sides + front)
+    corridor: { centerline: leg.centerline, half: 50 },
     roadLeg: leg,
   };
 }

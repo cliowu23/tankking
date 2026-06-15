@@ -55,6 +55,9 @@ export default class ArenaScene {
 
     this._paused = false;
 
+    // Long Road boundary corridor (invisible walls following the road), or null.
+    this._corridor = zone?.corridor ?? null;
+
     this._obstacles = [];
     this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
 
@@ -793,6 +796,7 @@ export default class ArenaScene {
       }
 
       this.tank.update(dt);
+      this._clampCorridor();
 
       for (const enemy of this.enemies) {
         enemy.update(dt, this.tank.position);
@@ -1183,6 +1187,24 @@ export default class ArenaScene {
     } else {
       this.camera.target.set(this._camX, 0, this._camZ);
     }
+  }
+
+  // Long Road invisible walls: keep the tank within `half` of the road centerline — a
+  // corridor that bounds rear, sides, and front (rounded caps at the road ends) in one check.
+  _clampCorridor() {
+    const c = this._corridor;
+    if (!c) return;
+    const t = this.tank.position, pts = c.centerline;
+    let best = Infinity, bx = 0, bz = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const ax = pts[i][0], az = pts[i][1], dx = pts[i+1][0] - ax, dz = pts[i+1][1] - az;
+      const L2 = dx*dx + dz*dz || 1;
+      let s = ((t.x - ax)*dx + (t.z - az)*dz) / L2; s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const px = ax + dx*s, pz = az + dz*s, d2 = (t.x - px)**2 + (t.z - pz)**2;
+      if (d2 < best) { best = d2; bx = px; bz = pz; }
+    }
+    const d = Math.sqrt(best);
+    if (d > c.half) { const k = c.half / d; t.x = bx + (t.x - bx) * k; t.z = bz + (t.z - bz) * k; }
   }
 
   _updateHUD() {
