@@ -145,6 +145,10 @@ MATERIALS = {
   "prop_foliage": dict(dir="props", pat="leaf",   base=(0.24,0.50,0.20), lite=(0.31,0.58,0.25), grP=94, nrm=2.4, seed=21),
   "prop_bark":    dict(dir="props", pat="planks", base=(0.36,0.25,0.14), lite=(0.46,0.33,0.20), planks=4, nrm=1.7, seed=22),
   "prop_stone":   dict(dir="props", pat="mottle", base=(0.53,0.51,0.47), lite=(0.60,0.57,0.52), macP=5, grP=72, grAmt=0.10, nrm=2.0, seed=23),
+  "prop_plaster": dict(dir="props", pat="plaster", base=(0.88,0.80,0.66), lite=(0.93,0.86,0.73), nrm=1.5, seed=24),
+  "prop_roof":    dict(dir="props", pat="tile",    base=(0.66,0.30,0.22), lite=(0.74,0.37,0.27), rows=10, cols=7, nrm=2.4, seed=25),
+  "prop_wood":    dict(dir="props", pat="planks",  base=(0.34,0.22,0.12), lite=(0.46,0.31,0.18), planks=4, nrm=1.7, seed=26),
+  "prop_brick":   dict(dir="props", pat="brick",   base=(0.52,0.32,0.26), lite=(0.60,0.38,0.31), rows=6, cols=4, mortar=0.06, nrm=2.2, seed=27),
 }
 
 def save_png(name, arr, path, is_data):

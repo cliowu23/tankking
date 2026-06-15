@@ -45,16 +45,24 @@ const ground=BABYLON.MeshBuilder.CreateGround('g',{width:60,height:60},scene);
 const gmat=new BABYLON.StandardMaterial('gm',scene); gmat.diffuseColor=new C3(0.34,0.56,0.22); gmat.specularColor=new C3(0,0,0);
 ground.material=gmat; ground.position.set(3,0,0);
 
-function matte(scene,mesh){
-  const src=mesh.material; const c=(src&&(src.albedoColor||src.diffuseColor))||null;
-  const rgb=c?[c.r,c.g,c.b]:[0.7,0.7,0.7];
-  const key='matte_'+rgb.map(v=>v.toFixed(2)).join('_');
-  let m=scene.getMaterialByName(key);
-  if(!m){m=new BABYLON.StandardMaterial(key,scene); m.diffuseColor=new C3(...rgb); m.specularColor=new C3(0.05,0.05,0.05);}
-  mesh.material=m;
-}
+// Subtle grain (matches src/world/props/loadProp.js): nearest-colour grain set, flat for
+// accents, warm glow for the window pane.
+const TEXDIR='/assets/textures/props/', TILE=6, THRESH=0.045;
+const SETS=[['prop_foliage',[0.24,0.50,0.20]],['prop_bark',[0.36,0.25,0.14]],['prop_wood',[0.34,0.22,0.12]],
+  ['prop_stone',[0.53,0.51,0.47]],['prop_plaster',[0.88,0.80,0.66]],['prop_roof',[0.66,0.30,0.22]],['prop_brick',[0.52,0.32,0.26]]];
+const mc={};
+function baseRGB(mat){const c=mat&&(mat.albedoColor||mat.diffuseColor);return c?[c.r,c.g,c.b]:[0.7,0.7,0.7];}
+function nearest([r,g,b]){let best=null,bd=1e9;for(const[s,c]of SETS){const d=(c[0]-r)**2+(c[1]-g)**2+(c[2]-b)**2;if(d<bd){bd=d;best=s;}}return bd<=THRESH?best:null;}
+const isWin=([r,g,b])=>r>0.9&&g>0.78&&b<0.66;
+function grain(set){if(mc[set])return mc[set];const m=new BABYLON.StandardMaterial('g_'+set,scene);
+  const d=new BABYLON.Texture(TEXDIR+set+'_diff.png',scene),n=new BABYLON.Texture(TEXDIR+set+'_nrm.png',scene);
+  d.uScale=d.vScale=TILE;n.uScale=n.vScale=TILE;m.diffuseTexture=d;m.bumpTexture=n;m.specularColor=new C3(0.04,0.04,0.04);m.specularPower=32;mc[set]=m;return m;}
+function flat(rgb,warm){const k=(warm?'w':'f')+rgb.map(v=>v.toFixed(2)).join('_');if(mc[k])return mc[k];
+  const m=new BABYLON.StandardMaterial(k,scene);m.diffuseColor=new C3(...rgb);m.specularColor=new C3(0.05,0.05,0.05);
+  if(warm)m.emissiveColor=new C3(rgb[0]*0.35,rgb[1]*0.30,rgb[2]*0.18);mc[k]=m;return m;}
+function texturize(mesh){const rgb=baseRGB(mesh.material);if(isWin(rgb)){mesh.material=flat(rgb,true);return;}const s=nearest(rgb);mesh.material=s?grain(s):flat(rgb,false);}
 BABYLON.SceneLoader.ImportMeshAsync('','/assets/models/props/',GLB,scene).then(res=>{
-  let n=0; for(const m of res.meshes){ if(m.getTotalVertices&&m.getTotalVertices()>0){ matte(scene,m); n++; } }
+  let n=0; for(const m of res.meshes){ if(m.getTotalVertices&&m.getTotalVertices()>0){ texturize(m); n++; } }
   console.log('loaded meshes:',n);
 });
 addEventListener('keydown',e=>{ if(e.code==='KeyG') ground.setEnabled(!ground.isEnabled()); });

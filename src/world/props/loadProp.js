@@ -11,14 +11,34 @@ const PROP_DIR = '/assets/models/props/';
 const TEX_DIR  = '/assets/textures/props/';
 const TEX_TILE = 6;     // grain tiling across the prop UVs (higher = finer grain) — user-picked
 
-// Which subtle-grain texture set each prop part uses, picked from the GLB mesh name.
-// Trees split into 2 primitives: _primitive0 = trunk (bark), _primitive1 = canopy (foliage).
-function texFor(name) {
-  if (/^Rock/.test(name))           return 'prop_stone';
-  if (/^Bush/.test(name))           return 'prop_foliage';
-  if (/_primitive0$/.test(name))    return 'prop_bark';
-  return 'prop_foliage';            // canopies (_primitive1) + fallback
+// Subtle-grain texture sets keyed by base palette colour. Each prop material is matched to
+// the NEAREST set by colour (trees → foliage/bark/stone; buildings → plaster/roof/wood/
+// brick/stone) when it's a clear match. Small accents (metal bands, gold lock) fall back to
+// a flat material; the warm window pane gets a flat material with a gentle glow.
+const GRAIN_SETS = [
+  ['prop_foliage', [0.24, 0.50, 0.20]],
+  ['prop_bark',    [0.36, 0.25, 0.14]],
+  ['prop_wood',    [0.34, 0.22, 0.12]],
+  ['prop_stone',   [0.53, 0.51, 0.47]],
+  ['prop_plaster', [0.88, 0.80, 0.66]],
+  ['prop_roof',    [0.66, 0.30, 0.22]],
+  ['prop_brick',   [0.52, 0.32, 0.26]],
+];
+const MATCH_THRESH = 0.045;   // colour-distance² beyond which a part stays flat (accents)
+
+function baseRGB(mat) {
+  const c = mat && (mat.albedoColor || mat.diffuseColor);
+  return c ? [c.r, c.g, c.b] : [0.7, 0.7, 0.7];
 }
+function nearestSet([r, g, b]) {
+  let best = null, bd = Infinity;
+  for (const [set, c] of GRAIN_SETS) {
+    const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2;
+    if (d < bd) { bd = d; best = set; }
+  }
+  return bd <= MATCH_THRESH ? best : null;
+}
+const isWindow = ([r, g, b]) => r > 0.9 && g > 0.78 && b < 0.66;
 
 // Matte StandardMaterial with a subtle grain (diffuse colour + normal) — kills the flat
 // "reflective plastic" look while matching the World 1 grain pipeline. Cached per set/scene.
@@ -38,16 +58,31 @@ function grainMat(scene, set) {
   return m;
 }
 
+// Flat matte material at a colour (accents). `warm` adds a gentle glow for window panes.
+function flatMat(scene, rgb, warm = false) {
+  const key = `propflat_${warm ? 'w' : ''}${rgb.map((v) => v.toFixed(2)).join('_')}`;
+  let m = scene.getMaterialByName(key);
+  if (m) return m;
+  m = new StandardMaterial(key, scene);
+  m.diffuseColor  = new Color3(...rgb);
+  m.specularColor = new Color3(0.05, 0.05, 0.05);
+  if (warm) m.emissiveColor = new Color3(rgb[0] * 0.35, rgb[1] * 0.30, rgb[2] * 0.18);
+  return m;
+}
+
 function flattenMesh(scene, mesh) {
-  mesh.material = grainMat(scene, texFor(mesh.name));
+  const rgb = baseRGB(mesh.material);
+  if (isWindow(rgb)) { mesh.material = flatMat(scene, rgb, true); return; }
+  const set = nearestSet(rgb);
+  mesh.material = set ? grainMat(scene, set) : flatMat(scene, rgb);
 }
 
 // Load treepatch.glb into the scene as hidden templates; returns { baseName: [meshes] }.
 // Two-material props (the trees) import as split `<name>_primitive0/1` meshes, so each
 // template is an ARRAY of primitive source meshes grouped under their base name. Loaded
 // fresh per scene (templates belong to the scene; a new arena reloads — cheap, ~91KB).
-export async function loadPropTemplates(scene) {
-  const res = await SceneLoader.ImportMeshAsync('', PROP_DIR, 'treepatch.glb', scene);
+export async function loadPropTemplates(scene, file = 'treepatch.glb') {
+  const res = await SceneLoader.ImportMeshAsync('', PROP_DIR, file, scene);
   const byName = {};
   for (const m of res.meshes) {
     if (!m.getTotalVertices || m.getTotalVertices() === 0) continue; // skip __root__/empties
