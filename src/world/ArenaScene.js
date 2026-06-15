@@ -846,6 +846,7 @@ export default class ArenaScene {
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
       this._updateExtraction(dt);
+      this._updateContainers();
       this.vfx.update(dt);
       this._updateLockRing(dt);
       this._updateAimIndicator();
@@ -1045,6 +1046,9 @@ export default class ArenaScene {
     this._aimEl.style.display = 'none';
     for (const crate of this._crates) crate.reset();
     this._extractZone.reset();
+    if (this._containers) for (const c of this._containers) c.looted = false;
+    this._nearContainer = null;
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
     this._runSalvage = 0;
     this._extracting = false;
   }
@@ -1063,6 +1067,55 @@ export default class ArenaScene {
     });
 
     this._extractZone = new ExtractionZone(this.scene, extract);
+
+    // E-lootable containers (POI chests): proximity prompt + E (handled in main.js) → salvage.
+    this._containers = (this.zone?.containers ?? []).map((c) => ({
+      x: c.x, z: c.z, value: c.value | 0, radius: c.radius ?? 5, looted: false,
+    }));
+    this._nearContainer = null;
+    this._lootPrompt = this._ensureLootPrompt();
+  }
+
+  // One reused DOM prompt (no per-scene listener/element leak). Built in JS so we never
+  // touch index.html (a parallel session has uncommitted edits there).
+  _ensureLootPrompt() {
+    let el = document.getElementById('loot-prompt');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loot-prompt';
+      el.textContent = '[ E ]  LOOT';
+      el.style.cssText = 'position:absolute;left:50%;bottom:150px;transform:translateX(-50%);' +
+        'font-family:monospace;font-size:18px;letter-spacing:3px;color:#ffd23a;' +
+        'text-shadow:0 0 6px #000,0 0 12px #ffb000;z-index:25;display:none;pointer-events:none;';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'none';
+    return el;
+  }
+
+  // Proximity check for E-loot containers; sets this._nearContainer + toggles the prompt.
+  _updateContainers() {
+    if (!this._containers || !this._containers.length) { this._nearContainer = null; return; }
+    let near = null;
+    if (this.tank.alive && !this._extracting) {
+      for (const c of this._containers) {
+        if (c.looted) continue;
+        const dx = this.tank.position.x - c.x, dz = this.tank.position.z - c.z;
+        if (dx * dx + dz * dz <= c.radius * c.radius) { near = c; break; }
+      }
+    }
+    this._nearContainer = near;
+    if (this._lootPrompt) this._lootPrompt.style.display = near ? 'block' : 'none';
+  }
+
+  // Called from main.js on the E key when in range of a container.
+  lootNearbyContainer() {
+    const c = this._nearContainer;
+    if (!c || c.looted) return;
+    c.looted = true;
+    this._runSalvage += c.value;
+    this._nearContainer = null;
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
   }
 
   _updateExtraction(dt) {
@@ -1097,6 +1150,7 @@ export default class ArenaScene {
     window.__state   = 'EXTRACTED';
     const banked = bankSalvage(this._runSalvage);
     if (this._aimEl) this._aimEl.style.display = 'none';
+    if (this._lootPrompt) this._lootPrompt.style.display = 'none';
     if (this._onExtract) this._onExtract(this._runSalvage, banked);
   }
 
