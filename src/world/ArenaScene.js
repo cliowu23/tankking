@@ -25,6 +25,14 @@ import { bankSalvage } from '../core/runState.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
 
+// Hull-follow camera (Long Road): the view yaws to keep the hull's forward up-screen, so
+// off-angle/branching roads read as "straight ahead". Reversing keeps facing up-the-road
+// because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
+// window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
+const CAM_BETA       = 0.6;   // tilt (was a fixed 0.5 top-down)
+const CAM_RADIUS     = 42;    // distance (was 39)
+const CAM_YAW_SMOOTH = 7;     // angle-lerp rate toward hull heading (higher = snappier)
+
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
     this.scene = new Scene(engine);
@@ -81,7 +89,10 @@ export default class ArenaScene {
   }
 
   _setupCamera() {
-    this.camera = new ArcRotateCamera('cam', -Math.PI / 2, 0.5, 39,
+    // Hull-follow: yaw the view to keep the hull's forward up-screen (Long Road).
+    this._camHeading   = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
+    this._camYawSmooth = CAM_YAW_SMOOTH;                   // live-tunable
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, CAM_RADIUS,
       new Vector3(this._camX, 0, this._camZ), this.scene);
   }
 
@@ -1174,6 +1185,15 @@ export default class ArenaScene {
     const smooth   = 1 - Math.exp(-7 * dt);
     this._camX += (desiredX - this._camX) * smooth;
     this._camZ += (desiredZ - this._camZ) * smooth;
+
+    // --- 4. Hull-follow yaw: rotate the view so the hull's forward stays up-screen.
+    // Angle-aware lerp (takes the short way) toward tank.rotY; reversing keeps facing
+    // up-the-road since rotY doesn't flip. -PI/2 - heading maps forward → up-screen. ---
+    let dHead = this.tank.rotY - this._camHeading;
+    while (dHead >  Math.PI) dHead -= 2 * Math.PI;
+    while (dHead < -Math.PI) dHead += 2 * Math.PI;
+    this._camHeading += dHead * (1 - Math.exp(-this._camYawSmooth * dt));
+    this.camera.alpha = -Math.PI / 2 - this._camHeading;
 
     // --- Apply with shake on top ---
     if (this._shakeTime > 0) {
