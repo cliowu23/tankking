@@ -163,8 +163,8 @@ export default class ArenaScene {
       const built = buildRoadLeg(this.scene, this.zone);
       this._obstacles.push(...built.obstacles);
       for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
-      if (built.poiReady) {
-        this._poiReady = built.poiReady.then(({ obstacles, shadowCasters }) => {
+      if (built.propsReady) {
+        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters }) => {
           this._obstacles.push(...obstacles);
           for (const m of shadowCasters) this.shadowGen.addShadowCaster(m);
         });

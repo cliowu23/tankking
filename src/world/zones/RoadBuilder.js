@@ -18,6 +18,7 @@ import { loadPropTemplates, instanceProp } from '../props/loadProp.js';
 // POI prop sizing: scale the native GLB props (built ~game-scale in Blender) to read
 // alongside the procedural roadside trees. Multiplied on top of each POI's per-prop scale.
 const POI_TREE_SCALE = 1.4, POI_BUSH_SCALE = 1.2, POI_ROCK_SCALE = 1.2;
+const ROAD_TREE_SCALE = 1.3;   // roadside dressing trees (× per-tree variation)
 const TREE_VARIANTS  = ['Tree_Round', 'Tree_Pine', 'Tree_Cluster'];
 
 const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 300;
@@ -155,42 +156,34 @@ export function buildRoadLeg(scene, zone) {
   buildPath(leg.centerline, 8);
   for (const sp of leg.spurs) buildPath(sp.wps, 5);
 
-  // ── trees (instanced trunk + foliage blob) ───────────────────────────────────
-  const trunkSrc = MeshBuilder.CreateCylinder('road-trunkSrc', { diameter:0.7, height:2.6, tessellation:7 }, scene);
-  trunkSrc.position.y=1.3; trunkSrc.material=M.trunk; trunkSrc.parent=root; trunkSrc.setEnabled(false);
-  const blobSrc = (() => {
-    const a=MeshBuilder.CreateSphere('rb1',{diameter:3.6,segments:7},scene); a.position.set(0,3.4,0);
-    const b=MeshBuilder.CreateSphere('rb2',{diameter:2.8,segments:7},scene); b.position.set(0.9,4.3,0.4);
-    const c=MeshBuilder.CreateSphere('rb3',{diameter:2.6,segments:7},scene); c.position.set(-0.9,4.1,-0.3);
-    const s=Mesh.MergeMeshes([a,b,c],true); s.material=M.foliage; s.isPickable=false; s.parent=root; s.setEnabled(false); return s;
-  })();
-  leg.trees.forEach(([x,z],i) => {
-    const sc = 0.85 + ((i*37)%10)/18;
-    const t = trunkSrc.createInstance('road-tt'+i); t.position.set(x,0,z); t.scaling.setAll(sc); t.parent=root;
-    const b = blobSrc.createInstance('road-tb'+i); b.position.set(x,0,z); b.scaling.setAll(sc); b.rotation.y=(i*1.3)%Math.PI; b.parent=root;
-    shadowCasters.push(t,b);
-  });
-
-  // ── modular POIs — props are native low-poly GLB templates (treepatch.glb), instanced
-  // per placement. Loading is async, so the POI meshes build in `poiReady` (folded into
-  // ArenaScene.ready behind the loading screen). Enemies/loot are already in the leg's
-  // arrays (built by ArenaScene from zone.enemies/loot), so combat/pickups don't wait. ──
-  const poiReady = (leg.pois && leg.pois.length)
+  // ── all GLB props (roadside dressing trees + POI thickets/set-pieces) — native low-poly
+  // models (treepatch.glb), instanced per placement. Loading is async, so they build in
+  // `propsReady`, folded into ArenaScene.ready behind the loading screen. Enemies/loot are
+  // already in the leg's arrays (built by ArenaScene), so combat/pickups don't wait. ──────
+  const propsReady = (leg.trees?.length || leg.pois?.length)
     ? (async () => {
         const tpl  = await loadPropTemplates(scene);
         const pick = (a) => a[Math.floor(Math.random() * a.length)];
+        const obs = [], sc = [];
+
+        // roadside dressing trees (line the road) — now the same GLB tree variants as POIs
+        (leg.trees ?? []).forEach(([x, z], i) => {
+          const scale = ROAD_TREE_SCALE * (0.85 + ((i * 37) % 10) / 22);
+          sc.push(...instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale, rotY: (i * 1.3) % Math.PI, parent: root }));
+        });
+
+        // POI thickets / set-pieces
         const helpers = {
           makeTree: (x, z, s = 1, r = 0) => instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale: s * POI_TREE_SCALE, rotY: r, parent: root }),
           makeBush: (x, z, s = 1, r = 0) => instanceProp(tpl, 'Bush',               { x, z, scale: s * POI_BUSH_SCALE, rotY: r, parent: root }),
           makeRock: (x, z, s = 1, r = 0) => instanceProp(tpl, s >= 0.9 ? 'Rock_A' : 'Rock_B', { x, z, scale: s * POI_ROCK_SCALE, rotY: r, parent: root }),
         };
-        const obs = [], sc = [];
-        for (const inst of leg.pois) {
+        for (const inst of (leg.pois ?? [])) {
           const type = POI_TYPES[inst.poiType];
           if (!type) continue;
           const out = type.build(scene, inst, helpers);
           if (out?.obstacles)     obs.push(...out.obstacles);
-          if (out?.shadowCasters) sc.push(...(out.shadowCasters.filter(Boolean)));
+          if (out?.shadowCasters) sc.push(...out.shadowCasters.filter(Boolean));
         }
         return { obstacles: obs, shadowCasters: sc };
       })()
@@ -211,5 +204,5 @@ export function buildRoadLeg(scene, zone) {
   // (No bunker tunnel — the tank simply starts at the road's south end. A future "tank
   // drives out to the location" intro animation is the planned replacement.)
 
-  return { obstacles, shadowCasters, root, poiReady };
+  return { obstacles, shadowCasters, root, propsReady };
 }
