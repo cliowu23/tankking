@@ -10,6 +10,7 @@
 import { Matrix, Vector3 } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
+import { hullFootprint } from '../utils/meshBounds.js';
 import { makePaintMaterial } from '../utils/modelPaint.js';
 
 const LOADOUT = { hull: 'light-hull-scout', turret: 'light-turret-enclosed', cannon: 'light-gun-75mm' };
@@ -70,6 +71,10 @@ export default class LightTankEnemy extends AIEnemy {
     const barY = 2.0;
     this.hpBarBg.position.y = barY;
     this.hpBarFill.position.y = barY;
+
+    // Fit the collision box to this enemy's actual composed hull (axis-aligned at compose).
+    const f = hullFootprint(this.root.getChildMeshes());
+    if (f) { this._halfW = f.halfW; this._halfD = f.halfD; }
     return this;
   }
 

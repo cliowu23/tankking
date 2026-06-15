@@ -611,6 +611,7 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this.tank.fitCollisionToModel();   // fit the hitbox to the loaded GLB hull
       this._readyResolve();
     }).catch(e => {
       console.error(`[GLB] ${modelFile} load failed:`, e);
@@ -661,6 +662,7 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
+      this.tank.fitCollisionToModel();   // fit the hitbox to the composed hull
       this._readyResolve();
     }).catch(e => {
       console.error('[Composed] assembly failed for', loadout, e);

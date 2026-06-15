@@ -1,5 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicTexture } from '@babylonjs/core';
 import { shortAngle } from '../utils/mathUtils.js';
+import { hullFootprint } from '../utils/meshBounds.js';
 
 export default class Tank {
   constructor(scene, x, z) {
@@ -13,6 +14,8 @@ export default class Tank {
     this.knockX           = 0;
     this.knockZ           = 0;
     this.knockDrag        = 28;   // units/s² — a ram knock fades in ~0.2-0.3s
+    this._halfW           = 1.2;  // collision half-extents — refit to the model via fitCollisionToModel()
+    this._halfD           = 1.6;
     this.rotY             = 0; // start facing north (+Z, away from camera)
     this.acceleration     = 6;
     this.maxSpeed         = 8;
@@ -206,9 +209,16 @@ export default class Tank {
     window.addEventListener('keyup',   this._onKeyUp);
   }
 
-  get halfW()    { return 1.2; }
-  get halfD()    { return 1.6; }
+  get halfW()    { return this._halfW; }
+  get halfD()    { return this._halfD; }
   get position() { return this.root.position; }
+
+  // Fit the collision box to the loaded model (call once, at spawn rotation). Keeps "what
+  // you see = what you hit" for whatever tank/loadout is selected.
+  fitCollisionToModel() {
+    const f = hullFootprint(this.root.getChildMeshes());
+    if (f) { this._halfW = f.halfW; this._halfD = f.halfD; }
+  }
 
   takeDamage(amount) {
     if (!this.alive) return;
