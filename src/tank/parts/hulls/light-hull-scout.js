@@ -13,6 +13,7 @@ export default {
   mountEmpty: 'turret',
   nativeTurret: 'light-turret-enclosed',
   ringDiameter: 1.6,   // mirrors ringD in scripts/modelgen/params/
+  footprint: { halfW: 1.35, halfD: 2.1 },   // collision box (authored, not measured) — light/short
 
   async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'light_hull_scout.glb', scene);

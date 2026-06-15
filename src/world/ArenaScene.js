@@ -663,7 +663,7 @@ export default class ArenaScene {
       startBtn.textContent = 'PRESS ENTER TO BATTLE';
       startBtn.style.pointerEvents = '';
       startBtn.style.opacity = '';
-      this.tank.fitCollisionToModel();   // fit the hitbox to the composed hull
+      this.tank.fitCollisionToModel(assembled.footprint);   // authored hull footprint (fallback: measure)
       this._readyResolve();
     }).catch(e => {
       console.error('[Composed] assembly failed for', loadout, e);

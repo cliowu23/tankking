@@ -213,9 +213,12 @@ export default class Tank {
   get halfD()    { return this._halfD; }
   get position() { return this.root.position; }
 
-  // Fit the collision box to the loaded model (call once, at spawn rotation). Keeps "what
-  // you see = what you hit" for whatever tank/loadout is selected.
-  fitCollisionToModel() {
+  // Fit the collision box to the selected tank. Prefers the hull part's AUTHORED footprint
+  // (exact, incl. length); falls back to measuring the model (for GLB tanks without a part).
+  fitCollisionToModel(declared) {
+    if (declared && declared.halfW && declared.halfD) {
+      this._halfW = declared.halfW; this._halfD = declared.halfD; return;
+    }
     const f = hullFootprint(this.root.getChildMeshes());
     if (f) { this._halfW = f.halfW; this._halfD = f.halfD; }
   }

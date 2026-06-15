@@ -15,6 +15,7 @@ export default {
   mountEmpty: 'turret',
   nativeTurret: 'player-turret-base',
   ringDiameter: 1.95,   // mirrors ringD in scripts/modelgen/params/
+  footprint: { halfW: 1.4, halfD: 2.3 },   // collision box (authored, not measured)
 
   async build(scene, paintOverride = null) {
     const result = await SceneLoader.ImportMeshAsync('', '/assets/models/tanks/parts/', 'player_hull_base.glb', scene);

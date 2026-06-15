@@ -136,6 +136,7 @@ export async function assembleTank(scene, loadout, materials = {}, options = {})
 
   return {
     root, turretPivot, barrelPivot, scale, minY,
+    footprint: hullPart.footprint ?? null,   // authored collision box from the hull part
     parts: { hullBuilt, turretBuilt, cannonBuilt },
   };
 }

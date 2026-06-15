@@ -72,9 +72,9 @@ export default class LightTankEnemy extends AIEnemy {
     this.hpBarBg.position.y = barY;
     this.hpBarFill.position.y = barY;
 
-    // Fit the collision box to this enemy's actual composed hull (axis-aligned at compose).
-    const f = hullFootprint(this.root.getChildMeshes());
-    if (f) { this._halfW = f.halfW; this._halfD = f.halfD; }
+    // Fit the collision box to this enemy's hull: authored footprint if declared, else measure.
+    if (a.footprint) { this._halfW = a.footprint.halfW; this._halfD = a.footprint.halfD; }
+    else { const f = hullFootprint(this.root.getChildMeshes()); if (f) { this._halfW = f.halfW; this._halfD = f.halfD; } }
     return this;
   }
 
