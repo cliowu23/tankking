@@ -1205,6 +1205,8 @@ export default class ArenaScene {
     }
     const d = Math.sqrt(best);
     if (d > c.half) { const k = c.half / d; t.x = bx + (t.x - bx) * k; t.z = bz + (t.z - bz) * k; }
+    // hard wall right behind spawn — can't reverse down the approach you came in on
+    if (c.southLimit != null && t.z < c.southLimit) t.z = c.southLimit;
   }
 
   _updateHUD() {
