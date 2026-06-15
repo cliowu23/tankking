@@ -14,6 +14,7 @@ import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
+import { buildPrimitiveTank } from '../tank/primitiveTank.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 
@@ -324,17 +325,39 @@ export default class HangarScene {
       return;
     }
     // Stale selectedTank no longer in the manifest (e.g. the removed whole-GLB M26) → composed.
-    if (filename !== 'composed' && !manifest[filename]) filename = 'composed';
+    // 'primitive' is the boxy DEFAULT TANK — it isn't in the manifest, so keep it from
+    // falling through to composed (that mismatch is the bug this branch fixes).
+    if (filename !== 'composed' && filename !== 'primitive' && !manifest[filename]) filename = 'composed';
+
+    // Primitive (DEFAULT TANK) — the same boxy placeholder the designer previews and the
+    // arena spawns. Built from shared geometry, scaled onto the plinth like the GLB display.
+    if (filename === 'primitive') {
+      const prim = buildPrimitiveTank(s, { simpleBarrel: true });
+      const meshes = prim.meshes.filter(m => m.getTotalVertices() > 0);
+      prim.root.position.set(0, 0, 0);
+      prim.root.computeWorldMatrix(true);
+      const { minX, maxX } = worldBounds(meshes);
+      const rawW = maxX - minX;
+      if (rawW > 0) prim.root.scaling.setAll(3.2 / rawW);
+      prim.root.computeWorldMatrix(true);
+      const { minY } = worldBounds(meshes);
+      prim.root.position.set(0, -minY, 10);
+      if (this._blobDrop) this._blobDrop(prim.root, { y: 0.035 });
+      return;
+    }
 
     // Composed (modular) tank — rebuild the saved hull+turret+cannon loadout, scaled onto the
     // plinth like the single-GLB display. Mirrors how the arena rebuilds the player tank.
     if (filename === 'composed') {
       const loadout = validLoadout(JSON.parse(localStorage.getItem('selectedLoadout') || 'null'));
-      const bodyCol = PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
+      // Honour the player's chosen paint so the hangar display matches the designer/arena
+      // (same rule as ArenaScene._loadPlayerComposed); fall back to the turret's own colour.
+      const paint = JSON.parse(localStorage.getItem('selectedPaint') || 'null');
+      const bodyCol = paint ?? PARTS_BY_ID[loadout.turret]?.paintColor ?? [0.12, 0.42, 0.88];
       const cannonMat = makePaintMaterial(s, bodyCol);
       let assembled;
       try {
-        assembled = await assembleTank(s, loadout, { cannon: cannonMat });
+        assembled = await assembleTank(s, loadout, { cannon: cannonMat }, { paint });
       } catch (e) { console.warn('[Hangar] composed assembly failed', e); return; }
 
       const meshes = [
