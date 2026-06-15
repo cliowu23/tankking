@@ -46,7 +46,7 @@ export default class AIEnemy {
     this._barrelBaseZ = 0.6;
     this._tipOffset   = 1.6;
     this._halfW       = 1.0;
-    this._halfD       = 1.4;
+    this._halfD       = 1.9;   // match the composed hull length (was 1.4 → clipping)
 
     // --- Rig (game logic drives these three nodes; visuals hang off them) ---
     this.root = new TransformNode('aiEnemy_root', scene);

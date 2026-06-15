@@ -1165,51 +1165,43 @@ export default class ArenaScene {
     }
   }
 
+  // Impulse-based elastic collision. Uses RELATIVE velocity (so an enemy ramming a stopped
+  // player still registers) and only applies a knock when the two are CLOSING — once they're
+  // separating we stop hitting them, which kills the old per-frame speed-crush stun-lock.
   _checkCollisions() {
     const t = this.tank;
-
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
-      const dx = t.position.x - enemy.position.x;
+      const dx = t.position.x - enemy.position.x;   // enemy → player
       const dz = t.position.z - enemy.position.z;
-
       const overlapX = (t.halfW + enemy.halfW) - Math.abs(dx);
       const overlapZ = (t.halfD + enemy.halfD) - Math.abs(dz);
-
       if (overlapX <= 0 || overlapZ <= 0) continue;
 
-      const impactSpeed = Math.abs(t.speed);
+      // Collision normal = axis of least penetration, pointing from enemy toward player.
+      let nx = 0, nz = 0, pen;
+      if (overlapX < overlapZ) { nx = Math.sign(dx) || 1; pen = overlapX; }
+      else                     { nz = Math.sign(dz) || 1; pen = overlapZ; }
 
-      if (impactSpeed < enemy.staticFrictionThreshold) {
-        t.speed *= 0.4;
-        this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.5);
-        continue;
+      // Positional separation, split by inverse mass (lighter player moves more).
+      const mP = t.mass, mE = enemy.mass;
+      const wP = mE / (mP + mE), wE = mP / (mP + mE);
+      t.root.position.x     += nx * pen * wP;  t.root.position.z     += nz * pen * wP;
+      enemy.root.position.x -= nx * pen * wE;  enemy.root.position.z -= nz * pen * wE;
+
+      // Relative velocity along the normal (negative = closing).
+      const pv = { x: Math.sin(t.rotY) * t.speed + t.knockX, z: Math.cos(t.rotY) * t.speed + t.knockZ };
+      const ev = enemy.getVelocity();
+      const rvn = (pv.x - ev.x) * nx + (pv.z - ev.z) * nz;
+      if (rvn < 0) {
+        const REST = 0.25;                                  // restitution — a bumpy thud, not a bounce
+        const j = -(1 + REST) * rvn / (1 / mP + 1 / mE);
+        t.applyKnockback(nx * j / mP, nz * j / mP);         // player: a decaying bump, keeps drive control
+        enemy.vx -= nx * j / mE; enemy.vz -= nz * j / mE;   // enemy shoved back by its share
+        if (enemy.speed) enemy.speed *= 0.5;                // bleed the rammer's drive so it doesn't re-charge instantly
+        const impact = Math.min(1, Math.abs(rvn) / 8);
+        this._triggerShake(0.06 + impact * 0.06, 0.15 + impact * 0.30);
       }
-
-      const alreadyBroken = enemy.staticFrictionThreshold === 0;
-      enemy.staticFrictionThreshold = 0;
-      t.speed *= 0.2;
-
-      const pushMult = alreadyBroken ? 3.5 : 2.2;
-      const pushSpd  = impactSpeed * (t.mass / enemy.mass) * pushMult;
-      const fwd      = new Vector3(Math.sin(t.rotY), 0, Math.cos(t.rotY));
-      enemy.vx = fwd.x * pushSpd;
-      enemy.vz = fwd.z * pushSpd;
-
-      this._separate(t, enemy, dx, dz, overlapX, overlapZ, 0.7);
-      this._triggerShake(0.11, 0.4);
-    }
-  }
-
-  _separate(tank, enemy, dx, dz, overlapX, overlapZ, ratio) {
-    if (overlapX < overlapZ) {
-      const sep = overlapX * Math.sign(dx);
-      tank.root.position.x  +=  sep * ratio;
-      enemy.root.position.x -= sep * (1 - ratio);
-    } else {
-      const sep = overlapZ * Math.sign(dz);
-      tank.root.position.z  +=  sep * ratio;
-      enemy.root.position.z -= sep * (1 - ratio);
     }
   }
 

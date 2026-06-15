@@ -24,8 +24,8 @@ export default class LightTankEnemy extends AIEnemy {
       ...opts,
       noPrimitiveVisuals: true,
     });
-    this._halfW = 0.9;
-    this._halfD = 1.2;
+    this._halfW = 1.0;   // match the composed hull footprint (~2.0 wide) — "what you see"
+    this._halfD = 1.9;   // hull is ~3.8 long; was 1.2 → you clipped deep into the enemy
     this._matStates = [];   // [{mat, d, e}] originals for death tint / revive
     this.ready = this._buildComposed(scene);
   }

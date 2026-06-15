@@ -8,6 +8,11 @@ export default class Tank {
     // --- Tuning ---
     this.mass             = 1;
     this.speed            = 0;
+    // Collision knockback (decaying velocity, separate from drive speed) so a ram bumps the
+    // tank without crushing its control — see ArenaScene._checkCollisions (impulse-based).
+    this.knockX           = 0;
+    this.knockZ           = 0;
+    this.knockDrag        = 28;   // units/s² — a ram knock fades in ~0.2-0.3s
     this.rotY             = 0; // start facing north (+Z, away from camera)
     this.acceleration     = 6;
     this.maxSpeed         = 8;
@@ -222,6 +227,8 @@ export default class Tank {
     this.hp    = this.maxHp;
     this.alive = true;
     this.speed = 0;
+    this.knockX = 0;
+    this.knockZ = 0;
     this.rotY  = 0;
     this.turretAimAngle  = 0;
     this.barrelElevation = 0;
@@ -328,10 +335,29 @@ export default class Tank {
     const vz = forward.z * this.speed;
     this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + vx * dt));
     this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + vz * dt));
+
+    // collision knockback (decaying), additive to drive — a ram shoves the tank without
+    // crushing its drive speed, so it can steer away instead of getting stun-locked.
+    if (this.knockX !== 0 || this.knockZ !== 0) {
+      this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.knockX * dt));
+      this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.knockZ * dt));
+      const ks = Math.hypot(this.knockX, this.knockZ);
+      const dec = Math.min(ks, this.knockDrag * dt);
+      this.knockX -= (this.knockX / ks) * dec;
+      this.knockZ -= (this.knockZ / ks) * dec;
+    }
+
     this.root.rotation.y = this.rotY;
 
     this._updateTurret(dt);
     this._justPressedShift = false;
+  }
+
+  // Apply a collision impulse (units/s), capped so a big hit can't fling the tank wildly.
+  applyKnockback(kx, kz) {
+    this.knockX += kx; this.knockZ += kz;
+    const m = Math.hypot(this.knockX, this.knockZ), CAP = 16;
+    if (m > CAP) { this.knockX = this.knockX / m * CAP; this.knockZ = this.knockZ / m * CAP; }
   }
 
   _updateTurret(dt) {
