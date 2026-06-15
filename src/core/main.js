@@ -4,6 +4,27 @@ import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
 import { WORLD1 } from '../world/zones/world1.js';
+import { generateRoadLeg } from '../world/zones/roadLeg.js';
+
+// The Long Road: wrap a generated leg into an ArenaScene-compatible zone. Provides the
+// generic fields ArenaScene's setup expects (empty enemies/loot, extraction at the
+// checkpoint, bounds/spawn/palette) plus roadLeg for the RoadBuilder. Deferred for now:
+// enemies-on-road, loot-pickup behaviour, the checkpoint extract menu.
+function makeRoadZone(seed = (Date.now() & 0xffff)) {
+  const leg = generateRoadLeg(seed);
+  return {
+    id: 'road-leg', kind: 'road', name: 'THE LONG ROAD — LEG',
+    palette: WORLD1.palette,
+    bounds: { half: leg.bbox.clampHalf, visual: leg.bbox.clampHalf + 60 },
+    spawn: leg.start,   // road's south start (z≈0)
+    enemies: leg.enemies, loot: leg.loot, bandTuning: WORLD1.bandTuning,
+    extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
+    // boundary corridor: stay within `half` of the road centerline (sides + front), and a
+    // hard wall right behind spawn (southLimit) — no reversing down the approach you came in on.
+    corridor: { centerline: leg.centerline, half: 50, southLimit: leg.start.z - 8 },
+    roadLeg: leg,
+  };
+}
 
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
@@ -191,7 +212,7 @@ function deployToArena() {
   // Build on the next frame so the overlay paints before the heavy work starts.
   requestAnimationFrame(() => {
     canvas.style.display = 'block';
-    arenaScene = new ArenaScene(engine, onExtractFromArena, WORLD1);
+    arenaScene = new ArenaScene(engine, onExtractFromArena, makeRoadZone());
     window.__arena = arenaScene;
 
     const MIN_MS = 900;   // let the loading screen breathe even on instant loads
