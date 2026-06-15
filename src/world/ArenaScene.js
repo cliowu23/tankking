@@ -72,6 +72,7 @@ export default class ArenaScene {
     // Resolves when the player tank's async model work is done (or immediately
     // for the primitive). The deploy loading screen awaits this before fading.
     this.ready = new Promise(res => { this._readyResolve = res; });
+    this._poiReady = null;   // set by the road branch of _setupGround (async GLB POI props)
 
     this._setupCamera();
     this._setupLighting();
@@ -81,6 +82,9 @@ export default class ArenaScene {
     this._setupHazards();
     this._setupEntities();
     this._setupExtraction();
+    // Fold the async POI-prop build (GLB templates) into ready so the deploy loading
+    // screen waits for the thicket to appear, not pop in after the world fades up.
+    if (this._poiReady) this.ready = Promise.all([this.ready, this._poiReady]);
     // this._setupDevLabels();
     this._setupLockOn();
     this._setupFiring();
@@ -159,6 +163,12 @@ export default class ArenaScene {
       const built = buildRoadLeg(this.scene, this.zone);
       this._obstacles.push(...built.obstacles);
       for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
+      if (built.poiReady) {
+        this._poiReady = built.poiReady.then(({ obstacles, shadowCasters }) => {
+          this._obstacles.push(...obstacles);
+          for (const m of shadowCasters) this.shadowGen.addShadowCaster(m);
+        });
+      }
       return;
     }
     if (this.zone) {

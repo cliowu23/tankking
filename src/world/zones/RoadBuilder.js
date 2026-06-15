@@ -13,7 +13,12 @@ import {
   VertexBuffer, Texture, DynamicTexture,
 } from '@babylonjs/core';
 import { POI_TYPES } from './pois/index.js';
-import { buildBush, buildRock } from '../props/structures.js';
+import { loadPropTemplates, instanceProp } from '../props/loadProp.js';
+
+// POI prop sizing: scale the native GLB props (built ~game-scale in Blender) to read
+// alongside the procedural roadside trees. Multiplied on top of each POI's per-prop scale.
+const POI_TREE_SCALE = 1.4, POI_BUSH_SCALE = 1.2, POI_ROCK_SCALE = 1.2;
+const TREE_VARIANTS  = ['Tree_Round', 'Tree_Pine', 'Tree_Cluster'];
 
 const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 300;
 
@@ -166,26 +171,30 @@ export function buildRoadLeg(scene, zone) {
     shadowCasters.push(t,b);
   });
 
-  // ── modular POIs (registry-driven build dispatch) ────────────────────────────
-  // Prop factories shared with POI type modules so their props match the road's tree
-  // look + flat palette. makeTree reuses the instanced trunk/blob templates above.
-  let _poiN = 0;
-  const makeTree = (x, z, scale = 1, rotY = 0) => {
-    const i = _poiN++;
-    const t = trunkSrc.createInstance('poi-tt' + i); t.position.set(x, 0, z); t.scaling.setAll(scale); t.parent = root;
-    const b = blobSrc.createInstance('poi-tb' + i);  b.position.set(x, 0, z); b.scaling.setAll(scale); b.rotation.y = rotY; b.parent = root;
-    return [t, b];
-  };
-  const makeBush = (x, z, scale = 1, rotY = 0) => { const m = buildBush(scene, M.foliage, { x, z, scale, rotY }); m.parent = root; return m; };
-  const makeRock = (x, z, scale = 1, rotY = 0) => { const m = buildRock(scene, M.stone,   { x, z, scale, rotY }); m.parent = root; return m; };
-  const poiHelpers = { makeTree, makeBush, makeRock, M, root };
-  for (const inst of (leg.pois ?? [])) {
-    const type = POI_TYPES[inst.poiType];
-    if (!type) continue;
-    const out = type.build(scene, inst, poiHelpers);
-    if (out?.obstacles)     obstacles.push(...out.obstacles);
-    if (out?.shadowCasters) shadowCasters.push(...out.shadowCasters);
-  }
+  // ── modular POIs — props are native low-poly GLB templates (treepatch.glb), instanced
+  // per placement. Loading is async, so the POI meshes build in `poiReady` (folded into
+  // ArenaScene.ready behind the loading screen). Enemies/loot are already in the leg's
+  // arrays (built by ArenaScene from zone.enemies/loot), so combat/pickups don't wait. ──
+  const poiReady = (leg.pois && leg.pois.length)
+    ? (async () => {
+        const tpl  = await loadPropTemplates(scene);
+        const pick = (a) => a[Math.floor(Math.random() * a.length)];
+        const helpers = {
+          makeTree: (x, z, s = 1, r = 0) => instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale: s * POI_TREE_SCALE, rotY: r, parent: root }),
+          makeBush: (x, z, s = 1, r = 0) => instanceProp(tpl, 'Bush',               { x, z, scale: s * POI_BUSH_SCALE, rotY: r, parent: root }),
+          makeRock: (x, z, s = 1, r = 0) => instanceProp(tpl, s >= 0.9 ? 'Rock_A' : 'Rock_B', { x, z, scale: s * POI_ROCK_SCALE, rotY: r, parent: root }),
+        };
+        const obs = [], sc = [];
+        for (const inst of leg.pois) {
+          const type = POI_TYPES[inst.poiType];
+          if (!type) continue;
+          const out = type.build(scene, inst, helpers);
+          if (out?.obstacles)     obs.push(...out.obstacles);
+          if (out?.shadowCasters) sc.push(...(out.shadowCasters.filter(Boolean)));
+        }
+        return { obstacles: obs, shadowCasters: sc };
+      })()
+    : null;
 
   // POI loot at the spur ends is the game's collectible SalvageCrate (built by
   // ArenaScene from zone.loot), so RoadBuilder draws no loot meshes here.
@@ -202,5 +211,5 @@ export function buildRoadLeg(scene, zone) {
   // (No bunker tunnel — the tank simply starts at the road's south end. A future "tank
   // drives out to the location" intro animation is the planned replacement.)
 
-  return { obstacles, shadowCasters, root };
+  return { obstacles, shadowCasters, root, poiReady };
 }
