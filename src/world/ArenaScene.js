@@ -25,6 +25,14 @@ import { bankSalvage } from '../core/runState.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
 
+// Hull-follow camera (Long Road): the view yaws to keep the hull's forward up-screen, so
+// off-angle/branching roads read as "straight ahead". Reversing keeps facing up-the-road
+// because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
+// window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
+const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
+const CAM_RADIUS         = 42;    // distance (was 39)
+const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
+
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
     this.scene = new Scene(engine);
@@ -64,6 +72,7 @@ export default class ArenaScene {
     // Resolves when the player tank's async model work is done (or immediately
     // for the primitive). The deploy loading screen awaits this before fading.
     this.ready = new Promise(res => { this._readyResolve = res; });
+    this._poiReady = null;   // set by the road branch of _setupGround (async GLB POI props)
 
     this._setupCamera();
     this._setupLighting();
@@ -73,6 +82,9 @@ export default class ArenaScene {
     this._setupHazards();
     this._setupEntities();
     this._setupExtraction();
+    // Fold the async POI-prop build (GLB templates) into ready so the deploy loading
+    // screen waits for the thicket to appear, not pop in after the world fades up.
+    if (this._poiReady) this.ready = Promise.all([this.ready, this._poiReady]);
     // this._setupDevLabels();
     this._setupLockOn();
     this._setupFiring();
@@ -81,7 +93,11 @@ export default class ArenaScene {
   }
 
   _setupCamera() {
-    this.camera = new ArcRotateCamera('cam', -Math.PI / 2, 0.5, 39,
+    // Hull-follow: yaw the view to keep the hull's forward up-screen (Long Road).
+    this._camHeading      = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
+    this._camHeadingVel   = 0;                               // spring velocity state
+    this._camYawSmoothTime = CAM_YAW_SMOOTH_TIME;            // live-tunable (seconds)
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, CAM_RADIUS,
       new Vector3(this._camX, 0, this._camZ), this.scene);
   }
 
@@ -148,6 +164,12 @@ export default class ArenaScene {
       const built = buildRoadLeg(this.scene, this.zone);
       this._obstacles.push(...built.obstacles);
       for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
+      if (built.propsReady) {
+        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters }) => {
+          this._obstacles.push(...obstacles);
+          for (const m of shadowCasters) this.shadowGen.addShadowCaster(m);
+        });
+      }
       return;
     }
     if (this.zone) {
@@ -1175,6 +1197,13 @@ export default class ArenaScene {
     this._camX += (desiredX - this._camX) * smooth;
     this._camZ += (desiredZ - this._camZ) * smooth;
 
+    // --- 4. Hull-follow yaw: a critically-damped spring eases the view toward the hull
+    // heading — it lags slightly and ramps its turn-rate in/out, so changing direction is
+    // smooth instead of a snap. Reversing keeps facing up-the-road (rotY doesn't flip).
+    // -PI/2 - heading maps hull-forward → up-screen. ---
+    this._camHeading  = this._smoothDampAngle(this._camHeading, this.tank.rotY, dt);
+    this.camera.alpha = -Math.PI / 2 - this._camHeading;
+
     // --- Apply with shake on top ---
     if (this._shakeTime > 0) {
       this._shakeTime -= dt;
@@ -1187,6 +1216,23 @@ export default class ArenaScene {
     } else {
       this.camera.target.set(this._camX, 0, this._camZ);
     }
+  }
+
+  // Critically-damped angle smoothing (Unity-style SmoothDampAngle). Velocity-stateful so
+  // the camera eases in AND out of turns (no initial jerk) and lags slightly. Angle-aware:
+  // always takes the short way around. `_camYawSmoothTime` ≈ seconds to settle.
+  _smoothDampAngle(current, target, dt) {
+    const st = Math.max(0.0001, this._camYawSmoothTime);
+    const omega = 2 / st;
+    const x = omega * dt;
+    const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    let change = current - target;
+    while (change >  Math.PI) change -= 2 * Math.PI;   // shortest signed delta
+    while (change < -Math.PI) change += 2 * Math.PI;
+    const targetAdj = current - change;
+    let temp = (this._camHeadingVel + omega * change) * dt;
+    this._camHeadingVel = (this._camHeadingVel - omega * temp) * exp;
+    return targetAdj + (change + temp) * exp;
   }
 
   // Long Road invisible walls: keep the tank within `half` of the road centerline — a

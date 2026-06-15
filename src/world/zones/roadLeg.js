@@ -10,6 +10,8 @@
 //   trees          — procedural roadside dressing
 // Forks REJOIN for now (always completable); destination-forks come with real content later.
 
+import { POI_LIST } from './pois/index.js';
+
 const STEP = 4;
 
 function mulberry32(seed) {
@@ -92,6 +94,26 @@ export function generateRoadLeg(seed = 1) {
     enemies.push({ x:p.x, z:p.z, mode:'patrol', band:bandFor(frac) });
   }
 
+  // modular POI placement pass (registry-driven). Pick a few POIs along the centerline,
+  // away from the spurs and road-blockers, and FOLD their enemies/loot into the leg's
+  // existing arrays — so combat, drive-over pickups, and extraction stay unchanged.
+  const pois = [];
+  const blockerIdx = [0.32, 0.55, 0.78].map(f => Math.round(f * (total - 1)));
+  const usedIdx = [...spurIdx, ...blockerIdx];
+  const nPoi = 1 + (rand() < 0.6 ? 1 : 0);
+  for (let s = 0; s < nPoi && POI_LIST.length; s++) {
+    const type = POI_LIST[Math.floor(rand() * POI_LIST.length)];
+    let idx, tries = 0;
+    do { idx = 12 + Math.floor(rand() * (total - 24)); tries++; }
+    while (usedIdx.some(j => Math.abs(j - idx) < 8) && tries < 16);
+    usedIdx.push(idx);
+    const inst = type.place({ pts, total, dirAt, bandFor, valueFor, anchorIdx: idx }, rand, {});
+    if (!inst) continue;
+    pois.push(inst);
+    for (const e of inst.enemies) enemies.push(e);
+    for (const l of inst.loot) loot.push(l);
+  }
+
   // procedural roadside trees (alternating sides, kept off the road body)
   const trees = [];
   for (let i=4;i<pts.length;i+=7){
@@ -107,6 +129,7 @@ export function generateRoadLeg(seed = 1) {
   const eat = (x,z) => { minX=Math.min(minX,x); maxX=Math.max(maxX,x); minZ=Math.min(minZ,z); maxZ=Math.max(maxZ,z); };
   for (const p of pts) eat(p.x, p.z);
   for (const sp of spurs) for (const w of sp.wps) eat(w[0], w[1]);
+  for (const poi of pois) for (const pr of poi.props) eat(pr.x, pr.z);
   for (const a of approach) eat(a[0], a[1]);   // include the southern approach (z down to −52)
   // full drivable centerline = approach + main (for the boundary corridor + edge fade)
   const centerline = [...approach, ...roadMain];
@@ -117,7 +140,7 @@ export function generateRoadLeg(seed = 1) {
   const clampHalf = Math.ceil(Math.max(Math.abs(minX),Math.abs(maxX),Math.abs(minZ),Math.abs(maxZ)) + 80);
 
   return {
-    seed, roadMain, approach, centerline, spurs, trees, checkpoint, enemies, loot,
+    seed, roadMain, approach, centerline, spurs, trees, checkpoint, enemies, loot, pois,
     start: { x: pts[0].x, z: pts[0].z, facing: 0 },
     bbox: { minX, maxX, minZ, maxZ, center, half, clampHalf },
   };
