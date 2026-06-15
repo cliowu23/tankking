@@ -952,11 +952,15 @@
   <script>
     (function() {
       const r = document.getElementById('reticle');
+      // Reveal on first movement: WebKit/Safari does not reliably fire `mouseenter`
+      // on `document`, so gating visibility on it left the reticle hidden there — and
+      // because the real cursor is `cursor:none`, Safari users saw no pointer at all.
+      // `mousemove` fires in every browser, so show it here instead.
       document.addEventListener('mousemove', e => {
         r.style.left = e.clientX + 'px';
         r.style.top  = e.clientY + 'px';
+        if (r.style.display !== 'block') r.style.display = 'block';
       });
-      document.addEventListener('mouseenter', () => { r.style.display = 'block'; });
       document.addEventListener('mouseleave', () => { r.style.display = 'none'; });
     })();
   </script>
