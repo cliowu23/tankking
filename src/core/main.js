@@ -29,6 +29,27 @@ function makeRoadZone(seed = (Date.now() & 0xffff)) {
 const canvas = document.getElementById('renderCanvas');
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true });
 
+// ── Safari / low-end-GL light fix ────────────────────────────────────────────
+// In WebGL2, Babylon gives each light its own uniform-buffer block, so a material
+// shader needs (3 base UBOs + N lights) blocks. Safari/WebKit caps the per-stage
+// uniform-buffer count low (GL_MAX_VERTEX_UNIFORM_BLOCKS = 12), while Chrome's ANGLE
+// allows far more. The glTF loader compounds this: on every GLB load it force-raises
+// *every* scene material's maxSimultaneousLights to scene.lights.length (the Hangar
+// has 14). On Safari those 14-light shaders blow past the block limit, fail to
+// compile, and the bunker renders dark/unlit (Chrome never hits the limit, hiding it).
+//
+// Fix: when the GPU reports too few vertex uniform blocks for our worst-case light
+// count, fall back to Babylon's non-UBO uniform path (no per-stage block limit — only
+// the far larger MAX_VERTEX_UNIFORM_VECTORS applies). This compiles every light count
+// cleanly with zero shader-recompile thrash and full visual parity with Chrome. It is
+// capability-gated (not UA-sniffed), so any low-limit driver is covered too.
+const WORST_CASE_UNIFORM_BLOCKS = 17; // 14 lights (Hangar) + Scene/Mesh/Material
+const gl2 = canvas.getContext('webgl2');
+const maxVertexUniformBlocks = gl2 ? gl2.getParameter(gl2.MAX_VERTEX_UNIFORM_BLOCKS) : 0;
+if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS) {
+  engine.disableUniformBuffers = true;
+}
+
 let arenaScene    = null;
 let designerScene = null;
 let hangarScene   = null;
