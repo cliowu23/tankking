@@ -11,7 +11,7 @@
 // rotation (spawn rotY 0 or PI) so the world extent equals the local footprint. Clamped to
 // sane ranges so a stray/oversized mesh can't produce a wild hitbox.
 export function hullFootprint(meshes) {
-  const SKIP = /barrel|gun|cannon|muzzle|mantlet|aihp|hpbar|healthbar|__root__/i;
+  const SKIP = /barrel|gun|cannon|muzzle|mantlet|aihp|hpbar|healthbar|colldbg|__root__/i;
   const ok = (m) =>
     m.getTotalVertices && m.getTotalVertices() > 0 &&
     m.isEnabled && m.isEnabled() && m.isVisible !== false && !SKIP.test(m.name);

@@ -73,6 +73,7 @@ export default class ArenaScene {
     // for the primitive). The deploy loading screen awaits this before fading.
     this.ready = new Promise(res => { this._readyResolve = res; });
     this._poiReady = null;   // set by the road branch of _setupGround (async GLB POI props)
+    this._collisionDebug = true;   // wireframe collision boxes (toggle: window.__arena.setCollisionDebug(false))
 
     this._setupCamera();
     this._setupLighting();
@@ -849,6 +850,7 @@ export default class ArenaScene {
       this._checkShellHits();
       this._updateExtraction(dt);
       this._updateContainers();
+      this._updateCollisionDebug();
       this.vfx.update(dt);
       this._updateLockRing(dt);
       this._updateAimIndicator();
@@ -1219,6 +1221,31 @@ export default class ArenaScene {
     }
     if (dcx * nx + dcz * nz < 0) { nx = -nx; nz = -nz; }   // point the normal A → B
     return { nx, nz, pen: minOv };
+  }
+
+  // DEBUG: draw each tank's collision box as a wireframe (cyan=player, orange=enemies) so the
+  // hitbox can be eyeballed against the hull. Lazily built per entity, sized to its fitted
+  // half-extents, parented to its root (so it tracks position + rotation = the live OBB).
+  setCollisionDebug(on) { this._collisionDebug = on; }
+  _updateCollisionDebug() {
+    if (!this._collDbgDepthSet) {   // draw group 2 on top of everything (clear its depth)
+      this.scene.setRenderingAutoClearDepthStencil(2, true, true, false);   // clear DEPTH before group 2
+      this._collDbgDepthSet = true;
+    }
+    const show = (ent, rgb) => {
+      if (!ent || !ent.root) return;
+      if (!ent._collDbg) {
+        const box = MeshBuilder.CreateBox('collDbg', { width: 2 * ent.halfW, height: 1.6, depth: 2 * ent.halfD }, this.scene);
+        box.position.y = 0.8; box.parent = ent.root; box.isPickable = false; box.renderingGroupId = 2;
+        const m = new StandardMaterial('collDbgMat', this.scene);
+        m.emissiveColor = rgb; m.disableLighting = true; m.alpha = 0.4;
+        m.backFaceCulling = false; box.material = m; box.visibility = 0.4;
+        ent._collDbg = box;
+      }
+      ent._collDbg.setEnabled(this._collisionDebug && ent.alive !== false);
+    };
+    show(this.tank, new Color3(0.2, 1, 0.25));            // green — pops on the blue player
+    for (const e of this.enemies) show(e, new Color3(1, 0.5, 0));   // orange on the red enemies
   }
 
   _triggerShake(duration, intensity) {
