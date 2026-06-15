@@ -12,6 +12,8 @@ import {
   MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, Mesh,
   VertexBuffer, Texture, DynamicTexture,
 } from '@babylonjs/core';
+import { POI_TYPES } from './pois/index.js';
+import { buildBush, buildRock } from '../props/structures.js';
 
 const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 300;
 
@@ -85,6 +87,7 @@ export function buildRoadLeg(scene, zone) {
   surf(M.wood,'wood',1,'hangar');
   surf(M.plaster,'plaster',1); surf(M.concrete,'concrete',1,'hangar'); surf(M.roof,'rooftile',1);
   M.flag.emissiveColor  = new Color3(0,0.3,0.28); M.flag.specularColor = new Color3(0,0,0);
+  M.stone = mat('road-stone', 0.52, 0.50, 0.46, 0.05);   // POI boulders
 
   // ── grass ground (covers the whole leg) ──────────────────────────────────────
   // Subdivided so we can vertex-tint it: grass near the road → darker BARREN dirt beyond
@@ -162,6 +165,27 @@ export function buildRoadLeg(scene, zone) {
     const b = blobSrc.createInstance('road-tb'+i); b.position.set(x,0,z); b.scaling.setAll(sc); b.rotation.y=(i*1.3)%Math.PI; b.parent=root;
     shadowCasters.push(t,b);
   });
+
+  // ── modular POIs (registry-driven build dispatch) ────────────────────────────
+  // Prop factories shared with POI type modules so their props match the road's tree
+  // look + flat palette. makeTree reuses the instanced trunk/blob templates above.
+  let _poiN = 0;
+  const makeTree = (x, z, scale = 1, rotY = 0) => {
+    const i = _poiN++;
+    const t = trunkSrc.createInstance('poi-tt' + i); t.position.set(x, 0, z); t.scaling.setAll(scale); t.parent = root;
+    const b = blobSrc.createInstance('poi-tb' + i);  b.position.set(x, 0, z); b.scaling.setAll(scale); b.rotation.y = rotY; b.parent = root;
+    return [t, b];
+  };
+  const makeBush = (x, z, scale = 1, rotY = 0) => { const m = buildBush(scene, M.foliage, { x, z, scale, rotY }); m.parent = root; return m; };
+  const makeRock = (x, z, scale = 1, rotY = 0) => { const m = buildRock(scene, M.stone,   { x, z, scale, rotY }); m.parent = root; return m; };
+  const poiHelpers = { makeTree, makeBush, makeRock, M, root };
+  for (const inst of (leg.pois ?? [])) {
+    const type = POI_TYPES[inst.poiType];
+    if (!type) continue;
+    const out = type.build(scene, inst, poiHelpers);
+    if (out?.obstacles)     obstacles.push(...out.obstacles);
+    if (out?.shadowCasters) shadowCasters.push(...out.shadowCasters);
+  }
 
   // POI loot at the spur ends is the game's collectible SalvageCrate (built by
   // ArenaScene from zone.loot), so RoadBuilder draws no loot meshes here.
