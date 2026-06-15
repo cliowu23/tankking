@@ -1251,11 +1251,13 @@ export default class ArenaScene {
     this._camX += (desiredX - this._camX) * smooth;
     this._camZ += (desiredZ - this._camZ) * smooth;
 
-    // --- 4. Hull-follow yaw: a critically-damped spring eases the view toward the hull
-    // heading — it lags slightly and ramps its turn-rate in/out, so changing direction is
-    // smooth instead of a snap. Reversing keeps facing up-the-road (rotY doesn't flip).
-    // -PI/2 - heading maps hull-forward → up-screen. ---
-    this._camHeading  = this._smoothDampAngle(this._camHeading, this.tank.rotY, dt);
+    // --- 4. Road-aligned yaw: the view follows the ROAD's direction (centerline tangent at
+    // the tank), NOT the hull — so steering doesn't whip the camera (far less motion-sick),
+    // and it always faces up-the-road. The cursor pull above (aimX/aimZ) gives the minor
+    // dynamic framing shift. A critically-damped spring keeps the slow road curves smooth.
+    // -PI/2 - heading maps road-forward → up-screen. Falls back to hull if there's no road.
+    const roadH = this._roadHeading();
+    this._camHeading  = this._smoothDampAngle(this._camHeading, roadH != null ? roadH : this.tank.rotY, dt);
     this.camera.alpha = -Math.PI / 2 - this._camHeading;
 
     // --- Apply with shake on top ---
@@ -1287,6 +1289,24 @@ export default class ArenaScene {
     let temp = (this._camHeadingVel + omega * change) * dt;
     this._camHeadingVel = (this._camHeadingVel - omega * temp) * exp;
     return targetAdj + (change + temp) * exp;
+  }
+
+  // Heading of the ROAD at the tank: tangent of the nearest centerline segment, pointing
+  // forward (the centerline runs spawn→checkpoint). Returns null off-road zones (no corridor).
+  _roadHeading() {
+    const c = this._corridor;
+    if (!c || !c.centerline || c.centerline.length < 2) return null;
+    const pts = c.centerline, t = this.tank.position;
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const ax = pts[i][0], az = pts[i][1], dx = pts[i + 1][0] - ax, dz = pts[i + 1][1] - az;
+      const L2 = dx * dx + dz * dz || 1;
+      let s = ((t.x - ax) * dx + (t.z - az) * dz) / L2; s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const px = ax + dx * s, pz = az + dz * s, d2 = (t.x - px) ** 2 + (t.z - pz) ** 2;
+      if (d2 < best) { best = d2; bi = i; }
+    }
+    const a = pts[bi], b = pts[bi + 1];
+    return Math.atan2(b[0] - a[0], b[1] - a[1]);   // road-forward heading (game convention)
   }
 
   // Long Road invisible walls: keep the tank within `half` of the road centerline — a
