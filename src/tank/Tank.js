@@ -1,6 +1,7 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicTexture } from '@babylonjs/core';
 import { shortAngle } from '../utils/mathUtils.js';
 import { hullFootprint } from '../utils/meshBounds.js';
+import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
 
 export default class Tank {
   constructor(scene, x, z) {
@@ -187,7 +188,7 @@ export default class Tank {
     this._shadowMeshes = [this.hull, trackLeft, trackRight, turretBody, turretRoof, mantlet, this.barrel];
 
     // --- Input ---
-    this.keys = { w: false, s: false, a: false, d: false, shift: false };
+    this.keys = { w: false, s: false, a: false, d: false, shift: false, q: false };
     this._justPressedShift = false;
 
     this._onKeyDown = (e) => {
@@ -197,6 +198,8 @@ export default class Tank {
       if (e.code === 'KeyD')  this.keys.d = true;
       if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !this.keys.shift) this._justPressedShift = true;
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.keys.shift = true;
+      if (e.code === 'KeyQ' && !this.keys.q) this._qPressed = true;
+      if (e.code === 'KeyQ') this.keys.q = true;
     };
     this._onKeyUp = (e) => {
       if (e.code === 'KeyW')  this.keys.w     = false;
@@ -204,9 +207,26 @@ export default class Tank {
       if (e.code === 'KeyA')  this.keys.a     = false;
       if (e.code === 'KeyD')  this.keys.d     = false;
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.keys.shift = false;
+      if (e.code === 'KeyQ') this.keys.q = false;
     };
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup',   this._onKeyUp);
+
+    // --- Shield (Q): burst + mitigation, shares the fuel meter ---
+    this.shield    = makeShieldState();
+    this._qPressed = false;          // edge-trigger latch, consumed each update
+
+    const shieldMat = new StandardMaterial('shieldBubble', scene);
+    shieldMat.diffuseColor    = new Color3(0.3, 0.7, 1.0);
+    shieldMat.emissiveColor   = new Color3(0.15, 0.45, 0.9);
+    shieldMat.alpha           = 0.28;
+    shieldMat.backFaceCulling = false;
+    this.shieldBubble = MeshBuilder.CreateSphere('shieldBubble', { diameter: 4.2, segments: 12 }, scene);
+    this.shieldBubble.position.set(0, 0.6, 0);
+    this.shieldBubble.material   = shieldMat;
+    this.shieldBubble.parent     = this.root;
+    this.shieldBubble.isVisible  = false;
+    this.shieldBubble.isPickable = false;
   }
 
   get halfW()    { return this._halfW; }
@@ -216,16 +236,23 @@ export default class Tank {
   // Fit the collision box to the selected tank. Prefers the hull part's AUTHORED footprint
   // (exact, incl. length); falls back to measuring the model (for GLB tanks without a part).
   fitCollisionToModel(declared) {
-    if (declared && declared.halfW && declared.halfD) {
+    // Guard against NaN/degenerate extents (e.g. a calibration hull with no real
+    // footprint): a NaN halfW slips through the `overlap <= 0` collision guard and
+    // poisons the tank position to NaN → camera targets NaN → black/sky screen.
+    // Use Number.isFinite so we fall back to the constructor defaults instead.
+    if (declared && Number.isFinite(declared.halfW) && Number.isFinite(declared.halfD)) {
       this._halfW = declared.halfW; this._halfD = declared.halfD; return;
     }
     const f = hullFootprint(this.root.getChildMeshes());
-    if (f) { this._halfW = f.halfW; this._halfD = f.halfD; }
+    if (f && Number.isFinite(f.halfW) && Number.isFinite(f.halfD)) {
+      this._halfW = f.halfW; this._halfD = f.halfD;
+    }
+    // else: keep the constructor defaults (1.2 / 1.6) — never NaN.
   }
 
   takeDamage(amount) {
     if (!this.alive) return;
-    this.hp = Math.max(0, this.hp - amount);
+    this.hp = Math.max(0, this.hp - amount * shieldDamageMultiplier(this.shield));
     if (this.hp <= 0) this._die();
   }
 
@@ -246,6 +273,10 @@ export default class Tank {
     this.turretAimAngle  = 0;
     this.barrelElevation = 0;
     this.fuel  = this.maxFuel;
+    this.shield.active = false;
+    this.shield.timeLeft = 0;
+    this._qPressed = false;
+    if (this.shieldBubble) this.shieldBubble.isVisible = false;
     this.root.position.set(this.spawnX, 0, this.spawnZ);
     this.root.rotation.y = 0;
     this.hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
@@ -258,6 +289,13 @@ export default class Tank {
 
   update(dt) {
     if (!this.alive) return;
+
+    // --- Shield step (before movement so the slow applies this frame) ---
+    const { fuelSpent } = stepShield(this.shield, dt, this._qPressed, this.fuel);
+    this.fuel = Math.max(0, this.fuel - fuelSpent);
+    this._qPressed = false;
+    this.shieldBubble.isVisible = this.shield.active;
+    const shieldMove = this.shield.active ? SHIELD_MOVE_MULT : 1;
 
     // --- Dash ---
     if (this.dashTimeLeft > 0) {
@@ -343,9 +381,9 @@ export default class Tank {
       this.fuel = Math.min(this.maxFuel, this.fuel + this.fuelRecharge * dt);
     }
 
-    // --- Apply velocity ---
-    const vx = forward.x * this.speed;
-    const vz = forward.z * this.speed;
+    // --- Apply velocity (shield slows you while held up) ---
+    const vx = forward.x * this.speed * shieldMove;
+    const vz = forward.z * this.speed * shieldMove;
     this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + vx * dt));
     this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + vz * dt));
 
