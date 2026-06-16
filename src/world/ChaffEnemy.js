@@ -14,12 +14,10 @@
 // Each laser hit is small CHIP; the threat is volume, so bolts live in
 // this.shells and the existing enemy-shell hit path applies this.shellDamage
 // with no special-casing.
-import { MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3, Matrix, SceneLoader } from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
+import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
 import LaserBolt from '../combat/LaserBolt.js';
-
-const MODEL_DIR = '/assets/models/enemies/';
+import { loadEnemyTemplate } from './enemyModels.js';
 
 const LASER_POOL     = 14;                  // bolts in flight at once (stream needs depth)
 const LASER_HSPEED   = 60;                  // bolt travels faster than a shell (35)
@@ -85,41 +83,45 @@ export default class ChaffEnemy extends AIEnemy {
   }
 
   async _buildComposedChaff(scene) {
-    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, 'chaff.glb', scene);
-    const glbRoot = res.meshes.find(m => m.name === '__root__') || res.meshes[0];
+    const tpl = await loadEnemyTemplate(scene, 'chaff', { body: BODY_STEEL, dark: LEG_DARK, eye: EYE_RED });
+    const id = (ChaffEnemy._n = (ChaffEnemy._n || 0) + 1);
+
     // Holder flips front (eye) to +Z local + lifts the feet onto the ground.
     this._holder = new TransformNode('chaffHolder', scene);
     this._holder.parent = this.root;
     this._holder.rotation.y = Math.PI;
-    glbRoot.parent = this._holder;
-    glbRoot.position.set(0, 0.03, 0);
+    this._holder.position.y = 0.03;
     this._holderBaseY = 0.03;
 
-    // Per-enemy flat materials (death tint can't bleed across instances).
-    this.hullMat = this._cmat('chBody', BODY_STEEL);   // body (death-tint target)
-    this.legMat  = this._cmat('chLeg', LEG_DARK);
-    this.eyeMat  = this._cmat('chEye', EYE_RED, true);
-
-    const meshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0);
-    for (const m of meshes) {
-      const mn = (m.material?.name || '').toLowerCase();
-      m.material = mn.includes('eye') ? this.eyeMat : mn.includes('dark') ? this.legMat : this.hullMat;
-      m.isPickable = false;
-      const nm = m.name.toLowerCase();
-      if (nm.startsWith('body')) this.hull = m;
-      if (nm.startsWith('dome')) this.turret = m;
-      if (m.material === this.eyeMat) this.eye = m;   // by material (names get .001 suffixes per import)
+    this.eyeMat = this._cmat('chEye', EYE_RED, true);   // per-enemy eye glow
+    this._tint = [];
+    const made = [];
+    for (const part of tpl.parts) {
+      let node;
+      if (part.isEye) {
+        node = part.mesh.clone(`cEye_${id}`, null);
+        node.setEnabled(true); node.material = this.eyeMat; this.eye = node;
+      } else {
+        node = part.mesh.createInstance(`c_${part.name}_${id}`);   // GPU-batched; geometry shared
+        node.instancedBuffers.color = new Color4(1, 1, 1, 1); this._tint.push(node);
+      }
+      node.rotationQuaternion = new Quaternion();
+      part.matrix.decompose(node.scaling, node.rotationQuaternion, node.position);
+      node.parent = this._holder; node.isPickable = false;
+      const nm = part.name.toLowerCase();
+      if (nm.startsWith('body')) this.hull = node;
+      if (nm.startsWith('dome')) this.turret = node;
+      made.push({ node, name: part.name, isEye: part.isEye });
     }
-    // Dome + eye onto the turret pivot so the eye tracks the player.
-    for (const m of meshes) {
+    // Dome + eye + socket → turret pivot so the eye tracks the player.
+    for (const m of made) {
       const nm = m.name.toLowerCase();
-      if (nm.startsWith('dome') || nm.startsWith('eye')) m.setParent(this.turretPivot);
+      if (m.isEye || nm.startsWith('dome') || nm.startsWith('eye')) m.node.setParent(this.turretPivot);
     }
-    // Beam muzzle = the eye lens, in turret-pivot space.
+    // Beam muzzle = the eye lens (bbox centre), in turret-pivot space.
     if (this.eye) {
       this.turretPivot.computeWorldMatrix(true);
       this.eye.computeWorldMatrix(true);
-      // Geometry BBOX centre, not the node origin (glTF bakes geometry at the model origin).
       const eyeW = this.eye.getBoundingInfo().boundingBox.centerWorld;
       const inv = Matrix.Invert(this.turretPivot.getWorldMatrix());
       const eyeLocal = Vector3.TransformCoordinates(eyeW, inv);
@@ -127,26 +129,26 @@ export default class ChaffEnemy extends AIEnemy {
       this._barrelBaseZ = eyeLocal.z;
     }
 
-    // Rig the 4 legs: drop a hip-pivot at each leg's joint and re-parent that
-    // leg's segments under it, so _animateLegs can swing them (diagonal-trot skitter).
+    // Rig the 4 legs: a hip-pivot per leg, re-parent that leg's segment instances
+    // under it, so _animateLegs swings them (diagonal-trot skitter).
     this._legs = [];
     this._holder.computeWorldMatrix(true);
     const holderInv = Matrix.Invert(this._holder.getWorldMatrix());
     for (let i = 0; i < 4; i++) {
-      const hipMesh = meshes.find(m => m.name.toLowerCase().startsWith(`hip_${i}`));
-      if (!hipMesh) continue;
-      hipMesh.computeWorldMatrix(true);
-      const hipW = hipMesh.getBoundingInfo().boundingBox.centerWorld;   // the joint, not the baked node origin
-      const pivot = new TransformNode(`chaffLegPivot${i}`, scene);
+      const hip = made.find(m => m.name.toLowerCase().startsWith(`hip_${i}`));
+      if (!hip) continue;
+      hip.node.computeWorldMatrix(true);
+      const hipW = hip.node.getBoundingInfo().boundingBox.centerWorld;
+      const pivot = new TransformNode(`chaffLegPivot${i}_${id}`, scene);
       pivot.parent = this._holder;
       pivot.position = Vector3.TransformCoordinates(hipW, holderInv);
-      for (const part of ['hip', 'thigh', 'knee', 'shin', 'foot']) {
-        const lm = meshes.find(m => m.name.toLowerCase().startsWith(`${part}_${i}`));
-        if (lm) lm.setParent(pivot);   // preserves world; now swings about the hip
+      for (const seg of ['hip', 'thigh', 'knee', 'shin', 'foot']) {
+        const lm = made.find(m => m.name.toLowerCase().startsWith(`${seg}_${i}`));
+        if (lm) lm.node.setParent(pivot);
       }
       const sx = Math.sign(pivot.position.x) || 1;
       const sz = Math.sign(pivot.position.z) || 1;
-      this._legs.push({ pivot, sx, phaseOffset: sx * sz > 0 ? Math.PI : 0 });   // diagonal pairs antiphase
+      this._legs.push({ pivot, sx, phaseOffset: sx * sz > 0 ? Math.PI : 0 });
     }
 
     this.hpBarBg.position.y = 1.95;
@@ -237,8 +239,8 @@ export default class ChaffEnemy extends AIEnemy {
   // Only the body + sensor dome cast shadows (the eye is emissive, the legs are
   // thin); override so the inherited addShadows doesn't touch a removed barrel.
   addShadows(shadowGen) {
-    if (this.hull)   shadowGen.addShadowCaster(this.hull);
-    if (this.turret) shadowGen.addShadowCaster(this.turret);
+    if (this.hull && !this.hull.isAnInstance)   shadowGen.addShadowCaster(this.hull);
+    if (this.turret && !this.turret.isAnInstance) shadowGen.addShadowCaster(this.turret);
   }
 
   // Fire a single laser bolt from the eye with azimuth spread, in bursts so the
@@ -313,18 +315,22 @@ export default class ChaffEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
-    if (!this.hullMat) return;
-    this.hullMat.diffuseColor.set(...DEATH_TINT);
-    this.hullMat.emissiveColor = new Color3(0.02, 0.01, 0.0);
-    this.legMat?.diffuseColor.set(0.06, 0.06, 0.07);
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
+    else if (this.hullMat) {   // primitive fallback
+      this.hullMat.diffuseColor.set(...DEATH_TINT);
+      this.hullMat.emissiveColor = new Color3(0.02, 0.01, 0.0);
+      this.legMat?.diffuseColor.set(0.06, 0.06, 0.07);
+    }
     if (this.eyeMat) this.eyeMat.emissiveColor.set(0.04, 0.01, 0.01);
   }
 
   _reviveVisuals() {
-    if (!this.hullMat) return;
-    this.hullMat.diffuseColor.set(...BODY_STEEL);
-    this.hullMat.emissiveColor = new Color3(0, 0, 0);
-    this.legMat?.diffuseColor.set(...LEG_DARK);
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(1, 1, 1, 1);
+    else if (this.hullMat) {
+      this.hullMat.diffuseColor.set(...BODY_STEEL);
+      this.hullMat.emissiveColor = new Color3(0, 0, 0);
+      this.legMat?.diffuseColor.set(...LEG_DARK);
+    }
     if (this.eyeMat) this.eyeMat.emissiveColor.set(...EYE_RED);
   }
 }

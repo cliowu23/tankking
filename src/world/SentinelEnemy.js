@@ -18,12 +18,11 @@
 // Blender GLB task). _buildPlaceholder is the seam: when the GLB lands, swap it
 // for an async _buildComposed (load chassis → root, dome → turretPivot) and set
 // this.ready to that promise — the beam/charge logic below is model-agnostic.
-import { MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3, Matrix, SceneLoader } from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
+import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
 import EyeBeam from '../combat/EyeBeam.js';
+import { loadEnemyTemplate } from './enemyModels.js';
 
-const MODEL_DIR = '/assets/models/enemies/';
 // Mesh names (Blender object names) that belong on the rotating turret/dome.
 const TURRET_PARTS = ['dome', 'eye', 'eyering', 'eyesocket', 'antenna', 'anttip'];
 const isTurretMesh = (n) => { n = (n || '').toLowerCase(); return TURRET_PARTS.some(t => n === t || n.startsWith(t + '.') || n.startsWith(t + '_')); };
@@ -84,47 +83,48 @@ export default class SentinelEnemy extends AIEnemy {
   }
 
   async _buildComposed(scene) {
-    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, 'sentinel.glb', scene);
-    const glbRoot = res.meshes.find(m => m.name === '__root__') || res.meshes[0];
-    // Holder flips the model 180° so its front (glacis + eye) faces +Z local — the
-    // enemy's forward (hull drives +Z, turret aims +Z). The glTF loader puts a
-    // conversion quaternion on __root__, so flip via a parent rather than its rotation.
+    const tpl = await loadEnemyTemplate(scene, 'sentinel',
+      { body: BODY_STEEL, dark: DARK_METAL, trim: TRIM_STEEL, eye: EYE_BASE });
+    const id = (SentinelEnemy._n = (SentinelEnemy._n || 0) + 1);
+
+    // Holder flips the model 180° (front/eye → +Z local) + lifts the tracks onto the ground.
     const holder = new TransformNode('sentinelHolder', scene);
     holder.parent = this.root;
     holder.rotation.y = Math.PI;
-    glbRoot.parent = holder;
-    glbRoot.position.set(0, 0.25, 0);   // lift so the track bottoms sit on the ground (model base ≈ -0.25)
+    holder.position.y = 0.25;
 
-    // Per-enemy flat materials (cloned per instance → death tint can't bleed across enemies).
-    this.bodyMat = this._mat('sentBody', BODY_STEEL);
-    this.darkMat = this._mat('sentDark', DARK_METAL, [0.05, 0.05, 0.06]);
-    this.trimMat = this._mat('sentTrim', TRIM_STEEL, [0.20, 0.22, 0.26]);
-    this.eyeMat  = this._mat('sentEye', EYE_BASE, null, true);
-
-    const meshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0);
-    for (const m of meshes) {
-      const mn = (m.material?.name || '').toLowerCase();
-      m.material = mn.includes('eye') ? this.eyeMat
-                 : mn.includes('dark') ? this.darkMat
-                 : mn.includes('trim') ? this.trimMat
-                 : this.bodyMat;
-      m.isPickable = false;
-      if (m.name.toLowerCase().startsWith('hull')) this.hull = m;
-      if (m.name.toLowerCase().startsWith('dome')) this.turret = m;
-      if (m.material === this.eyeMat)              this.eye = m;   // by material (names get .001 suffixes per import)
+    this.eyeMat = this._mat('sentEye', EYE_BASE, null, true);   // per-enemy eye glow
+    this._tint = [];                                            // instances we death-tint
+    const made = [];
+    for (const part of tpl.parts) {
+      let node;
+      if (part.isEye) {
+        node = part.mesh.clone(`sEye_${id}`, null);   // cloned (own material) so each bot charges independently
+        node.setEnabled(true);
+        node.material = this.eyeMat;
+        this.eye = node;
+      } else {
+        node = part.mesh.createInstance(`s_${part.name}_${id}`);   // GPU-batched; geometry shared
+        node.instancedBuffers.color = new Color4(1, 1, 1, 1);
+        this._tint.push(node);
+      }
+      node.rotationQuaternion = new Quaternion();
+      part.matrix.decompose(node.scaling, node.rotationQuaternion, node.position);   // model-space layout
+      node.parent = holder;
+      node.isPickable = false;
+      const nm = part.name.toLowerCase();
+      if (nm.startsWith('hull')) this.hull = node;
+      if (nm.startsWith('dome')) this.turret = node;
+      made.push({ node, name: part.name, isEye: part.isEye });
     }
 
-    // Split the dome/eye onto the turret pivot so the eye TRACKS the player
-    // (setParent preserves world transform; turretPivot spins about the model's
-    // vertical axis at root-local (0,0.55,0)).
-    for (const m of meshes) if (isTurretMesh(m.name)) m.setParent(this.turretPivot);
+    // Dome/eye → turret pivot (preserve world) so the eye tracks the player.
+    for (const m of made) if (m.isEye || isTurretMesh(m.name)) m.node.setParent(this.turretPivot);
 
-    // Beam muzzle = the eye lens, in turret-pivot space.
+    // Beam muzzle = the eye lens (bbox centre, not the baked node origin), in turret-pivot space.
     if (this.eye) {
       this.turretPivot.computeWorldMatrix(true);
       this.eye.computeWorldMatrix(true);
-      // Use the geometry BBOX centre, not the node origin (glTF bakes geometry; the
-      // node sits at the model origin, so getAbsolutePosition would read ground level).
       const eyeW = this.eye.getBoundingInfo().boundingBox.centerWorld;
       const inv = Matrix.Invert(this.turretPivot.getWorldMatrix());
       const eyeLocal = Vector3.TransformCoordinates(eyeW, inv);
@@ -132,7 +132,6 @@ export default class SentinelEnemy extends AIEnemy {
       this._barrelBaseZ = eyeLocal.z;
     }
 
-    // Raise the hp bar clear above the dome silhouette.
     this.hpBarBg.position.y = 2.95;
     this.hpBarFill.position.y = 2.95;
     return this;
@@ -250,8 +249,10 @@ export default class SentinelEnemy extends AIEnemy {
   // Body + dome + tracks cast shadows; the eye is emissive and the antenna is
   // thin. Override so inherited addShadows doesn't reach for a removed barrel.
   addShadows(shadowGen) {
-    if (this.hull)   shadowGen.addShadowCaster(this.hull);
-    if (this.turret) shadowGen.addShadowCaster(this.turret);
+    // Instanced GLB meshes don't take real-time shadow maps here (target GPU uses
+    // blob shadows anyway); only the primitive fallback's real meshes do.
+    if (this.hull && !this.hull.isAnInstance)   shadowGen.addShadowCaster(this.hull);
+    if (this.turret && !this.turret.isAnInstance) shadowGen.addShadowCaster(this.turret);
   }
 
   // _fire (called by AIEnemy when in COMBAT, off cooldown, roughly aimed) BEGINS
@@ -331,20 +332,22 @@ export default class SentinelEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
-    if (!this.bodyMat) return;
-    this.bodyMat.diffuseColor.set(...DEATH_TINT);
-    this.trimMat.diffuseColor.set(0.09, 0.09, 0.10);
-    this.darkMat.diffuseColor.set(0.06, 0.06, 0.07);
-    this.eyeMat.diffuseColor.set(0.08, 0.02, 0.02);
-    this.eyeMat.emissiveColor.set(0.04, 0.01, 0.01);   // eye goes dark
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.22, 0.22, 0.24, 1);
+    else if (this.bodyMat) {   // primitive fallback
+      this.bodyMat.diffuseColor.set(...DEATH_TINT);
+      this.trimMat.diffuseColor.set(0.09, 0.09, 0.10);
+      this.darkMat.diffuseColor.set(0.06, 0.06, 0.07);
+    }
+    if (this.eyeMat) this.eyeMat.emissiveColor.set(0.04, 0.01, 0.01);   // eye goes dark
   }
 
   _reviveVisuals() {
-    if (!this.bodyMat) return;
-    this.bodyMat.diffuseColor.set(...BODY_STEEL);
-    this.trimMat.diffuseColor.set(...TRIM_STEEL);
-    this.darkMat.diffuseColor.set(...DARK_METAL);
-    this.eyeMat.diffuseColor.set(...EYE_BASE);
-    this.eyeMat.emissiveColor.set(...EYE_BASE);
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(1, 1, 1, 1);
+    else if (this.bodyMat) {
+      this.bodyMat.diffuseColor.set(...BODY_STEEL);
+      this.trimMat.diffuseColor.set(...TRIM_STEEL);
+      this.darkMat.diffuseColor.set(...DARK_METAL);
+    }
+    if (this.eyeMat) this.eyeMat.emissiveColor.set(...EYE_BASE);
   }
 }
