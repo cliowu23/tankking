@@ -18,9 +18,15 @@
 // Blender GLB task). _buildPlaceholder is the seam: when the GLB lands, swap it
 // for an async _buildComposed (load chassis → root, dome → turretPivot) and set
 // this.ready to that promise — the beam/charge logic below is model-agnostic.
-import { MeshBuilder, StandardMaterial, Color3, TransformNode } from '@babylonjs/core';
+import { MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3, Matrix, SceneLoader } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 import AIEnemy from './AIEnemy.js';
 import EyeBeam from '../combat/EyeBeam.js';
+
+const MODEL_DIR = '/assets/models/enemies/';
+// Mesh names (Blender object names) that belong on the rotating turret/dome.
+const TURRET_PARTS = ['dome', 'eye', 'eyering', 'eyesocket', 'antenna', 'anttip'];
+const isTurretMesh = (n) => { n = (n || '').toLowerCase(); return TURRET_PARTS.some(t => n === t || n.startsWith(t + '.') || n.startsWith(t + '_')); };
 
 const BEAM_POOL   = 3;                  // single heavy shot + recovery — no stream needed
 const BEAM_HSPEED = 80;                 // fast: it's dodged via the tell, not the bolt
@@ -47,27 +53,89 @@ export default class SentinelEnemy extends AIEnemy {
     this._halfD = 1.80;  // ~3.6 long (sloped nose + rear plate)
     this._rotateSpeed  = 1.0;                  // turns slowly (it's a heavy bot)
     this._aimTolerance = 8 * Math.PI / 180;    // commits to a charge when roughly on target
+    this._tipOffset    = 0.12;                 // bolt spawn just ahead of the eye lens
 
     // Charge bookkeeping (drives the wind-up tell + the discharge flash).
     this._charging = false;
     this._chargeT  = 0;
     this._eyeFlash = 0;        // 0..1, bright flash on discharge, decays to idle
 
-    this._buildPlaceholder(scene);
-
-    // The eye lens IS the muzzle: point the logical barrelPivot at it so beams
-    // emit from the glow (mirrors ChaffEnemy).
-    this.barrelPivot.position.set(0, this._eyeLocal.y, this._eyeLocal.z);
-    this._barrelBaseZ = this._eyeLocal.z;
-    this._tipOffset   = 0.12;
-
     // Swap the inherited 4-shell cannon pool for an eye-beam pool.
     for (const s of this.shells) s.deactivate?.();
     this.shells = Array.from({ length: BEAM_POOL }, () => new EyeBeam(scene));
 
-    // Synchronous (no GLB yet) — expose a resolved ready like the composed
-    // enemies so ArenaScene's Promise.all wait stays uniform.
-    this.ready = Promise.resolve(this);
+    // Load the Blender GLB; fall back to the primitive placeholder if it fails.
+    this.ready = this._buildComposed(scene).catch((e) => {
+      console.error('[sentinel] GLB load failed, using placeholder:', e);
+      this._buildPlaceholder(scene);
+      this.barrelPivot.position.set(0, this._eyeLocal.y, this._eyeLocal.z);
+      this._barrelBaseZ = this._eyeLocal.z;
+      return this;
+    });
+  }
+
+  // Make one of our flat StandardMaterials (matches the game look; PBR washes out).
+  _mat(name, rgb, spec = [0.16, 0.18, 0.21], emissive = false) {
+    const m = new StandardMaterial(name, this.scene);
+    m.diffuseColor = new Color3(...rgb);
+    if (emissive) { m.emissiveColor = new Color3(...rgb); m.disableLighting = true; }
+    else m.specularColor = new Color3(...spec);
+    return m;
+  }
+
+  async _buildComposed(scene) {
+    const res = await SceneLoader.ImportMeshAsync('', MODEL_DIR, 'sentinel.glb', scene);
+    const glbRoot = res.meshes.find(m => m.name === '__root__') || res.meshes[0];
+    // Holder flips the model 180° so its front (glacis + eye) faces +Z local — the
+    // enemy's forward (hull drives +Z, turret aims +Z). The glTF loader puts a
+    // conversion quaternion on __root__, so flip via a parent rather than its rotation.
+    const holder = new TransformNode('sentinelHolder', scene);
+    holder.parent = this.root;
+    holder.rotation.y = Math.PI;
+    glbRoot.parent = holder;
+    glbRoot.position.set(0, 0.25, 0);   // lift so the track bottoms sit on the ground (model base ≈ -0.25)
+
+    // Per-enemy flat materials (cloned per instance → death tint can't bleed across enemies).
+    this.bodyMat = this._mat('sentBody', BODY_STEEL);
+    this.darkMat = this._mat('sentDark', DARK_METAL, [0.05, 0.05, 0.06]);
+    this.trimMat = this._mat('sentTrim', TRIM_STEEL, [0.20, 0.22, 0.26]);
+    this.eyeMat  = this._mat('sentEye', EYE_BASE, null, true);
+
+    const meshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0);
+    for (const m of meshes) {
+      const mn = (m.material?.name || '').toLowerCase();
+      m.material = mn.includes('eye') ? this.eyeMat
+                 : mn.includes('dark') ? this.darkMat
+                 : mn.includes('trim') ? this.trimMat
+                 : this.bodyMat;
+      m.isPickable = false;
+      if (m.name.toLowerCase().startsWith('hull')) this.hull = m;
+      if (m.name.toLowerCase().startsWith('dome')) this.turret = m;
+      if (m.material === this.eyeMat)              this.eye = m;   // by material (names get .001 suffixes per import)
+    }
+
+    // Split the dome/eye onto the turret pivot so the eye TRACKS the player
+    // (setParent preserves world transform; turretPivot spins about the model's
+    // vertical axis at root-local (0,0.55,0)).
+    for (const m of meshes) if (isTurretMesh(m.name)) m.setParent(this.turretPivot);
+
+    // Beam muzzle = the eye lens, in turret-pivot space.
+    if (this.eye) {
+      this.turretPivot.computeWorldMatrix(true);
+      this.eye.computeWorldMatrix(true);
+      // Use the geometry BBOX centre, not the node origin (glTF bakes geometry; the
+      // node sits at the model origin, so getAbsolutePosition would read ground level).
+      const eyeW = this.eye.getBoundingInfo().boundingBox.centerWorld;
+      const inv = Matrix.Invert(this.turretPivot.getWorldMatrix());
+      const eyeLocal = Vector3.TransformCoordinates(eyeW, inv);
+      this.barrelPivot.position.copyFrom(eyeLocal);
+      this._barrelBaseZ = eyeLocal.z;
+    }
+
+    // Raise the hp bar clear above the dome silhouette.
+    this.hpBarBg.position.y = 2.95;
+    this.hpBarFill.position.y = 2.95;
+    return this;
   }
 
   _buildPlaceholder(scene) {
@@ -224,8 +292,11 @@ export default class SentinelEnemy extends AIEnemy {
     if (beam) {
       const tip = this._barrelTip();
       const aim = this.turretAimAngle;
+      // Clamp emit height: the eye sits near the y<1.6 hit-gate ceiling, so keep
+      // the flat beam under it (on a fat beam the offset from the lens is invisible).
+      const ty = Math.min(tip.y, 1.45);
       beam.fire(
-        tip.x, tip.y, tip.z,
+        tip.x, ty, tip.z,
         Math.sin(aim) * BEAM_HSPEED, 0, Math.cos(aim) * BEAM_HSPEED,
         BEAM_RANGE,
       );
