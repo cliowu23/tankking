@@ -12,23 +12,13 @@ import { generateRoadLeg } from '../world/zones/roadLeg.js';
 // enemies-on-road, loot-pickup behaviour, the checkpoint extract menu.
 function makeRoadZone(seed = (Date.now() & 0xffff)) {
   const leg = generateRoadLeg(seed);
-
-  // Slice-1 horde feel-test: a scout-bot pack clustered a short way up the road
-  // from spawn, so the player drives straight into the swarm. Anchored to
-  // leg.start (the approach is straight) and within the boundary corridor.
-  const s = leg.start;
-  const chaff = [];
-  for (let k = 0; k < 8; k++) {
-    const ang = (k / 8) * Math.PI * 2;
-    chaff.push({ x: s.x + Math.sin(ang) * 10, z: s.z + 18 + Math.cos(ang) * 8 });
-  }
-
   return {
     id: 'road-leg', kind: 'road', name: 'THE LONG ROAD — LEG',
     palette: WORLD1.palette,
     bounds: { half: leg.bbox.clampHalf, visual: leg.bbox.clampHalf + 60 },
     spawn: leg.start,   // road's south start (z≈0)
-    enemies: leg.enemies, chaff, loot: leg.loot, containers: leg.containers, bandTuning: WORLD1.bandTuning,
+    // chaff scout-bots get placed by POIs (zone.chaff); none seeded by default.
+    enemies: leg.enemies, chaff: leg.chaff ?? [], loot: leg.loot, containers: leg.containers, bandTuning: WORLD1.bandTuning,
     extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
     // boundary corridor: stay within `half` of the road centerline (sides + front), and a
     // hard wall right behind spawn (southLimit) — no reversing down the approach you came in on.
@@ -224,7 +214,9 @@ const DEPLOY_TIPS = [
 // Deploy uses the loading screen, not the checker transition: the overlay goes
 // up instantly, the arena builds + the tank GLB loads behind it (arenaScene.ready),
 // then it fades into the world. _tBusy still guards against double-deploys.
-function deployToArena() {
+// dev=true deploys the development arena (no zone) — a flat sandbox for enemy
+// testing. dev=false deploys World 1 (the generated road leg).
+function deployToArena(dev = false) {
   if (_tBusy) return;
   _tBusy = true;
 
@@ -244,7 +236,7 @@ function deployToArena() {
   // Build on the next frame so the overlay paints before the heavy work starts.
   requestAnimationFrame(() => {
     canvas.style.display = 'block';
-    arenaScene = new ArenaScene(engine, onExtractFromArena, makeRoadZone());
+    arenaScene = new ArenaScene(engine, onExtractFromArena, dev ? undefined : makeRoadZone());
     window.__arena = arenaScene;
 
     const MIN_MS = 900;   // let the loading screen breathe even on instant loads
@@ -430,7 +422,28 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) autoP
 window.addEventListener('blur', autoPause);
 setInterval(() => { if (!document.hidden && !document.hasFocus()) autoPause(); }, 300);
 
-document.getElementById('hangar-panel-deploy').addEventListener('click', deployToArena);
+// Tactical-map DEPLOY → World 1. (Wrap so the click Event isn't passed as `dev`.)
+const _deployBtn = document.getElementById('hangar-panel-deploy');
+_deployBtn.textContent = 'DEPLOY · WORLD 1';
+_deployBtn.addEventListener('click', () => deployToArena(false));
+
+// Second destination: a DEV ARENA button injected next to DEPLOY (index.html is
+// owned by a parallel session, so the button is built in JS). HangarScene.openPanel
+// toggles its visibility alongside the deploy button.
+const _devBtn = document.createElement('button');
+_devBtn.id = 'hangar-panel-deploy-dev';
+_devBtn.textContent = 'DEV ARENA · TEST';
+// Match the deploy/close button look (shared CSS targets fixed IDs, so style
+// inline) with an amber "dev/test" accent to set it apart from the red World 1.
+_devBtn.style.cssText =
+  "display:none;background:transparent;font-family:'Press Start 2P',monospace;" +
+  'font-size:9px;padding:10px 20px;cursor:none;letter-spacing:2px;' +
+  'border:1px solid #ffb000;color:#ffb000;box-shadow:0 0 8px rgba(255,176,0,0.3);';
+_devBtn.addEventListener('mouseenter', () => { _devBtn.style.background = 'rgba(255,176,0,0.1)'; });
+_devBtn.addEventListener('mouseleave', () => { _devBtn.style.background = 'transparent'; });
+_deployBtn.insertAdjacentElement('afterend', _devBtn);
+_devBtn.addEventListener('click', () => deployToArena(true));
+
 document.getElementById('hangar-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
 });

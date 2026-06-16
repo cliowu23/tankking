@@ -430,7 +430,7 @@ export default class ArenaScene {
       this.enemies.push(ai);
       this._spawnDefs.push([0, 42]);
 
-      // Slice-1 horde feel-test: a dense ring of scout-bot chaff around the spawn.
+      // Dev arena = enemy-testing sandbox: a ring of scout-bot chaff to fight.
       const CHAFF_RING_COUNT  = 8;
       const CHAFF_RING_RADIUS = 24;
       for (let i = 0; i < CHAFF_RING_COUNT; i++) {
