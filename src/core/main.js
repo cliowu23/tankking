@@ -221,8 +221,18 @@ function deployToArena(dev = false) {
   _tBusy = true;
 
   const lo = document.getElementById('deploy-loading');
-  document.getElementById('deploy-tip').textContent =
-    DEPLOY_TIPS[Math.floor(Math.random() * DEPLOY_TIPS.length)];
+  // Loading-screen title/sub/tip reflect the destination (reset for World 1 in
+  // case a prior dev deploy changed them).
+  if (dev) {
+    document.getElementById('deploy-loading-title').textContent = 'DEV ARENA';
+    document.getElementById('deploy-loading-sub').textContent   = 'ENEMY TESTING';
+    document.getElementById('deploy-tip').textContent           = 'SANDBOX — TEST ENEMIES & MECHANICS';
+  } else {
+    document.getElementById('deploy-loading-title').textContent = 'WORLD 1';
+    document.getElementById('deploy-loading-sub').textContent   = 'GREEN FIELDS';
+    document.getElementById('deploy-tip').textContent =
+      DEPLOY_TIPS[Math.floor(Math.random() * DEPLOY_TIPS.length)];
+  }
   lo.classList.remove('done');
   lo.style.opacity = '1';
   lo.style.display = 'flex';
@@ -236,7 +246,12 @@ function deployToArena(dev = false) {
   // Build on the next frame so the overlay paints before the heavy work starts.
   requestAnimationFrame(() => {
     canvas.style.display = 'block';
-    arenaScene = new ArenaScene(engine, onExtractFromArena, dev ? undefined : makeRoadZone());
+    try {
+      arenaScene = new ArenaScene(engine, onExtractFromArena, dev ? undefined : makeRoadZone());
+    } catch (e) {
+      console.error('[deploy] ArenaScene construction failed:', e);
+      throw e;
+    }
     window.__arena = arenaScene;
 
     const MIN_MS = 900;   // let the loading screen breathe even on instant loads
@@ -443,6 +458,42 @@ _devBtn.addEventListener('mouseenter', () => { _devBtn.style.background = 'rgba(
 _devBtn.addEventListener('mouseleave', () => { _devBtn.style.background = 'transparent'; });
 _deployBtn.insertAdjacentElement('afterend', _devBtn);
 _devBtn.addEventListener('click', () => deployToArena(true));
+
+// Controls tab: lock-on is disabled (planned future module), so strip its rows
+// and document the shield (Q) in their place. index.html is owned by a parallel
+// session, so patch the DOM here.
+(() => {
+  for (const row of document.querySelectorAll('#controls-screen .ctrl-row')) {
+    const desc = row.querySelector('.ctrl-desc')?.textContent || '';
+    if (/lock on|locked target/i.test(desc)) row.remove();
+  }
+  const cols = [...document.querySelectorAll('#controls-screen .controls-col')];
+  const combatCol = cols.find(c =>
+    /COMBAT/i.test(c.querySelector('.ctrl-section-title')?.textContent || ''));
+  if (combatCol) {
+    const row = document.createElement('div');
+    row.className = 'ctrl-row';
+    row.innerHTML = '<span class="key">Q</span><span class="ctrl-desc">Shield (hold ground)</span>';
+    combatCol.appendChild(row);
+  }
+
+  // Move the in-arena run-salvage readout to the screen's top-left (it ships
+  // absolutely-positioned inside the bottom-left #hud, overlapping the bars).
+  // Done once at load so it's correct on spawn even while paused on the controls
+  // screen (the in-loop reposition didn't run until you unpaused).
+  const sal = document.getElementById('hud-salvage');
+  if (sal) {
+    sal.style.position = 'fixed';
+    sal.style.top      = '18px';
+    sal.style.left     = '24px';
+    sal.style.right    = 'auto';
+  }
+
+  // The bottom-left meter now powers boost AND the shield (and future modules),
+  // so it's the tank's shared ENERGY pool, not just "boost".
+  const fuelLabel = document.getElementById('hud-label');
+  if (fuelLabel) fuelLabel.textContent = 'ENERGY';
+})();
 
 document.getElementById('hangar-panel-close').addEventListener('click', () => {
   if (hangarScene) hangarScene.closePanel();
