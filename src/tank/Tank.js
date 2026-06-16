@@ -2,6 +2,7 @@ import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicT
 import { shortAngle } from '../utils/mathUtils.js';
 import { hullFootprint } from '../utils/meshBounds.js';
 import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 export default class Tank {
   constructor(scene, x, z) {
@@ -253,6 +254,7 @@ export default class Tank {
   takeDamage(amount) {
     if (!this.alive) return;
     this.hp = Math.max(0, this.hp - amount * shieldDamageMultiplier(this.shield));
+    if (amount > 0) audio.play('tank.hit_heavy');
     if (this.hp <= 0) this._die();
   }
 
@@ -291,10 +293,19 @@ export default class Tank {
     if (!this.alive) return;
 
     // --- Shield step (before movement so the slow applies this frame) ---
+    const prevShieldActive = this.shield.active;
     const { fuelSpent } = stepShield(this.shield, dt, this._qPressed, this.fuel);
     this.fuel = Math.max(0, this.fuel - fuelSpent);
     this._qPressed = false;
     this.shieldBubble.isVisible = this.shield.active;
+    // Shield audio: edge-triggered activate/break + a hold loop while up.
+    if (this.shield.active && !prevShieldActive) {
+      audio.play('tank.shield_activate');
+      audio.startLoop('tank.shield_loop');
+    } else if (!this.shield.active && prevShieldActive) {
+      audio.play('tank.shield_break');
+      audio.stopLoop('tank.shield_loop');
+    }
     const shieldMove = this.shield.active ? SHIELD_MOVE_MULT : 1;
 
     // --- Dash ---

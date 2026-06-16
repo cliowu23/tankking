@@ -1,0 +1,43 @@
+// src/core/audio/soundManifest.js
+// The audio registry: every sound the game can play, declared once.
+// AudioManager preloads these and routes each to its category bus.
+//
+// Adding a sound = add a row here + drop the file at public/assets/audio/<url>.
+// Per-sound knobs:
+//   bus       — category bus for mixing/ducking: sfx | ui | music | ambience | voice
+//   spatial   — true → 3D positional (mono source, follows an emitter mesh)
+//   loop      — true → loops until stopped (engine/ambience/shield)
+//   duck      — true → briefly ducks music+ambience while this plays (impactful SFX)
+//   pitchVar  — ± random playbackRate per play (anti-repetition); 0.12 = ±12%
+//   gain      — per-sound volume (0..1), on top of the bus volume
+//   maxInstances — max simultaneous copies (polyphony for rapid fire)
+//
+// NOTE: files are currently ffmpeg-generated PLACEHOLDER TONES. Replace the
+// .ogg files in place (same path/id) with real assets and nothing else changes.
+
+export const BUSES = {
+  sfx:      { volume: 0.90 },
+  ui:       { volume: 0.70 },
+  music:    { volume: 0.60 },
+  ambience: { volume: 0.50 },
+  voice:    { volume: 1.00 },
+};
+
+// Buses ducked when a `duck` sound fires, and how hard/long.
+export const DUCK = { buses: ['music', 'ambience'], amount: 0.30, attack: 0.05, release: 0.40 };
+
+export const SOUNDS = {
+  // --- Player tank ---
+  'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: true,  duck: true, pitchVar: 0.12, gain: 1.00, maxInstances: 4 },
+  'tank.hit_heavy':     { url: 'sfx/tank/hit_heavy.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.10, gain: 0.90, maxInstances: 3 },
+  'tank.shield_activate': { url: 'sfx/tank/shield_activate.ogg', bus: 'sfx', gain: 0.80 },
+  'tank.shield_loop':   { url: 'sfx/tank/shield_loop.ogg',   bus: 'sfx', loop: true, gain: 0.45 },
+  'tank.shield_break':  { url: 'sfx/tank/shield_break.ogg',  bus: 'sfx', gain: 0.80 },
+
+  // --- The King's machines (spatial — emit from the bot) ---
+  'enemy.sentinel_beam_charge': { url: 'sfx/enemy/sentinel_beam_charge.ogg', bus: 'sfx', spatial: true, gain: 0.85 },
+  'enemy.sentinel_beam_fire':   { url: 'sfx/enemy/sentinel_beam_fire.ogg',   bus: 'sfx', spatial: true, duck: true, gain: 1.00, maxInstances: 4 },
+
+  // --- UI ---
+  'ui.wave_start':      { url: 'ui/wave_start.ogg', bus: 'ui', gain: 0.80 },
+};

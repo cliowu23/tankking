@@ -3,6 +3,7 @@ import ArenaScene        from '../world/ArenaScene.js';
 import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
+import { audio } from './audio/AudioManager.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { generateRoadLeg } from '../world/zones/roadLeg.js';
 
@@ -50,6 +51,10 @@ const maxVertexUniformBlocks = gl2 ? gl2.getParameter(gl2.MAX_VERTEX_UNIFORM_BLO
 if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS) {
   engine.disableUniformBuffers = true;
 }
+
+// Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
+// grants playback on the first user gesture (the START / deploy click).
+audio.init();
 
 let arenaScene    = null;
 let designerScene = null;
@@ -262,6 +267,8 @@ function deployToArena(dev = false) {
       setTimeout(() => {
         document.getElementById('hud').style.display = 'block';
         engine.runRenderLoop(() => arenaScene.scene.render());
+        audio.play('ui.wave_start'); // dropped into combat
+
         // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
         if (!controlsSeen) {
           controlsSeen = true;

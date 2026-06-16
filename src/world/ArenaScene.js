@@ -21,6 +21,7 @@ import SalvageCrate from './SalvageCrate.js';
 import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
+import { audio } from '../core/audio/AudioManager.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
 
@@ -384,6 +385,7 @@ export default class ArenaScene {
     const bounds = this.zone?.bounds.half ?? 48;
 
     this.tank = new Tank(this.scene, spawn.x, spawn.z);
+    audio.attachListener(this.tank.root); // 3D audio relative to the player
     this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 
@@ -1452,6 +1454,7 @@ export default class ArenaScene {
     const vz = Math.cos(aim + azSpread) * HSPEED;
 
     shell.fire(tip.x, tip.y, tip.z, vx, 0, vz, 45);
+    audio.play('tank.cannon_fire', { emitter: this.tank.root });
     this.vfx.spawnMuzzleFlash(tip);
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;

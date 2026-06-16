@@ -22,6 +22,7 @@ import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, 
 import AIEnemy from './AIEnemy.js';
 import EyeBeam from '../combat/EyeBeam.js';
 import { loadEnemyTemplate } from './enemyModels.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 // Mesh names (Blender object names) that belong on the rotating turret/dome.
 const TURRET_PARTS = ['dome', 'eye', 'eyering', 'eyesocket', 'antenna', 'anttip'];
@@ -263,6 +264,7 @@ export default class SentinelEnemy extends AIEnemy {
     this._charging = true;
     this._chargeT  = 0;
     this.fireCooldown = 999;
+    audio.play('enemy.sentinel_beam_charge', { emitter: this.root }); // the dodge tell
   }
 
   update(dt, playerPos) {
@@ -303,6 +305,7 @@ export default class SentinelEnemy extends AIEnemy {
       );
     }
     this._eyeFlash = 1;                              // bright discharge flash
+    audio.play('enemy.sentinel_beam_fire', { emitter: this.root });
     this.fireCooldown = this._fireCooldownDuration;  // recovery before next charge
   }
 
