@@ -12,8 +12,7 @@ import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import Tank from '../tank/Tank.js';
-import AIEnemy from './AIEnemy.js';
-import LightTankEnemy from './LightTankEnemy.js';
+import SentinelEnemy from './SentinelEnemy.js';
 import ChaffEnemy from './ChaffEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
@@ -389,27 +388,48 @@ export default class ArenaScene {
     this.tank.addShadows(this.shadowGen);
 
     // One unified enemy array. Zone: every spawn in the config becomes a
-    // Chaffee-style light tank with its band's tuning (ambushers start hidden
-    // in the tall grass). Legacy arena: the old 5 statics + orange AI.
+    // Sentinel-bot with its band's tuning (ambushers start hidden in the tall
+    // grass). Dev arena: a lone Sentinel + a chaff ring to fight.
     if (this.zone) {
       const tuning = this.zone.bandTuning;
-      this._spawnDefs = this.zone.enemies.map(e => [e.x, e.z]);
-      this.enemies = this.zone.enemies.map(e => {
-        const t = tuning[e.band];
-        return new LightTankEnemy(this.scene, e.x, e.z, {
-          hp: t.hp, damage: t.dmg, cooldown: t.cooldown,
-          ambush: e.mode === 'ambush',
-          bounds,
-        });
-      });
-      // Chaff scout-bots from the zone config — appended to the same enemies
-      // array (and _spawnDefs, kept index-aligned for _restart).
-      for (const c of (this.zone.chaff ?? [])) {
-        const bot = new ChaffEnemy(this.scene, c.x, c.z, { bounds });
-        bot.addShadows(this.shadowGen);
-        this.enemies.push(bot);
-        this._spawnDefs.push([c.x, c.z]);
+      this.enemies = [];
+      this._spawnDefs = [];   // kept index-aligned with enemies for _restart
+      const add = (enemy, x, z) => {
+        enemy.addShadows?.(this.shadowGen);
+        this.enemies.push(enemy);
+        this._spawnDefs.push([x, z]);
+      };
+      // Scatter n points randomly around a centre (random angle + radius → an
+      // organic spread, not an even ring that reads as "organized").
+      const scatter = (cx, cz, n, r) => {
+        const out = [];
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const rad = r * (0.35 + Math.random() * 0.65);
+          out.push([cx + Math.sin(a) * rad, cz + Math.cos(a) * rad]);
+        }
+        return out;
+      };
+      const spawnChaff = (cx, cz, n) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.2)) add(new ChaffEnemy(this.scene, px, pz, { bounds }), px, pz);
+      };
+      const spawnSentinels = (cx, cz, n, t, ambush) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.6))
+          add(new SentinelEnemy(this.scene, px, pz, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ambush, bounds }), px, pz);
+      };
+      // Each former single-tank spawn becomes a spider-bot pack; POI markers become
+      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm.
+      for (const e of this.zone.enemies) {
+        const t = tuning[e.band] || tuning.mid;
+        if (e.poi) {
+          if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+          else                     spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+        } else {
+          spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
+        }
       }
+      // Any explicitly-seeded chaff from the zone config.
+      for (const c of (this.zone.chaff ?? [])) add(new ChaffEnemy(this.scene, c.x, c.z, { bounds }), c.x, c.z);
       // The loading screen waits for the player AND the composed enemies.
       this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
@@ -417,13 +437,13 @@ export default class ArenaScene {
       // NOTE: the old static `Enemy` class has no `rotY`, which makes the
       // tank-vs-enemy OBB collision compute Math.cos(undefined)=NaN and poison
       // the tank position → black/sky screen. So we DON'T spawn it here; only
-      // AIEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
+      // SentinelEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
       this.enemies = [];
       this._spawnDefs = [];
 
-      const ai = new AIEnemy(this.scene, 0, 42, { bounds });
-      ai.addShadows(this.shadowGen);
-      this.enemies.push(ai);
+      const sentinel = new SentinelEnemy(this.scene, 0, 42, { bounds });
+      sentinel.addShadows(this.shadowGen);
+      this.enemies.push(sentinel);
       this._spawnDefs.push([0, 42]);
 
       // A ring of scout-bot chaff to fight.

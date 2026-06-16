@@ -111,7 +111,9 @@ export function generateRoadLeg(seed = 1) {
     const inst = type.place({ pts, total, dirAt, bandFor, valueFor, anchorIdx: idx }, rand, {});
     if (!inst) continue;
     pois.push(inst);
-    for (const e of (inst.enemies || [])) enemies.push(e);
+    // POI combat = ONE encounter marker at the anchor; ArenaScene turns it into
+    // either 2 Sentinels or 8 spider-bots (replaces the POI's own guard enemies).
+    enemies.push({ x: inst.anchor.x, z: inst.anchor.z, mode: 'ambush', band: bandFor(idx / total), poi: true });
     for (const l of (inst.loot || [])) loot.push(l);
     for (const c of (inst.containers || [])) containers.push(c);
     if (inst.spur) spurs.push(inst.spur);   // mini-camp etc. add a branch road

@@ -11,6 +11,8 @@ import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
+import SentinelEnemy from '../world/SentinelEnemy.js';
+import ChaffEnemy from '../world/ChaffEnemy.js';
 
 const PAD_Y = 0.06;
 
@@ -427,6 +429,23 @@ export default class TankDesignerScene {
           sidebar.appendChild(btn);
         }
 
+        // ENEMIES — dev-only VIEWER (not selectable as the player tank). Lets us
+        // eyeball the King's-machine models on the plinth alongside the tanks.
+        const enemyDiv = document.createElement('div');
+        enemyDiv.className = 'ds-divider';
+        sidebar.appendChild(enemyDiv);
+        const enemyTitle = document.createElement('div');
+        enemyTitle.className = 'ds-title';
+        enemyTitle.textContent = 'ENEMIES · VIEW';
+        sidebar.appendChild(enemyTitle);
+        for (const [kind, name] of [['sentinel', 'SENTINEL-BOT'], ['chaff', 'CHAFF SCOUT']]) {
+          const eb = document.createElement('button');
+          eb.className = 'shape-btn';
+          eb.textContent = name;
+          eb.addEventListener('click', () => this._loadEnemy(kind, eb));
+          sidebar.appendChild(eb);
+        }
+
         // Auto-load the saved selection
         if (this._selectedFilename === 'primitive') {
           this._loadPrimitive(primBtn);
@@ -543,7 +562,51 @@ export default class TankDesignerScene {
     this.camera.beta   = 0.72;
   }
 
+  // Spawn an enemy on the plinth purely to LOOK at it (dev viewer). Enemies use
+  // the AIEnemy rig, not the composed-parts system, so we instantiate the class,
+  // strip its combat bits (hp bar, projectile pool), face it at the camera, and
+  // track every mesh for disposal. View-only: _previewFilename stays null so the
+  // SELECT/confirm path treats it as un-pickable as a player tank.
+  _loadEnemy(kind, btn) {
+    if (this._activeBtn) this._activeBtn.classList.remove('active');
+    if (btn) { btn.classList.add('active'); this._activeBtn = btn; }
+
+    this._clearCurrentModel();
+
+    const EnemyClass = kind === 'chaff' ? ChaffEnemy : SentinelEnemy;
+    const enemy = new EnemyClass(this.scene, 0, 0, { bounds: 9999 });
+    this._enemyInstance = enemy;
+
+    // Enemies default to facing south (rotY = π); face the plinth camera like the tanks.
+    enemy.rotY = 0;
+    enemy.root.rotation.y = 0;
+    enemy.turretAimAngle = 0;
+    if (enemy.turretPivot) enemy.turretPivot.rotation.y = 0;
+    enemy.root.position.set(0, PAD_Y + 0.01, 0);
+
+    // Hide the combat HUD + drop the projectile pool — this is a static turntable.
+    if (enemy.hpBarBg)   enemy.hpBarBg.isVisible = false;
+    if (enemy.hpBarFill) enemy.hpBarFill.isVisible = false;
+    for (const s of (enemy.shells || [])) { s.deactivate?.(); s.mesh?.dispose(false, true); }
+    enemy.shells = [];
+
+    // A/D rotate the turret/eye-dome (same control as the tanks).
+    this._turretPivot = enemy.turretPivot || null;
+    this._barrelPivot = enemy.barrelPivot || null;
+
+    const meshes = enemy.root.getChildMeshes(false);
+    for (const m of meshes) this.shadowGen.addShadowCaster(m);
+    // Push every mesh (so _clearCurrentModel frees each material/texture) + the rig nodes.
+    this._toDispose.push(...meshes, enemy.root, enemy.turretPivot, enemy.barrelPivot);
+
+    // Not a selectable player tank.
+    this._previewFilename = null;
+    const hint = document.getElementById('designer-bottom-hint');
+    if (hint) hint.textContent = '👁 VIEW ONLY — enemy model  ·  [ A / D ] rotate turret  ·  [ ESC ] back to menu';
+  }
+
   _clearCurrentModel() {
+    this._enemyInstance = null;
     // Gather every material on the things we're about to dispose. Babylon's
     // mesh.dispose() leaves materials + their textures resident in GPU memory,
     // so on repeated model switches the GPU steadily leaks multi-MB GLB textures

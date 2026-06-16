@@ -14,9 +14,10 @@
 // Each laser hit is small CHIP; the threat is volume, so bolts live in
 // this.shells and the existing enemy-shell hit path applies this.shellDamage
 // with no special-casing.
-import { MeshBuilder, StandardMaterial, Color3, TransformNode } from '@babylonjs/core';
+import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
 import LaserBolt from '../combat/LaserBolt.js';
+import { loadEnemyTemplate } from './enemyModels.js';
 
 const LASER_POOL     = 14;                  // bolts in flight at once (stream needs depth)
 const LASER_HSPEED   = 60;                  // bolt travels faster than a shell (35)
@@ -49,33 +50,110 @@ export default class ChaffEnemy extends AIEnemy {
       noPrimitiveVisuals: true,   // we draw our own walker below
     });
 
-    // Uniform up-scale of the whole bot (visuals + collision kept in sync).
-    const SCALE = 1.07;
-    this.root.scaling.setAll(SCALE);
-    this._halfW        = 0.7 * SCALE;
-    this._halfD        = 0.7 * SCALE;  // small footprint — it's a little bot
+    this._halfW        = 0.62;         // small footprint — it's a little bot
+    this._halfD        = 0.62;
     this._rotateSpeed  = 2.6;          // skitter: turns far quicker than a tank
     this._aimTolerance = LASER_AIM_TOL;
-
-    // The eye is the muzzle: point the logical barrelPivot at the eye lens
-    // (front-top of the sensor dome) so bolts emit from the glow.
-    this.barrelPivot.position.set(0, 0.32, 0.30);
-    this._barrelBaseZ = 0.30;   // recoil baseline (kept = pivot z; no recoil for a laser)
-    this._tipOffset   = 0.12;   // bolt spawn just ahead of the eye lens
-    this._eyeFlash    = 0;      // 0..1, brightens the eye briefly on each shot
-
-    // Burst bookkeeping (drives the readable stream cadence).
-    this._burstLeft = LASER_BURST;
-
-    this._buildWalker(scene);
+    this._tipOffset    = 0.12;         // bolt spawn just ahead of the eye lens
+    this._eyeFlash     = 0;            // 0..1, brightens the eye briefly on each shot
+    this._burstLeft    = LASER_BURST;
+    this._gaitPhase = 0; this._gaitSpeed = 0; this._legs = [];
 
     // Replace the inherited 4-shell cannon pool with a laser-bolt pool.
     for (const s of this.shells) s.deactivate?.();
     this.shells = Array.from({ length: LASER_POOL }, () => new LaserBolt(scene));
 
-    // ChaffEnemy is synchronous (no GLB) — expose a resolved ready like the
-    // composed enemies so ArenaScene's Promise.all wait is uniform.
-    this.ready = Promise.resolve(this);
+    // Load the Blender GLB; fall back to the primitive walker if it fails.
+    this.ready = this._buildComposedChaff(scene).catch((e) => {
+      console.error('[chaff] GLB load failed, using placeholder:', e);
+      this.root.scaling.setAll(1.07);
+      this._buildWalker(scene);
+      this.barrelPivot.position.set(0, 0.32, 0.30);
+      this._barrelBaseZ = 0.30;
+      return this;
+    });
+  }
+
+  _cmat(name, rgb, emissive = false) {
+    const m = new StandardMaterial(name, this.scene);
+    m.diffuseColor = new Color3(...rgb);
+    if (emissive) { m.emissiveColor = new Color3(...rgb); m.disableLighting = true; }
+    else m.specularColor = new Color3(0.18, 0.20, 0.24);
+    return m;
+  }
+
+  async _buildComposedChaff(scene) {
+    const tpl = await loadEnemyTemplate(scene, 'chaff', { body: BODY_STEEL, dark: LEG_DARK, eye: EYE_RED });
+    const id = (ChaffEnemy._n = (ChaffEnemy._n || 0) + 1);
+
+    // Holder flips front (eye) to +Z local + lifts the feet onto the ground.
+    this._holder = new TransformNode('chaffHolder', scene);
+    this._holder.parent = this.root;
+    this._holder.rotation.y = Math.PI;
+    this._holder.position.y = 0.03;
+    this._holderBaseY = 0.03;
+
+    this.eyeMat = this._cmat('chEye', EYE_RED, true);   // per-enemy eye glow
+    this._tint = [];
+    const made = [];
+    for (const part of tpl.parts) {
+      let node;
+      if (part.isEye) {
+        node = part.mesh.clone(`cEye_${id}`, null);
+        node.setEnabled(true); node.material = this.eyeMat; this.eye = node;
+      } else {
+        node = part.mesh.createInstance(`c_${part.name}_${id}`);   // GPU-batched; geometry shared
+        node.instancedBuffers.color = new Color4(1, 1, 1, 1); this._tint.push(node);
+      }
+      node.rotationQuaternion = new Quaternion();
+      part.matrix.decompose(node.scaling, node.rotationQuaternion, node.position);
+      node.parent = this._holder; node.isPickable = false;
+      const nm = part.name.toLowerCase();
+      if (nm.startsWith('body')) this.hull = node;
+      if (nm.startsWith('dome')) this.turret = node;
+      made.push({ node, name: part.name, isEye: part.isEye });
+    }
+    // Dome + eye + socket → turret pivot so the eye tracks the player.
+    for (const m of made) {
+      const nm = m.name.toLowerCase();
+      if (m.isEye || nm.startsWith('dome') || nm.startsWith('eye')) m.node.setParent(this.turretPivot);
+    }
+    // Beam muzzle = the eye lens (bbox centre), in turret-pivot space.
+    if (this.eye) {
+      this.turretPivot.computeWorldMatrix(true);
+      this.eye.computeWorldMatrix(true);
+      const eyeW = this.eye.getBoundingInfo().boundingBox.centerWorld;
+      const inv = Matrix.Invert(this.turretPivot.getWorldMatrix());
+      const eyeLocal = Vector3.TransformCoordinates(eyeW, inv);
+      this.barrelPivot.position.copyFrom(eyeLocal);
+      this._barrelBaseZ = eyeLocal.z;
+    }
+
+    // Rig the 4 legs: a hip-pivot per leg, re-parent that leg's segment instances
+    // under it, so _animateLegs swings them (diagonal-trot skitter).
+    this._legs = [];
+    this._holder.computeWorldMatrix(true);
+    const holderInv = Matrix.Invert(this._holder.getWorldMatrix());
+    for (let i = 0; i < 4; i++) {
+      const hip = made.find(m => m.name.toLowerCase().startsWith(`hip_${i}`));
+      if (!hip) continue;
+      hip.node.computeWorldMatrix(true);
+      const hipW = hip.node.getBoundingInfo().boundingBox.centerWorld;
+      const pivot = new TransformNode(`chaffLegPivot${i}_${id}`, scene);
+      pivot.parent = this._holder;
+      pivot.position = Vector3.TransformCoordinates(hipW, holderInv);
+      for (const seg of ['hip', 'thigh', 'knee', 'shin', 'foot']) {
+        const lm = made.find(m => m.name.toLowerCase().startsWith(`${seg}_${i}`));
+        if (lm) lm.node.setParent(pivot);
+      }
+      const sx = Math.sign(pivot.position.x) || 1;
+      const sz = Math.sign(pivot.position.z) || 1;
+      this._legs.push({ pivot, sx, phaseOffset: sx * sz > 0 ? Math.PI : 0 });
+    }
+
+    this.hpBarBg.position.y = 1.95;
+    this.hpBarFill.position.y = 1.95;
+    return this;
   }
 
   _buildWalker(scene) {
@@ -161,8 +239,8 @@ export default class ChaffEnemy extends AIEnemy {
   // Only the body + sensor dome cast shadows (the eye is emissive, the legs are
   // thin); override so the inherited addShadows doesn't touch a removed barrel.
   addShadows(shadowGen) {
-    if (this.hull)   shadowGen.addShadowCaster(this.hull);
-    if (this.turret) shadowGen.addShadowCaster(this.turret);
+    if (this.hull && !this.hull.isAnInstance)   shadowGen.addShadowCaster(this.hull);
+    if (this.turret && !this.turret.isAnInstance) shadowGen.addShadowCaster(this.turret);
   }
 
   // Fire a single laser bolt from the eye with azimuth spread, in bursts so the
@@ -212,29 +290,47 @@ export default class ChaffEnemy extends AIEnemy {
     const moving = Math.abs(this.speed);
     this._gaitSpeed += (moving - this._gaitSpeed) * Math.min(1, dt * 8);
     this._gaitPhase += this._gaitSpeed * GAIT_FREQ * dt;
-
     const amp = Math.min(1, this._gaitSpeed / 4);
-    const swing = GAIT_SWING * amp;
-    for (const leg of this._legs) {
-      const ph = this._gaitPhase + leg.phaseOffset;
-      // Fore-aft step + a lift on the forward half of the stride (so the foot
-      // picks up and reaches instead of dragging — reads as a real step).
-      leg.hip.rotation.x = leg.restX + Math.sin(ph) * swing;
-      leg.hip.rotation.z = leg.restZ + leg.sx * Math.max(0, Math.cos(ph)) * 0.35 * amp;
+
+    if (this._legs.length && this._legs[0].pivot) {
+      // GLB walker: swing each rigged hip pivot fore-aft (diagonal trot), with a
+      // small outward lift on the forward half + a body bob — the skitter.
+      const swing = 0.34 * amp;
+      for (const leg of this._legs) {
+        const ph = this._gaitPhase + leg.phaseOffset;
+        leg.pivot.rotation.x = Math.sin(ph) * swing;
+        leg.pivot.rotation.z = leg.sx * Math.max(0, Math.cos(ph)) * 0.18 * amp;
+      }
+      if (this._holder) this._holder.position.y = this._holderBaseY + Math.abs(Math.sin(this._gaitPhase)) * 0.05 * amp;
+    } else if (this._legs.length) {
+      // Primitive walker fallback: swing each hip pivot for the skitter.
+      const swing = GAIT_SWING * amp;
+      for (const leg of this._legs) {
+        const ph = this._gaitPhase + leg.phaseOffset;
+        leg.hip.rotation.x = leg.restX + Math.sin(ph) * swing;
+        leg.hip.rotation.z = leg.restZ + leg.sx * Math.max(0, Math.cos(ph)) * 0.35 * amp;
+      }
+      this.hull.position.y = this._bodyBaseY + Math.abs(Math.sin(this._gaitPhase)) * GAIT_BOB * amp;
     }
-    const bob = GAIT_BOB * Math.min(1, this._gaitSpeed / 4);
-    this.hull.position.y = this._bodyBaseY + Math.abs(Math.sin(this._gaitPhase)) * bob;
   }
 
   _deathVisuals() {
-    if (!this.hullMat) return;
-    this.hullMat.diffuseColor.set(...DEATH_TINT);
-    this.hullMat.emissiveColor = new Color3(0.02, 0.01, 0.0);
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
+    else if (this.hullMat) {   // primitive fallback
+      this.hullMat.diffuseColor.set(...DEATH_TINT);
+      this.hullMat.emissiveColor = new Color3(0.02, 0.01, 0.0);
+      this.legMat?.diffuseColor.set(0.06, 0.06, 0.07);
+    }
+    if (this.eyeMat) this.eyeMat.emissiveColor.set(0.04, 0.01, 0.01);
   }
 
   _reviveVisuals() {
-    if (!this.hullMat) return;
-    this.hullMat.diffuseColor.set(...BODY_STEEL);
-    this.hullMat.emissiveColor = new Color3(0, 0, 0);
+    if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(1, 1, 1, 1);
+    else if (this.hullMat) {
+      this.hullMat.diffuseColor.set(...BODY_STEEL);
+      this.hullMat.emissiveColor = new Color3(0, 0, 0);
+      this.legMat?.diffuseColor.set(...LEG_DARK);
+    }
+    if (this.eyeMat) this.eyeMat.emissiveColor.set(...EYE_RED);
   }
 }
