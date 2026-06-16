@@ -126,6 +126,29 @@ export default class ChaffEnemy extends AIEnemy {
       this.barrelPivot.position.copyFrom(eyeLocal);
       this._barrelBaseZ = eyeLocal.z;
     }
+
+    // Rig the 4 legs: drop a hip-pivot at each leg's joint and re-parent that
+    // leg's segments under it, so _animateLegs can swing them (diagonal-trot skitter).
+    this._legs = [];
+    this._holder.computeWorldMatrix(true);
+    const holderInv = Matrix.Invert(this._holder.getWorldMatrix());
+    for (let i = 0; i < 4; i++) {
+      const hipMesh = meshes.find(m => m.name.toLowerCase().startsWith(`hip_${i}`));
+      if (!hipMesh) continue;
+      hipMesh.computeWorldMatrix(true);
+      const hipW = hipMesh.getBoundingInfo().boundingBox.centerWorld;   // the joint, not the baked node origin
+      const pivot = new TransformNode(`chaffLegPivot${i}`, scene);
+      pivot.parent = this._holder;
+      pivot.position = Vector3.TransformCoordinates(hipW, holderInv);
+      for (const part of ['hip', 'thigh', 'knee', 'shin', 'foot']) {
+        const lm = meshes.find(m => m.name.toLowerCase().startsWith(`${part}_${i}`));
+        if (lm) lm.setParent(pivot);   // preserves world; now swings about the hip
+      }
+      const sx = Math.sign(pivot.position.x) || 1;
+      const sz = Math.sign(pivot.position.z) || 1;
+      this._legs.push({ pivot, sx, phaseOffset: sx * sz > 0 ? Math.PI : 0 });   // diagonal pairs antiphase
+    }
+
     this.hpBarBg.position.y = 1.95;
     this.hpBarFill.position.y = 1.95;
     return this;
@@ -267,8 +290,18 @@ export default class ChaffEnemy extends AIEnemy {
     this._gaitPhase += this._gaitSpeed * GAIT_FREQ * dt;
     const amp = Math.min(1, this._gaitSpeed / 4);
 
-    if (this._legs.length) {
-      // Primitive walker: swing each hip pivot for a diagonal-trot skitter.
+    if (this._legs.length && this._legs[0].pivot) {
+      // GLB walker: swing each rigged hip pivot fore-aft (diagonal trot), with a
+      // small outward lift on the forward half + a body bob — the skitter.
+      const swing = 0.34 * amp;
+      for (const leg of this._legs) {
+        const ph = this._gaitPhase + leg.phaseOffset;
+        leg.pivot.rotation.x = Math.sin(ph) * swing;
+        leg.pivot.rotation.z = leg.sx * Math.max(0, Math.cos(ph)) * 0.18 * amp;
+      }
+      if (this._holder) this._holder.position.y = this._holderBaseY + Math.abs(Math.sin(this._gaitPhase)) * 0.05 * amp;
+    } else if (this._legs.length) {
+      // Primitive walker fallback: swing each hip pivot for the skitter.
       const swing = GAIT_SWING * amp;
       for (const leg of this._legs) {
         const ph = this._gaitPhase + leg.phaseOffset;
@@ -276,10 +309,6 @@ export default class ChaffEnemy extends AIEnemy {
         leg.hip.rotation.z = leg.restZ + leg.sx * Math.max(0, Math.cos(ph)) * 0.35 * amp;
       }
       this.hull.position.y = this._bodyBaseY + Math.abs(Math.sin(this._gaitPhase)) * GAIT_BOB * amp;
-    } else if (this._holder) {
-      // GLB model (static legs): bob the whole body so a moving bot reads as
-      // scuttling rather than sliding. (Leg-rigging the GLB = a follow-up.)
-      this._holder.position.y = this._holderBaseY + Math.abs(Math.sin(this._gaitPhase)) * 0.06 * amp;
     }
   }
 
