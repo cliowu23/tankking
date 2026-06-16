@@ -399,12 +399,13 @@ export default class ArenaScene {
         this.enemies.push(enemy);
         this._spawnDefs.push([x, z]);
       };
-      // Scatter n points in a jittered ring around a centre (so a pack doesn't stack).
+      // Scatter n points randomly around a centre (random angle + radius → an
+      // organic spread, not an even ring that reads as "organized").
       const scatter = (cx, cz, n, r) => {
         const out = [];
         for (let i = 0; i < n; i++) {
-          const a = (i / n) * Math.PI * 2 + Math.random() * 0.6;
-          const rad = r * (0.45 + Math.random() * 0.55);
+          const a = Math.random() * Math.PI * 2;
+          const rad = r * (0.35 + Math.random() * 0.65);
           out.push([cx + Math.sin(a) * rad, cz + Math.cos(a) * rad]);
         }
         return out;
@@ -422,9 +423,9 @@ export default class ArenaScene {
         const t = tuning[e.band] || tuning.mid;
         if (e.poi) {
           if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
-          else                     spawnChaff(e.x, e.z, 8);
+          else                     spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
         } else {
-          spawnChaff(e.x, e.z, 4 + Math.floor(Math.random() * 3));   // 4–6 spider bots
+          spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
         }
       }
       // Any explicitly-seeded chaff from the zone config.
