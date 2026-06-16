@@ -12,8 +12,7 @@ import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import Tank from '../tank/Tank.js';
-import AIEnemy from './AIEnemy.js';
-import LightTankEnemy from './LightTankEnemy.js';
+import SentinelEnemy from './SentinelEnemy.js';
 import ChaffEnemy from './ChaffEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
@@ -389,14 +388,14 @@ export default class ArenaScene {
     this.tank.addShadows(this.shadowGen);
 
     // One unified enemy array. Zone: every spawn in the config becomes a
-    // Chaffee-style light tank with its band's tuning (ambushers start hidden
-    // in the tall grass). Legacy arena: the old 5 statics + orange AI.
+    // Sentinel-bot with its band's tuning (ambushers start hidden in the tall
+    // grass). Dev arena: a lone Sentinel + a chaff ring to fight.
     if (this.zone) {
       const tuning = this.zone.bandTuning;
       this._spawnDefs = this.zone.enemies.map(e => [e.x, e.z]);
       this.enemies = this.zone.enemies.map(e => {
         const t = tuning[e.band];
-        return new LightTankEnemy(this.scene, e.x, e.z, {
+        return new SentinelEnemy(this.scene, e.x, e.z, {
           hp: t.hp, damage: t.dmg, cooldown: t.cooldown,
           ambush: e.mode === 'ambush',
           bounds,
@@ -417,13 +416,13 @@ export default class ArenaScene {
       // NOTE: the old static `Enemy` class has no `rotY`, which makes the
       // tank-vs-enemy OBB collision compute Math.cos(undefined)=NaN and poison
       // the tank position → black/sky screen. So we DON'T spawn it here; only
-      // AIEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
+      // SentinelEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
       this.enemies = [];
       this._spawnDefs = [];
 
-      const ai = new AIEnemy(this.scene, 0, 42, { bounds });
-      ai.addShadows(this.shadowGen);
-      this.enemies.push(ai);
+      const sentinel = new SentinelEnemy(this.scene, 0, 42, { bounds });
+      sentinel.addShadows(this.shadowGen);
+      this.enemies.push(sentinel);
       this._spawnDefs.push([0, 42]);
 
       // A ring of scout-bot chaff to fight.

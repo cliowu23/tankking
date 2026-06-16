@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TanKING — Enemy Tuner (pin & comment)</title>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+<style>
+  :root { --accent:#00eedd; --gold:#ffcc00; --bg:#050d1a; --panel:#081830; --dim:#206878; --white:#ddfff8; }
+  * { box-sizing:border-box; }
+  body { margin:0; display:flex; height:100vh; background:var(--bg); color:var(--white);
+         font-family:monospace; font-size:12px; overflow:hidden; }
+  #panel { width:310px; min-width:310px; background:var(--panel); border-right:1px solid var(--dim);
+           overflow-y:auto; padding:10px; }
+  h1 { font-size:14px; color:var(--gold); margin:4px 0 4px; }
+  h2 { font-size:11px; color:var(--accent); border-bottom:1px solid var(--dim);
+       padding-bottom:3px; margin:14px 0 6px; }
+  .hint { color:#5a8a90; font-size:10px; margin:5px 0; line-height:1.5; }
+  button { background:#0a2240; color:var(--white); border:1px solid var(--dim);
+           padding:5px 8px; cursor:pointer; font-family:monospace; font-size:11px; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.on { border-color:var(--gold); color:var(--gold); }
+  .modelrow, .viewrow { display:flex; gap:6px; margin:4px 0; flex-wrap:wrap; }
+  #pinlist { margin:6px 0; }
+  .pin { display:flex; align-items:flex-start; gap:6px; margin:4px 0; padding:4px 6px;
+         background:#03101e; border:1px solid #14384a; }
+  .pin .n { color:var(--gold); font-weight:bold; min-width:20px; }
+  .pin .note { flex:1; color:var(--white); word-break:break-word; }
+  .pin .del { color:#ff6a6a; border-color:#5a2330; padding:1px 6px; }
+  #status { position:fixed; top:8px; right:12px; padding:4px 10px; background:#081830cc;
+            border:1px solid var(--dim); z-index:5; }
+  #views { position:fixed; top:8px; left:326px; display:flex; gap:6px; z-index:5; }
+  #canvas { flex:1 1 0; min-width:0; height:100%; display:block; outline:none; }
+  #dumpbox { width:100%; height:150px; background:#03101e; color:var(--accent);
+             border:1px solid var(--dim); display:none; margin-top:6px; font-size:10px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>⊙ ENEMY TUNER — pin &amp; comment</h1>
+
+  <h2>MODEL</h2>
+  <div class="modelrow" id="modelrow"></div>
+
+  <h2>PINS — flag issues on the model</h2>
+  <button id="pinmode">📍 PIN MODE: OFF</button>
+  <div class="hint">Pin mode ON → click anywhere on the model → type your comment.
+  Each pin records the spot + the part name. Pins save automatically per model.</div>
+  <div id="pinlist"></div>
+  <button id="clearpins">CLEAR THIS MODEL'S PINS</button>
+
+  <h2>EXPORT</h2>
+  <button id="dump">⬇ DUMP (copy JSON for Claude)</button>
+  <div class="hint">Copies all pins as JSON to your clipboard — paste it back to me and I'll act on each.</div>
+  <textarea id="dumpbox" readonly></textarea>
+</div>
+<div id="views">
+  <button data-v="iso">ISO</button><button data-v="front">FRONT</button>
+  <button data-v="side">SIDE</button><button data-v="rear">REAR</button><button data-v="top">TOP</button>
+</div>
+<div id="status">loading…</div>
+<canvas id="canvas"></canvas>
+
+<script>
+const ASSETS = '/assets/models/enemies/';
+const MODELS = { sentinel: 'sentinel.glb', chaff: 'chaff.glb' };
+let model = new URLSearchParams(location.search).get('model');
+if (!MODELS[model]) model = 'sentinel';
+
+const status = (t) => document.getElementById('status').textContent = t;
+
+// ── Scene ──────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const engine = new BABYLON.Engine(canvas, true);
+const scene  = new BABYLON.Scene(engine);
+scene.clearColor = BABYLON.Color4.FromHexString('#0a1626ff');
+const cam = new BABYLON.ArcRotateCamera('cam', -Math.PI*0.7, 1.1, 9, new BABYLON.Vector3(0,0.9,0), scene);
+cam.attachControl(canvas, true);
+cam.wheelDeltaPercentage = 0.02; cam.lowerRadiusLimit = 2.5; cam.upperRadiusLimit = 40;
+const hemi = new BABYLON.HemisphericLight('h', new BABYLON.Vector3(0.3,1,0.2), scene); hemi.intensity = 0.85;
+const dir  = new BABYLON.DirectionalLight('d', new BABYLON.Vector3(-0.4,-1,0.6), scene); dir.intensity = 0.75;
+dir.position = new BABYLON.Vector3(6,12,-6);
+const ground = BABYLON.MeshBuilder.CreateGround('g', {width:40,height:40}, scene);
+const gm = new BABYLON.StandardMaterial('gm', scene);
+gm.diffuseColor = new BABYLON.Color3(0.07,0.11,0.16); gm.specularColor = BABYLON.Color3.Black();
+ground.material = gm; ground.isPickable = false;
+engine.runRenderLoop(() => scene.render());
+window.addEventListener('resize', () => engine.resize());
+
+// Fullscreen GUI layer for numbered pin labels.
+const gui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
+
+// ── Model loading + PBR→flat conversion (matches the game's StandardMaterial look) ──
+let modelRoot = null, modelMeshes = [];
+function flatten() {
+  for (const m of modelMeshes) {
+    const pm = m.material;
+    if (!pm || !pm.getClassName || !pm.getClassName().includes('PBR')) continue;
+    const s = new BABYLON.StandardMaterial(pm.name + '_flat', scene);
+    s.diffuseColor  = pm.albedoColor ? pm.albedoColor.clone() : new BABYLON.Color3(0.5,0.5,0.5);
+    s.specularColor = new BABYLON.Color3(0.14,0.15,0.17); s.specularPower = 48;
+    const e = pm.emissiveColor || BABYLON.Color3.Black();
+    const glow = (e.r + e.g + e.b) > 0.05;
+    s.emissiveColor = glow ? e.scale(1.8) : new BABYLON.Color3(0,0,0);
+    if (glow) s.disableLighting = true;
+    m.material = s;
+  }
+}
+async function loadModel() {
+  clearPinMeshes();
+  if (modelRoot) { modelRoot.dispose(); modelRoot = null; }
+  status('loading ' + MODELS[model] + '…');
+  const r = await BABYLON.SceneLoader.ImportMeshAsync('', ASSETS, MODELS[model] + '?v=' + Date.now(), scene, null, '.glb');
+  modelRoot = new BABYLON.TransformNode('modelRoot', scene);
+  modelMeshes = r.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0);
+  for (const m of modelMeshes) { if (!m.parent || m.parent.name === '__root__') m.setParent(modelRoot); m.isPickable = true; }
+  flatten();
+  // Recenter on the ground, framed.
+  let min = new BABYLON.Vector3(1e9,1e9,1e9), max = new BABYLON.Vector3(-1e9,-1e9,-1e9);
+  for (const m of modelMeshes) { m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox;
+    min = BABYLON.Vector3.Minimize(min, b.minimumWorld); max = BABYLON.Vector3.Maximize(max, b.maximumWorld); }
+  const c = min.add(max).scale(0.5), size = max.subtract(min);
+  modelRoot.position = new BABYLON.Vector3(-c.x, -min.y, -c.z);   // sit on ground, centered
+  const span = Math.max(size.x, size.y, size.z);
+  cam.setTarget(new BABYLON.Vector3(0, size.y*0.5, 0));
+  cam.radius = span * 2.1;
+  applyPins();
+  renderPinList();
+  status(`✓ ${model} — ${modelMeshes.length} parts`);
+  syncModelButtons();
+}
+
+// ── Pins ───────────────────────────────────────────────────────────────────
+let pinMode = false;
+let pinsByModel = JSON.parse(localStorage.getItem('enemyPins') || '{}');
+const pins = () => (pinsByModel[model] = pinsByModel[model] || []);
+let pinMeshes = [], pinLabels = [];
+function savePins() { localStorage.setItem('enemyPins', JSON.stringify(pinsByModel)); }
+
+function clearPinMeshes() {
+  for (const m of pinMeshes) m.dispose();
+  for (const l of pinLabels) l.dispose();
+  pinMeshes = []; pinLabels = [];
+}
+function applyPins() {                 // (re)draw markers for the current model
+  clearPinMeshes();
+  pins().forEach((p, i) => spawnMarker(p, i));
+}
+function spawnMarker(p, i) {
+  const s = BABYLON.MeshBuilder.CreateSphere('pin'+i, {diameter:0.14}, scene);
+  s.position = new BABYLON.Vector3(p.position[0], p.position[1], p.position[2]);
+  s.isPickable = false;
+  const m = new BABYLON.StandardMaterial('pm'+i, scene);
+  m.emissiveColor = new BABYLON.Color3(1,0.85,0.1); m.disableLighting = true; s.material = m;
+  pinMeshes.push(s);
+  const label = new BABYLON.GUI.Ellipse(); label.width = '22px'; label.height = '22px';
+  label.thickness = 2; label.color = '#ffcc00'; label.background = '#0a2240';
+  const tb = new BABYLON.GUI.TextBlock(); tb.text = String(i+1); tb.color = '#ffcc00'; tb.fontSize = 12;
+  label.addControl(tb); gui.addControl(label); label.linkWithMesh(s); label.linkOffsetY = -18;
+  pinLabels.push(label);
+}
+function renderPinList() {
+  const host = document.getElementById('pinlist');
+  const arr = pins();
+  if (!arr.length) { host.innerHTML = '<div class="hint">No pins yet.</div>'; return; }
+  host.innerHTML = '';
+  arr.forEach((p, i) => {
+    const row = document.createElement('div'); row.className = 'pin';
+    row.innerHTML = `<span class="n">#${i+1}</span><span class="note">${p.note}
+      <br><span style="color:#4a7a86">${p.mesh}</span></span>`;
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×';
+    del.onclick = () => { arr.splice(i,1); savePins(); applyPins(); renderPinList(); };
+    row.appendChild(del); host.appendChild(row);
+  });
+}
+document.getElementById('pinmode').onclick = function () {
+  pinMode = !pinMode;
+  this.textContent = `📍 PIN MODE: ${pinMode ? 'ON' : 'OFF'}`;
+  this.classList.toggle('on', pinMode);
+  status(pinMode ? 'pin mode ON — click the model' : 'pin mode off');
+};
+document.getElementById('clearpins').onclick = () => {
+  if (!pins().length || !confirm('Clear all pins on ' + model + '?')) return;
+  pinsByModel[model] = []; savePins(); applyPins(); renderPinList();
+};
+scene.onPointerObservable.add(pi => {
+  if (pi.type !== BABYLON.PointerEventTypes.POINTERPICK || !pinMode) return;
+  const info = pi.pickInfo;
+  if (!info || !info.hit || !info.pickedMesh || info.pickedMesh === ground || !info.pickedPoint) return;
+  const note = prompt('Comment for this pin — what\'s the issue / request?');
+  if (!note) return;
+  const pt = info.pickedPoint;
+  const p = { note, mesh: info.pickedMesh.name,
+              position: [+pt.x.toFixed(3), +pt.y.toFixed(3), +pt.z.toFixed(3)] };
+  pins().push(p); savePins();
+  spawnMarker(p, pins().length - 1); renderPinList();
+});
+
+// ── Model + view switching ───────────────────────────────────────────────────
+function syncModelButtons() {
+  document.querySelectorAll('#modelrow button').forEach(b =>
+    b.classList.toggle('on', b.dataset.m === model));
+}
+const modelrow = document.getElementById('modelrow');
+for (const key of Object.keys(MODELS)) {
+  const b = document.createElement('button'); b.dataset.m = key; b.textContent = key.toUpperCase();
+  b.onclick = () => { if (model === key) return; model = key;
+    history.replaceState(null,'','?model='+key); loadModel(); };
+  modelrow.appendChild(b);
+}
+const VIEWS = { iso:[-Math.PI*0.7,1.05], front:[-Math.PI/2,1.25], side:[Math.PI,1.25],
+                rear:[Math.PI/2,1.25], top:[-Math.PI/2,0.15] };
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => {
+  const [a,be] = VIEWS[b.dataset.v]; cam.alpha = a; cam.beta = be;
+});
+
+// ── DUMP ──────────────────────────────────────────────────────────────────────
+document.getElementById('dump').onclick = async () => {
+  const out = { model, allPins: pinsByModel };
+  const txt = JSON.stringify(out, null, 2);
+  const box = document.getElementById('dumpbox'); box.style.display = 'block'; box.value = txt;
+  try { await navigator.clipboard.writeText(txt); status('✓ pins copied to clipboard'); }
+  catch (e) { status('JSON shown below (clipboard blocked)'); }
+};
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+loadModel().then(() => engine.resize());
+</script>
+</body>
+</html>

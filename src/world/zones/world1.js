@@ -121,11 +121,13 @@ export const WORLD1 = {
     { x:80,  z:100, mode:'ambush', band:'deep' },  // checkpoint guard
   ],
 
-  // Per-band enemy tuning (consumed by the light-tank enemy in M5).
+  // Per-band enemy tuning (consumed by SentinelEnemy). dmg = per-beam hit
+  // (heavier than a shell — the beam is telegraphed and dodgeable); cooldown =
+  // recovery between charges (the ~1.1s wind-up adds to the real cadence).
   bandTuning: {
-    near: { hp: 70,  dmg: 22, cooldown: 2.4 },
-    mid:  { hp: 90,  dmg: 28, cooldown: 2.0 },
-    deep: { hp: 110, dmg: 34, cooldown: 1.7 },
+    near: { hp: 70,  dmg: 30, cooldown: 1.8 },
+    mid:  { hp: 90,  dmg: 38, cooldown: 1.5 },
+    deep: { hp: 110, dmg: 46, cooldown: 1.2 },
   },
 
   // Salvage drops; value scales with depth, flank POIs pay band rate.

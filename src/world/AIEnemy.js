@@ -41,8 +41,8 @@ export default class AIEnemy {
     this.fireCooldown    = 1.5; // brief delay before first shot
     this._recoil         = 0;
 
-    // Recoil baseline + muzzle length — primitive defaults; composed visuals
-    // (LightTankEnemy) overwrite these with measured values after assembly.
+    // Recoil baseline + muzzle length — primitive defaults; subclasses
+    // (SentinelEnemy/ChaffEnemy) overwrite these to point at their own muzzle.
     this._barrelBaseZ = 0.6;
     this._tipOffset   = 1.6;
     this._halfW       = 1.0;
@@ -86,7 +86,7 @@ export default class AIEnemy {
     this.shells = Array.from({ length: 4 }, () => new Shell(scene));
   }
 
-  // Primitive box-tank visuals on the rig. Subclasses (e.g. LightTankEnemy)
+  // Primitive box-tank visuals on the rig. Subclasses (e.g. SentinelEnemy)
   // pass noPrimitiveVisuals and attach their own meshes instead.
   _buildVisuals(scene) {
     this.hullMat = new StandardMaterial('aiHull', scene);
