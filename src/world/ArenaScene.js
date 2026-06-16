@@ -15,6 +15,7 @@ import Tank from '../tank/Tank.js';
 import Enemy from './Enemy.js';
 import AIEnemy from './AIEnemy.js';
 import LightTankEnemy from './LightTankEnemy.js';
+import ChaffEnemy from './ChaffEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -399,6 +400,14 @@ export default class ArenaScene {
           bounds,
         });
       });
+      // Chaff scout-bots from the zone config — appended to the same enemies
+      // array (and _spawnDefs, kept index-aligned for _restart).
+      for (const c of (this.zone.chaff ?? [])) {
+        const bot = new ChaffEnemy(this.scene, c.x, c.z, { bounds });
+        bot.addShadows(this.shadowGen);
+        this.enemies.push(bot);
+        this._spawnDefs.push([c.x, c.z]);
+      }
       // The loading screen waits for the player AND the composed enemies.
       this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
@@ -420,6 +429,19 @@ export default class ArenaScene {
       ai.addShadows(this.shadowGen);
       this.enemies.push(ai);
       this._spawnDefs.push([0, 42]);
+
+      // Slice-1 horde feel-test: a dense ring of scout-bot chaff around the spawn.
+      const CHAFF_RING_COUNT  = 8;
+      const CHAFF_RING_RADIUS = 24;
+      for (let i = 0; i < CHAFF_RING_COUNT; i++) {
+        const ang = (i / CHAFF_RING_COUNT) * Math.PI * 2;
+        const cx  = Math.sin(ang) * CHAFF_RING_RADIUS;
+        const cz  = Math.cos(ang) * CHAFF_RING_RADIUS;
+        const c   = new ChaffEnemy(this.scene, cx, cz, { bounds });
+        c.addShadows(this.shadowGen);
+        this.enemies.push(c);
+        this._spawnDefs.push([cx, cz]);
+      }
     }
 
 

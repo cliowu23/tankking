@@ -12,12 +12,23 @@ import { generateRoadLeg } from '../world/zones/roadLeg.js';
 // enemies-on-road, loot-pickup behaviour, the checkpoint extract menu.
 function makeRoadZone(seed = (Date.now() & 0xffff)) {
   const leg = generateRoadLeg(seed);
+
+  // Slice-1 horde feel-test: a scout-bot pack clustered a short way up the road
+  // from spawn, so the player drives straight into the swarm. Anchored to
+  // leg.start (the approach is straight) and within the boundary corridor.
+  const s = leg.start;
+  const chaff = [];
+  for (let k = 0; k < 8; k++) {
+    const ang = (k / 8) * Math.PI * 2;
+    chaff.push({ x: s.x + Math.sin(ang) * 10, z: s.z + 18 + Math.cos(ang) * 8 });
+  }
+
   return {
     id: 'road-leg', kind: 'road', name: 'THE LONG ROAD — LEG',
     palette: WORLD1.palette,
     bounds: { half: leg.bbox.clampHalf, visual: leg.bbox.clampHalf + 60 },
     spawn: leg.start,   // road's south start (z≈0)
-    enemies: leg.enemies, loot: leg.loot, containers: leg.containers, bandTuning: WORLD1.bandTuning,
+    enemies: leg.enemies, chaff, loot: leg.loot, containers: leg.containers, bandTuning: WORLD1.bandTuning,
     extraction: { x: leg.checkpoint.x, z: leg.checkpoint.z, radius: 6 },
     // boundary corridor: stay within `half` of the road centerline (sides + front), and a
     // hard wall right behind spawn (southLimit) — no reversing down the approach you came in on.
