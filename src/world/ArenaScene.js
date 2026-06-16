@@ -12,9 +12,9 @@ import { measureBasket } from '../tank/parts/measureBasket.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import Tank from '../tank/Tank.js';
-import Enemy from './Enemy.js';
 import AIEnemy from './AIEnemy.js';
 import LightTankEnemy from './LightTankEnemy.js';
+import ChaffEnemy from './ChaffEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -29,6 +29,9 @@ import { buildRoadLeg } from './zones/RoadBuilder.js';
 // off-angle/branching roads read as "straight ahead". Reversing keeps facing up-the-road
 // because rotY doesn't flip. Defaults dialed in via camera-mockup.html; live-tunable on
 // window.__arena (`camera.beta`, `camera.radius`, `_camYawSmooth`).
+// Lock-on is disabled for now — planned as a future module upgrade. Flip to true
+// to restore hold-F lock-on (the full mechanic + ring rendering is left intact).
+const LOCKON_ENABLED     = false;
 const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
 const CAM_RADIUS         = 48;    // distance (zoomed out a tad from 42)
 const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
@@ -399,27 +402,42 @@ export default class ArenaScene {
           bounds,
         });
       });
+      // Chaff scout-bots from the zone config — appended to the same enemies
+      // array (and _spawnDefs, kept index-aligned for _restart).
+      for (const c of (this.zone.chaff ?? [])) {
+        const bot = new ChaffEnemy(this.scene, c.x, c.z, { bounds });
+        bot.addShadows(this.shadowGen);
+        this.enemies.push(bot);
+        this._spawnDefs.push([c.x, c.z]);
+      }
       // The loading screen waits for the player AND the composed enemies.
       this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
-      this._spawnDefs = [
-        [  0.0, -25.5],
-        [-21.9, -10.3],
-        [ 19.2, -13.9],
-        [-13.6,  16.7],
-        [ 16.2,  14.7],
-      ];
-      this.enemies = this._spawnDefs.map(([x, z]) => {
-        const e = new Enemy(this.scene, x, z);
-        e.bounds = bounds;
-        e.addShadows(this.shadowGen);
-        return e;
-      });
-      const ai = new AIEnemy(this.scene, 0, 42);
-      ai.bounds = bounds;
+      // Dev arena (the grid blank room) = a clean enemy-testing sandbox.
+      // NOTE: the old static `Enemy` class has no `rotY`, which makes the
+      // tank-vs-enemy OBB collision compute Math.cos(undefined)=NaN and poison
+      // the tank position → black/sky screen. So we DON'T spawn it here; only
+      // AIEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
+      this.enemies = [];
+      this._spawnDefs = [];
+
+      const ai = new AIEnemy(this.scene, 0, 42, { bounds });
       ai.addShadows(this.shadowGen);
       this.enemies.push(ai);
       this._spawnDefs.push([0, 42]);
+
+      // A ring of scout-bot chaff to fight.
+      const CHAFF_RING_COUNT  = 8;
+      const CHAFF_RING_RADIUS = 22;
+      for (let i = 0; i < CHAFF_RING_COUNT; i++) {
+        const ang = (i / CHAFF_RING_COUNT) * Math.PI * 2;
+        const cx  = Math.sin(ang) * CHAFF_RING_RADIUS;
+        const cz  = Math.cos(ang) * CHAFF_RING_RADIUS;
+        const c   = new ChaffEnemy(this.scene, cx, cz, { bounds });
+        c.addShadows(this.shadowGen);
+        this.enemies.push(c);
+        this._spawnDefs.push([cx, cz]);
+      }
     }
 
 
@@ -718,6 +736,7 @@ export default class ArenaScene {
     this._aimEl = document.getElementById('aim-indicator');
 
     window.addEventListener('keydown', (e) => {
+      if (!LOCKON_ENABLED) return;   // lock-on disabled (future module)
       if (e.code !== 'KeyF' || this._fHeld) return;
       this._fHeld       = true;
       this._fHoldTime   = 0;
@@ -783,7 +802,8 @@ export default class ArenaScene {
       const dz = t.position.z - obs.position.z;
       const overlapX = (t.halfW + obs.halfW) - Math.abs(dx);
       const overlapZ = (t.halfD + obs.halfD) - Math.abs(dz);
-      if (overlapX <= 0 || overlapZ <= 0) continue;
+      // `> 0` (not `<= 0`) so a NaN overlap is skipped, never added to position.
+      if (!(overlapX > 0) || !(overlapZ > 0)) continue;
       t.speed *= 0.25;
       if (overlapX < overlapZ) {
         t.root.position.x += overlapX * Math.sign(dx);
@@ -1265,7 +1285,11 @@ export default class ArenaScene {
     // dynamic framing shift. A critically-damped spring keeps the slow road curves smooth.
     // -PI/2 - heading maps road-forward → up-screen. Falls back to hull if there's no road.
     const roadH = this._roadHeading();
-    this._camHeading  = this._smoothDampAngle(this._camHeading, roadH != null ? roadH : this.tank.rotY, dt);
+    if (roadH != null) {
+      this._camHeading = this._smoothDampAngle(this._camHeading, roadH, dt);
+    } else {
+      this._camHeading = 0;   // no road (dev arena / open field) → camera fixed facing north
+    }
     this.camera.alpha = -Math.PI / 2 - this._camHeading;
 
     // --- Apply with shake on top ---
@@ -1341,16 +1365,18 @@ export default class ArenaScene {
     const fuelRatio = this.tank.fuel / this.tank.maxFuel;
     const fill = document.getElementById('hud-fill');
     if (fill) {
-      fill.style.width      = `${Math.max(1, fuelRatio * 100)}%`;
-      fill.style.background = fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
+      fill.style.width = `${Math.max(1, fuelRatio * 100)}%`;
+      // backgroundColor (not the `background` shorthand) so the CSS segmentation
+      // gradient (repeating-linear-gradient on #hud-fill) survives the recolor.
+      fill.style.backgroundColor = fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
     }
 
     const hpRatio = this.tank.hp / this.tank.maxHp;
     const hpFill  = document.getElementById('hud-hp-fill');
     if (hpFill) {
-      hpFill.style.width      = `${Math.max(1, hpRatio * 100)}%`;
+      hpFill.style.width = `${Math.max(1, hpRatio * 100)}%`;
       const { red, green } = hpColor(hpRatio);
-      hpFill.style.background = `rgb(${Math.round(red*220)},${Math.round(green*220)},40)`;
+      hpFill.style.backgroundColor = `rgb(${Math.round(red*220)},${Math.round(green*220)},40)`;
     }
   }
 

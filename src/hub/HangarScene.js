@@ -266,7 +266,7 @@ export default class HangarScene {
     const s = this.scene;
 
     this._stationDefs = {
-      map:      { id: 'map',      label: 'INTERACT',  title: 'TACTICAL MAP',  body: 'MISSION SELECT\nComing soon.',         showDeploy: true  },
+      map:      { id: 'map',      label: 'INTERACT',  title: 'TACTICAL MAP',  body: 'MISSION SELECT\n\nWORLD 1 — the Long Road\nDEV ARENA — enemy testing', showDeploy: true  },
       radio:    { id: 'radio',    label: 'INTERACT',  title: 'RADIO / INTEL', body: 'STAND BY FOR BRIEFING.\nComing soon.', showDeploy: false },
       mechanic: { id: 'mechanic', label: 'INTERACT',  title: 'MECHANIC',      body: 'UPGRADES & REPAIRS\nComing soon.',     showDeploy: false },
       qm:       { id: 'qm',       label: 'INTERACT',  title: 'QUARTERMASTER', body: 'AMMO & SUPPLIES\nComing soon.',        showDeploy: false },
@@ -805,6 +805,8 @@ export default class HangarScene {
     document.getElementById('hangar-panel-body').textContent  = station.body;
     document.getElementById('hangar-panel-deploy').style.display =
       station.showDeploy ? 'block' : 'none';
+    const devBtn = document.getElementById('hangar-panel-deploy-dev');
+    if (devBtn) devBtn.style.display = station.showDeploy ? 'block' : 'none';
     document.getElementById('hangar-panel').style.display = 'flex';
   }
 
