@@ -392,23 +392,43 @@ export default class ArenaScene {
     // grass). Dev arena: a lone Sentinel + a chaff ring to fight.
     if (this.zone) {
       const tuning = this.zone.bandTuning;
-      this._spawnDefs = this.zone.enemies.map(e => [e.x, e.z]);
-      this.enemies = this.zone.enemies.map(e => {
-        const t = tuning[e.band];
-        return new SentinelEnemy(this.scene, e.x, e.z, {
-          hp: t.hp, damage: t.dmg, cooldown: t.cooldown,
-          ambush: e.mode === 'ambush',
-          bounds,
-        });
-      });
-      // Chaff scout-bots from the zone config — appended to the same enemies
-      // array (and _spawnDefs, kept index-aligned for _restart).
-      for (const c of (this.zone.chaff ?? [])) {
-        const bot = new ChaffEnemy(this.scene, c.x, c.z, { bounds });
-        bot.addShadows(this.shadowGen);
-        this.enemies.push(bot);
-        this._spawnDefs.push([c.x, c.z]);
+      this.enemies = [];
+      this._spawnDefs = [];   // kept index-aligned with enemies for _restart
+      const add = (enemy, x, z) => {
+        enemy.addShadows?.(this.shadowGen);
+        this.enemies.push(enemy);
+        this._spawnDefs.push([x, z]);
+      };
+      // Scatter n points in a jittered ring around a centre (so a pack doesn't stack).
+      const scatter = (cx, cz, n, r) => {
+        const out = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + Math.random() * 0.6;
+          const rad = r * (0.45 + Math.random() * 0.55);
+          out.push([cx + Math.sin(a) * rad, cz + Math.cos(a) * rad]);
+        }
+        return out;
+      };
+      const spawnChaff = (cx, cz, n) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.2)) add(new ChaffEnemy(this.scene, px, pz, { bounds }), px, pz);
+      };
+      const spawnSentinels = (cx, cz, n, t, ambush) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.6))
+          add(new SentinelEnemy(this.scene, px, pz, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ambush, bounds }), px, pz);
+      };
+      // Each former single-tank spawn becomes a spider-bot pack; POI markers become
+      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm.
+      for (const e of this.zone.enemies) {
+        const t = tuning[e.band] || tuning.mid;
+        if (e.poi) {
+          if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+          else                     spawnChaff(e.x, e.z, 8);
+        } else {
+          spawnChaff(e.x, e.z, 4 + Math.floor(Math.random() * 3));   // 4–6 spider bots
+        }
       }
+      // Any explicitly-seeded chaff from the zone config.
+      for (const c of (this.zone.chaff ?? [])) add(new ChaffEnemy(this.scene, c.x, c.z, { bounds }), c.x, c.z);
       // The loading screen waits for the player AND the composed enemies.
       this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
