@@ -14,7 +14,7 @@ as `STEP_INTERVAL` in each enemy's `_moveBeep`.
 
 ## Ideas / reserved
 - [ ] **amb.sea** (`ambience/sea.ogg`) — the old "arena wind" reads as ocean surf; user liked it for a future **coastal / sea leg**. Baked + in manifest, NOT wired. Use when a sea/ocean zone exists.
-- [ ] **Grassy-zone ambience (W1)** — user undecided (maybe none). Pending cozy-grassland ambient research (2026-06-17). Hangar hum kept (liked).
+- [ ] **Grassy-zone ambience (W1)** — PARKED 2026-06-17, blocked on Freesound (down). Plan = CC0 nature 3-layer: gentle breeze bed + crickets/birdsong life layer + procedural bird spot-calls (sampler-style). Needs good CC0 bird/cricket field recordings (Freesound when up, or hand-grabbed). No-auth GitHub CC0 repos lack good ones. Research: `_docs/design/2026-06-17-cozy-grassland-ambience.md`. Hangar hum kept (liked).
 
 ## Done / resolved
 - cannon_fire was too loud → gain 1.0 → 0.6 (2026-06-17).
