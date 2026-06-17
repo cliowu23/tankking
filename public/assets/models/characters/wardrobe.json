@@ -320,12 +320,8 @@
         "label": "Headset"
       },
       {
-        "id": "hw-goggles",
-        "label": "Goggles"
-      },
-      {
-        "id": "hw-ushanka",
-        "label": "Ushanka"
+        "id": "hw-woolcap",
+        "label": "Wool Cap"
       }
     ],
     "face": [
