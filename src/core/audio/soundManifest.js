@@ -28,15 +28,18 @@ export const DUCK = { buses: ['music', 'ambience'], amount: 0.30, attack: 0.05, 
 
 export const SOUNDS = {
   // --- Player tank ---
-  'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: true,  duck: true, pitchVar: 0.12, gain: 0.60, maxInstances: 4 },
+  // Your own tank sits AT the listener, so spatializing its sounds gains nothing
+  // (distance 0) and triggers iOS Safari's PannerNode silence bug — the cannon
+  // went mute on iPhone. Keep these non-spatial: full-volume, centered, reliable.
+  'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: false, duck: true, pitchVar: 0.12, gain: 0.60, maxInstances: 4 },
   'tank.hit_heavy':     { url: 'sfx/tank/hit_heavy.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.10, gain: 0.90, maxInstances: 3 },
   'tank.hit_light':     { url: 'sfx/tank/hit_light.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.12, gain: 0.75, maxInstances: 3 },
   'tank.shield_activate': { url: 'sfx/tank/shield_activate.ogg', bus: 'sfx', gain: 0.80 },
   'tank.shield_loop':   { url: 'sfx/tank/shield_loop.ogg',   bus: 'sfx', loop: true, gain: 0.45 },
   'tank.shield_break':  { url: 'sfx/tank/shield_break.ogg',  bus: 'sfx', gain: 0.80 },
   'tank.destroyed':     { url: 'sfx/tank/destroyed.ogg',     bus: 'sfx', duck: true, gain: 1.00 },
-  'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.10 },
-  'tank.reload':        { url: 'sfx/tank/reload.ogg',        bus: 'sfx', spatial: true, pitchVar: 0.05, gain: 0.55 },
+  'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: false, loop: true, gain: 0.10 },
+  'tank.reload':        { url: 'sfx/tank/reload.ogg',        bus: 'sfx', spatial: false, pitchVar: 0.05, gain: 0.55 },
   'tank.low_fuel':      { url: 'sfx/tank/low_fuel.ogg',      bus: 'ui',  gain: 0.50 },
 
   // --- The King's machines (spatial — emit from the bot) ---

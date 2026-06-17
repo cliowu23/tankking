@@ -7,6 +7,7 @@ import { audio } from './audio/AudioManager.js';
 import { music } from './audio/MusicManager.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { generateRoadLeg } from '../world/zones/roadLeg.js';
+import { initMobileControls } from './MobileControls.js';
 
 // The Long Road: wrap a generated leg into an ArenaScene-compatible zone. Provides the
 // generic fields ArenaScene's setup expects (empty enemies/loot, extraction at the
@@ -56,6 +57,7 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
+window.__audio = audio; window.__music = music; // debug hooks (mirror __arena/__hangar)
 // music: Tone graph is built lazily (music.start) after the audio context is
 // running — no autoplay-warning spam. Kick off the MENU theme on the very first
 // user gesture (so the title screen has music before the player presses start).
@@ -141,10 +143,22 @@ const _renderMute = () => {
   _muteBtn.style.opacity = music.muted ? '0.7' : '1';
   _settingsBtn.style.opacity = music.muted ? '0.55' : '1'; // dim the gear when muted
 };
+// Unmuting should make music play *now*, not on the next scene change — the music
+// graph starts lazily, so re-kick the current state's theme (idempotent _switch).
+// (Mobile-session fix, preserved across the merge with the settings panel.)
+function _kickMusicForState() {
+  try {
+    const s = window.__state;
+    if (s === 'HANGAR' || s === 'INSPECTOR') music.playHangar();
+    else if (s === 'GAME' || s === 'PAUSED') music.playCombat();
+    else music.playMenu();
+  } catch (e) { console.warn('[music] unmute kick failed:', e); }
+}
 function _toggleMusicMute() {
   const m = music.toggleMuted();
   localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   _renderMute();
+  if (!m) _kickMusicForState();   // just unmuted → start/keep the right theme audible
 }
 
 _musicSlider.addEventListener('input', () => {
@@ -203,10 +217,25 @@ let controlsSeen  = false;   // HOW-TO-PLAY shows on the first arena entry per s
 
 window.__state = 'MENU'; // 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
 
+// Additive touch layer for phone playtesting. No-op on non-touch devices; never
+// modifies a keyboard handler (it dispatches the game's own key events). See
+// MobileControls.js. Pass ?touch=1 to force it on desktop for testing.
+initMobileControls();
+
 // ── Transition engine ────────────────────────────────────────────────────────
 const _tc   = document.getElementById('transition-canvas');
 const _tctx = _tc.getContext('2d');
 let   _tBusy = false;
+let   _tWatchdog = null;
+// A transition must never lock the UI permanently. If one stalls (e.g. tapping
+// Play before the first frame settles), force-clear the cover + release the lock
+// so the next tap works. iris/checker finish in <1s, so 2s is a safe ceiling.
+function _clearTransition() {
+  clearTimeout(_tWatchdog);
+  _tBusy = false;
+  try { _tctx.clearRect(0, 0, _tc.width, _tc.height); } catch (_) {}
+  _tc.style.display = 'none';
+}
 
 function _resizeTC() { _tc.width = window.innerWidth; _tc.height = window.innerHeight; }
 window.addEventListener('resize', _resizeTC);
@@ -236,12 +265,13 @@ function _iris(hideFn, showFn) {
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'close') {
       // Screen fully covered — swap now so the open reveals the live scene
-      hideFn(); showFn();
+      try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
       phase = 'open'; start = null;
       requestAnimationFrame(tick);
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
+      clearTimeout(_tWatchdog);
       _tBusy = false;
     }
   }
@@ -279,13 +309,14 @@ function _checker(hideFn, showFn) {
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'in') {
       // Screen fully covered — swap now so the reveal shows the live scene
-      hideFn(); showFn();
+      try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
       phase = 'out'; start = null;
       order.sort(() => Math.random() - 0.5); // re-shuffle for reveal
       requestAnimationFrame(tick);
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
+      clearTimeout(_tWatchdog);
       _tBusy = false;
     }
   }
@@ -295,6 +326,8 @@ function _checker(hideFn, showFn) {
 function transition(hideFn, showFn, type = 'checker') {
   if (_tBusy) return;
   _tBusy = true;
+  clearTimeout(_tWatchdog);
+  _tWatchdog = setTimeout(_clearTransition, 2000); // never lock the UI permanently
   _resizeTC();
   if (type === 'iris') _iris(hideFn, showFn);
   else                 _checker(hideFn, showFn);

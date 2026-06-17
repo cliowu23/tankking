@@ -25,6 +25,13 @@ import { BUSES, DUCK, SOUNDS } from './soundManifest.js';
 
 const BASE = `${import.meta.env.BASE_URL}assets/audio/`;
 
+// Every browser loads the 48 kHz AAC (.m4a). The original .ogg sources were
+// 192 kHz — out of spec, so iOS Safari was silent AND real Chrome couldn't
+// actually produce sound from them (it only "played" them in name). AAC at
+// 48 kHz is universally decodable (Chrome/Firefox/Safari/iOS/Android), so the
+// manifest's .ogg paths are simply mapped to their .m4a sibling.
+const srcUrl = (url) => BASE + url.replace(/\.ogg$/, '.m4a');
+
 class AudioManager {
   constructor() {
     this.engine = null;
@@ -41,7 +48,10 @@ class AudioManager {
     if (this._initStarted) return;
     this._initStarted = true;
     try {
-      this.engine = await CreateAudioEngineAsync();
+      // disableDefaultUI: suppress Babylon's built-in "unmute" overlay button
+      // (the stray top-left button) — we have our own music toggle, and
+      // resumeOnInteraction (default true) still unlocks audio on first gesture.
+      this.engine = await CreateAudioEngineAsync({ disableDefaultUI: true });
 
       // Category buses — everything routes through one of these for group mixing.
       for (const [name, cfg] of Object.entries(BUSES)) {
@@ -56,7 +66,7 @@ class AudioManager {
         if (def.poolSize) {
           const free = [];
           for (let k = 0; k < def.poolSize; k++) {
-            const s = await CreateSoundAsync(`${id}#${k}`, BASE + def.url, { spatialEnabled: true, maxInstances: 1 });
+            const s = await CreateSoundAsync(`${id}#${k}`, srcUrl(def.url), { spatialEnabled: true, maxInstances: 1 });
             if (this.buses[def.bus]) s.outBus = this.buses[def.bus];
             if (def.gain != null) s.volume = def.gain;
             free.push(s);
@@ -64,7 +74,7 @@ class AudioManager {
           this.pools[id] = { def, free, used: new Map() };
           return;
         }
-        const snd = await CreateSoundAsync(id, BASE + def.url, {
+        const snd = await CreateSoundAsync(id, srcUrl(def.url), {
           spatialEnabled: !!def.spatial,
           maxInstances: def.maxInstances ?? 1,
         });
@@ -99,12 +109,17 @@ class AudioManager {
       return;
     }
     const { snd, def } = entry;
-    if (def.pitchVar) snd.playbackRate = 1 + (Math.random() * 2 - 1) * def.pitchVar;
-    if (def.spatial && opts.emitter && snd.spatial && typeof snd.spatial.attach === 'function') {
-      snd.spatial.attach(opts.emitter);
-    }
-    if (def.duck) this._duck();
-    try { snd.play(); } catch (_) { /* not yet unlocked */ }
+    // Pre-play tweaks must NEVER prevent the sound — a throw here (e.g. a duck or
+    // spatial-attach failing on some browser) used to silently swallow the whole
+    // play() and the sound went mute. Each step is isolated; play() always runs.
+    try {
+      if (def.pitchVar) snd.playbackRate = 1 + (Math.random() * 2 - 1) * def.pitchVar;
+      if (def.spatial && opts.emitter && snd.spatial && typeof snd.spatial.attach === 'function') {
+        snd.spatial.attach(opts.emitter);
+      }
+    } catch (e) { console.warn('[audio] pre-play tweak failed:', id, e); }
+    try { snd.play(); } catch (e) { console.warn('[audio] play failed:', id, e); }
+    try { if (def.duck) this._duck(); } catch (e) { console.warn('[audio] duck failed:', id, e); }
   }
 
   startLoop(id, opts = {}) {

@@ -101,7 +101,9 @@ export default class ArenaScene {
     this._camHeading      = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
     this._camHeadingVel   = 0;                               // spring velocity state
     this._camYawSmoothTime = CAM_YAW_SMOOTH_TIME;            // live-tunable (seconds)
-    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, CAM_RADIUS,
+    // Phone/portrait pulls the camera back (wider view); desktop = ×1 (unchanged).
+    const camRadius = CAM_RADIUS * (window.__camZoom ? window.__camZoom() : 1);
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, camRadius,
       new Vector3(this._camX, 0, this._camZ), this.scene);
   }
 
@@ -782,6 +784,21 @@ export default class ArenaScene {
     });
   }
 
+  // Nearest LIVING enemy that is actively engaging the player (state past IDLE/
+  // AMBUSH). All enemy types extend AIEnemy, so this aggro check is universal.
+  // Used by the mobile auto-aim so you can't target enemies outside their aggro.
+  _nearestAggroedEnemy() {
+    const px = this.tank.position.x, pz = this.tank.position.z;
+    let best = null, bestD = Infinity;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (e.state === 'IDLE' || e.state === 'AMBUSH') continue;   // hasn't aggroed onto us
+      const d = (e.position.x - px) ** 2 + (e.position.z - pz) ** 2;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
   _nearestToCursor() {
     let cx = this.tank.position.x;
     let cz = this.tank.position.z;
@@ -850,9 +867,22 @@ export default class ArenaScene {
         }
       }
 
+      // Mobile (Soul-Knight style): the turret auto-locks the nearest enemy that
+      // is actually aggroed onto the player — you can't snipe enemies outside
+      // their own aggro range. Desktop keeps manual mouse aim (this is skipped).
+      if (window.__mobile && window.__mobile.active) {
+        this.lockedEnemy = this._nearestAggroedEnemy();
+      }
+
       // Pass lock target to tank — use predicted position for moving targets
       if (this.lockedEnemy) {
         this.tank.lockTarget = this._predictTargetPos(this.lockedEnemy);
+      } else if (window.__mobile && window.__mobile.active) {
+        // No aggroed target → rest the gun facing the hull's heading.
+        this.tank.lockTarget = {
+          x: this.tank.position.x + Math.sin(this.tank.rotY) * 20,
+          z: this.tank.position.z + Math.cos(this.tank.rotY) * 20,
+        };
       } else {
         this.tank.lockTarget = null;
       }
@@ -903,6 +933,14 @@ export default class ArenaScene {
   }
 
   _updateLockRing(dt) {
+    // Mobile uses ONLY the white corner brackets (#aim-indicator) as the lock
+    // cue. Suppress the legacy red lock-on ring, which the auto-lock would
+    // otherwise draw under every targeted enemy. Desktop is unchanged.
+    if (window.__mobile && window.__mobile.active) {
+      if (this.lockRing) this.lockRing.isVisible = false;
+      if (this.fadeRing) this.fadeRing.isVisible = false;
+      return;
+    }
     const FADE_OUT = 0.2;
     // Cache candidate once per frame
     const candidate = (this._fHeld && !this._fDidLock) ? this._nearestToCursor() : null;
@@ -999,6 +1037,13 @@ export default class ArenaScene {
     // or dead. (_updateExtraction runs earlier in the same frame, so without this
     // guard a just-completed extract re-shows the bracket and leaves it stuck.)
     if (this._paused || this._extracting || !this.tank.alive) {
+      this._aimEl.style.display = 'none';
+      return;
+    }
+    // Mobile auto-aim: the brackets mark the auto-locked enemy. With nothing
+    // locked there's no cursor to track, so hide them rather than parking the
+    // brackets at a stale screen point.
+    if (window.__mobile && window.__mobile.active && !this.lockedEnemy) {
       this._aimEl.style.display = 'none';
       return;
     }

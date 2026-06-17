@@ -682,6 +682,9 @@ export default class HangarScene {
 
   _setupDriver() {
     this.driver = new DriverCharacter(this.scene);
+    // Phone/portrait pulls the hangar camera back too (its north-offset is
+    // radius * _camNorthRatio, so it stays framed). Desktop = ×1 (unchanged).
+    if (window.__camZoom) this.driver.camera.radius *= window.__camZoom();
     this._driverConfig = this._loadDriverConfig();
     // Apply the saved look once the default model finishes loading; adopt back the
     // APPLIED config (the driver clears slots whose pieces failed to load).
