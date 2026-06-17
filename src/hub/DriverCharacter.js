@@ -28,9 +28,6 @@ export const DRIVER_ACCESSORIES = ['none'];
 export const ATTACH_SLOTS = {
   hair:     { boneRe: /(^|[^a-z])head/i },
   headwear: { boneRe: /(^|[^a-z])head/i },
-  // Comms (headset) is its OWN head-bone slot so it can be worn alongside any
-  // headwear (helmet + headset, beanie + headset, …).
-  comms:    { boneRe: /(^|[^a-z])head/i },
   face:     { boneRe: /(^|[^a-z])head/i },
   back:     { boneRe: /torso/i },
   // Bedroll is a satchel add-on, not a standalone back piece — it rides the same
@@ -47,7 +44,7 @@ export const DRIVER_OPTIONS = {
 };
 export const DRIVER_DEFAULT = {
   head: 'char-driver-a', body: 'char-driver-a',
-  hair: 'none', headwear: 'none', comms: 'none', face: 'none', back: 'none', bedroll: 'none',
+  hair: 'none', headwear: 'none', face: 'none', back: 'none', bedroll: 'none',
   skin: '#eebb94',   // tints the skinMat material (skin verts authored white)
 };
 

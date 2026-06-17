@@ -320,12 +320,6 @@
         "label": "Wool Cap"
       }
     ],
-    "comms": [
-      {
-        "id": "hw-headset",
-        "label": "Headset"
-      }
-    ],
     "face": [
       {
         "id": "face-glasses",
