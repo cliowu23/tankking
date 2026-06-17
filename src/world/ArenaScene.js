@@ -928,6 +928,14 @@ export default class ArenaScene {
   }
 
   _updateLockRing(dt) {
+    // Mobile uses ONLY the white corner brackets (#aim-indicator) as the lock
+    // cue. Suppress the legacy red lock-on ring, which the auto-lock would
+    // otherwise draw under every targeted enemy. Desktop is unchanged.
+    if (window.__mobile && window.__mobile.active) {
+      if (this.lockRing) this.lockRing.isVisible = false;
+      if (this.fadeRing) this.fadeRing.isVisible = false;
+      return;
+    }
     const FADE_OUT = 0.2;
     // Cache candidate once per frame
     const candidate = (this._fHeld && !this._fDidLock) ? this._nearestToCursor() : null;
@@ -1024,6 +1032,13 @@ export default class ArenaScene {
     // or dead. (_updateExtraction runs earlier in the same frame, so without this
     // guard a just-completed extract re-shows the bracket and leaves it stuck.)
     if (this._paused || this._extracting || !this.tank.alive) {
+      this._aimEl.style.display = 'none';
+      return;
+    }
+    // Mobile auto-aim: the brackets mark the auto-locked enemy. With nothing
+    // locked there's no cursor to track, so hide them rather than parking the
+    // brackets at a stale screen point.
+    if (window.__mobile && window.__mobile.active && !this.lockedEnemy) {
       this._aimEl.style.display = 'none';
       return;
     }
