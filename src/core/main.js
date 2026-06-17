@@ -65,6 +65,20 @@ function silenceArena() {
   audio.stopLoop('amb.sea');
 }
 
+// UI sounds — delegated so it covers menu buttons shown/hidden at runtime.
+// hover on entering any button; click → confirm for go-forward actions, else select.
+let _uiHover = null;
+document.addEventListener('pointerover', (e) => {
+  const b = e.target.closest('button');
+  if (b && b !== _uiHover) { _uiHover = b; audio.play('ui.hover'); }
+  else if (!b) _uiHover = null;
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  audio.play(/deploy|resume|return|restart/.test(b.id || '') ? 'ui.confirm' : 'ui.select');
+});
+
 let arenaScene    = null;
 let designerScene = null;
 let hangarScene   = null;
@@ -170,6 +184,7 @@ function transition(hideFn, showFn, type = 'checker') {
 }
 
 function startGame() {
+  audio.play('ui.confirm'); // keyboard-driven start (not a button, so wire it here)
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
