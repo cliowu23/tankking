@@ -28,7 +28,7 @@ export const DUCK = { buses: ['music', 'ambience'], amount: 0.30, attack: 0.05, 
 
 export const SOUNDS = {
   // --- Player tank ---
-  'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: true,  duck: true, pitchVar: 0.12, gain: 1.00, maxInstances: 4 },
+  'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: true,  duck: true, pitchVar: 0.12, gain: 0.60, maxInstances: 4 },
   'tank.hit_heavy':     { url: 'sfx/tank/hit_heavy.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.10, gain: 0.90, maxInstances: 3 },
   'tank.hit_light':     { url: 'sfx/tank/hit_light.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.12, gain: 0.75, maxInstances: 3 },
   'tank.shield_activate': { url: 'sfx/tank/shield_activate.ogg', bus: 'sfx', gain: 0.80 },
