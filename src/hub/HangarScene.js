@@ -12,6 +12,7 @@ import { buildKitchen } from './HangarKitchen.js';
 import { buildMapTable } from './HangarMapTable.js';
 import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
+import { audio } from '../core/audio/AudioManager.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { buildPrimitiveTank } from '../tank/primitiveTank.js';
@@ -837,6 +838,7 @@ export default class HangarScene {
   }
 
   openPanel(station) {
+    audio.play('ui.interact'); // E-press station interaction blip
     this._panelOpen = true;
     document.getElementById('hangar-prompt').style.display    = 'none';
     document.getElementById('hangar-panel-title').textContent = station.title;

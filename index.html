@@ -29,6 +29,9 @@
       background-size: 4px 4px;
       overflow: hidden;
       cursor: none;
+      user-select: none;                        /* no text/canvas selection highlight on click-drag */
+      -webkit-user-select: none;                /* Safari / older Chrome */
+      -webkit-tap-highlight-color: transparent; /* no tap flash on touch */
       font-family: 'Press Start 2P', monospace;
       -webkit-font-smoothing: none;
       font-smooth: never;
