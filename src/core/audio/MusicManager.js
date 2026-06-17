@@ -1,38 +1,47 @@
 // src/core/audio/MusicManager.js
 // Claude-composed music via Tone.js (separate from the SFX AudioManager).
-// Three themes, each its own tempo/feel — built on demand and disposed on switch
+// Four themes, each its own tempo/feel — built on demand and disposed on switch
 // (cleaner than one shared transport for differing BPMs). Master gain dips during
 // a switch for a quick crossfade.
 //
-//   menu    — calm pad + plucked arp (the old hangar theme; title-screen vibe)
+//   menu    — "Signal Home": hummable bell hook over a warm pad bed + soft breath
 //   hangar  — cozy lo-fi groove: soft swung beat, warm sine bass, mellow keys
 //   combat  — driving darksynth, VERTICAL-LAYERED by intensity (live enemy count):
 //             base (bass+kick) always · mid (hats+snare) · high (lead arp)
+//   arena   — "Test Chamber": sparse bitcrushed lab tone — the DEV ARENA · TEST sandbox
 //
 // All A minor (Am–F–C–G). Fails silently. window.__music for debug.
-// (Synthwave "theme C" lives in audio-gen/hangar-theme-preview.html — reserved
-//  for a future level / minigame.)
+// Parked candidates / palette audition pages live in audio-gen/*-audition.html
+// (e.g. menu "Long Road" + the old menu theme, dev-arena alternates, synthwave theme C).
 
 import * as Tone from 'tone';
 
-const CHORDS  = [['A3','C4','E4'], ['F3','A3','C4'], ['C4','E4','G4'], ['G3','B3','D4']];
 const LOFI_CH = [['A3','C4','E4','G4'], ['F3','A3','C4','E4'], ['C4','E4','G4','B4'], ['G3','B3','D4','E4']];
 const ROOTS   = ['A1','F1','C1','G1'];
-// Menu arp: 4 notes per chord (triad tones + a return step, e.g. A–C–E–C) that
-// carry the melody an octave above the pad. Each group aligns to its chord in the
-// Am–F–C–G cycle (one chord per measure), played at '4n'.
-const MENU_ARP = [];
-[['A4','C5','E5','C5'], ['F4','A4','C5','A4'], ['C5','E5','G5','E5'], ['G4','B4','D5','B4']].forEach(a => MENU_ARP.push(...a));
+// Menu "Signal Home" hook: a hummable bell motif over the Am–F–C–G cycle (8n grid,
+// 2 bars, with rests so it breathes). The tune that sets the title-screen tone.
+const MENU_MEL = [
+  'A4','C5','E5',null, 'E5','D5',null,null, 'F4','A4','C5',null, 'C5','B4',null,null,
+  'C5','E5','G5',null, 'G5','E5',null,null, 'G4','B4','D5',null, 'E5',null,null,null,
+];
 const CBASS = [];
 ROOTS.forEach(r => { for (let i = 0; i < 8; i++) CBASS.push(r); });
 const CLEAD = [];
 [['A5','C6'], ['F5','A5'], ['E5','G5'], ['D5','G5']].forEach(([a, b]) => CLEAD.push(a, null, b, null, a, b, null, null));
 
 const CFG = {
-  menu:   { bpm: 100, swing: 0 },
+  menu:   { bpm: 84,  swing: 0 },
   hangar: { bpm: 78,  swing: 0.35 },
   combat: { bpm: 112, swing: 0 },
+  arena:  { bpm: 88,  swing: 0 },   // dev test arena — "Test Chamber"
 };
+
+// Dev-arena "Test Chamber" melody: sparse, uneasy chromatic/tritone steps with
+// lots of rests — clinical lab-console feel. (8n grid, 2 bars.)
+const ARENA_MEL = [
+  'A4', null, null, 'D#5', null, null, 'C5', null,   null, 'B4', null, null,  'F4', null, null, null,
+  'A4', null, 'E5', null,   null, null, 'D#5', null,  'G4', null, null, 'C5',  null, null, null, null,
+];
 
 class MusicManager {
   constructor() {
@@ -45,12 +54,31 @@ class MusicManager {
     this._swT = null;
     this._muted = false;
     this._baseVol = 0.55;
+    this._lastTheme = null; // remembers the last theme so restart() works after a stop()
   }
 
   // ---- public ----
   playMenu()   { this._setMode('menu'); }
   playHangar() { this._setMode('hangar'); }
   playCombat() { this._setMode('combat'); }
+  playArena()  { this._setMode('arena'); }   // dev test arena soundtrack
+
+  // Replay the current theme from bar 0 — used by the in-run RESTART so the
+  // music restarts with the run. Falls back to the last theme if the theme was
+  // already stopped (e.g. death stops it before RESTART is pressed). Also lifts
+  // a paused transport, so restarting from the pause menu resumes playback.
+  restart() {
+    const id = this._mode || this._lastTheme;
+    if (!id || !this._started) return;
+    this._mode = null;          // bypass the same-mode early-return in _switch
+    this._switch(id, true);     // rebuild immediately from position 0
+  }
+
+  // Freeze / un-freeze the transport with the game (PAUSE). The music holds its
+  // place and resumes where it left off. Stingers ride their own clock (_fxOut),
+  // so the needle-lift and other one-shots still sound while paused.
+  pause()  { if (this._started) { const T = Tone.getTransport(); if (T.state === 'started') T.pause(); } }
+  resume() { if (this._started) { const T = Tone.getTransport(); if (T.state === 'paused')  T.start(); } }
 
   // ---- one-shot stingers + transition SFX (fire-and-forget, survive theme stop) ----
   // These are game FEEDBACK, not music: they ride their own output (_fxOut) so a
@@ -67,6 +95,8 @@ class MusicManager {
   playCrtOff()  { this._fire(this._fx_crtOff); }
   playHitmark() { this._fire(this._fx_hitmark); }  // shell connects with an enemy
   playHitCrit() { this._fire(this._fx_hitcrit); }  // dead-center critical hit
+  playPickup()  { this._fire(this._fx_pickup); }   // salvage grabbed — coin ding
+  playNeedleLift() { this._fire(this._fx_needleLift); } // pause — record needle lifts off the groove
 
   setIntensity(x) { this._intensity = Math.max(0, Math.min(1, x)); this._applyIntensity(); }
   setMasterVolume(v) { this._baseVol = v; if (this.master && !this._muted) this.master.gain.rampTo(v, 0.2); }
@@ -115,6 +145,7 @@ class MusicManager {
       T.position = 0;
       this._theme = this[`_build_${id}`]();
       this._mode = id;
+      this._lastTheme = id;
       T.start();
       if (id === 'combat') this._applyIntensity();
       this.master.gain.rampTo(this._activeVol(), 0.5); // respects mute across switches
@@ -137,21 +168,22 @@ class MusicManager {
   }
 
   // ---- theme builders (return { nodes, layerMid?, layerHigh? }) ----
-  _build_menu() {
+  _build_menu() { // "Signal Home" — hummable, hopeful, sets the title-screen tone
     const m = this.master, nodes = [];
-    // Structured intro: warm held chords play ALONE first, then the SINE arp (an
-    // octave above the pad) DROPS IN — a little melodic "beat drop" so the title
-    // theme has an arc instead of both parts competing from bar one (user: the
-    // simultaneous start sounded messy — 2026-06-17). Drop lands when the 4-bar
-    // Am–F–C–G progression loops back. ARP_DROP is the one knob: '2m' = snappier,
-    // '4m' = full-cycle build. The transport resets to 0 on each menu entry, so
-    // the intro + drop replays every time you return to the menu.
-    const ARP_DROP = '4m';
-    const verb = new Tone.Freeverb(0.7, 2200).connect(m); nodes.push(verb);
-    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -15 }).connect(verb); nodes.push(pad);
-    const arp = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.3, sustain: 0, release: 0.4 }, volume: -19 }).connect(verb); nodes.push(arp);
-    nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), CHORDS, '1m').start(0));
-    nodes.push(new Tone.Sequence((t, n) => arp.triggerAttackRelease(Tone.Frequency(n).transpose(12), '8n', t), MENU_ARP, '4n').start(ARP_DROP));
+    // Warm pad bed + sine bass + a soft pink-noise "breath" each bar, with the
+    // bell hook (MENU_MEL) entering after the first bar so the theme blooms in
+    // rather than starting all at once. The transport resets to 0 on each menu
+    // entry, so the bloom replays every time you return to the title screen.
+    const verb = new Tone.Freeverb(0.7, 3500).connect(m); nodes.push(verb);
+    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.5, sustain: 0.6, release: 1.5 }, volume: -23 }).connect(verb); nodes.push(pad);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.4 }, volume: -13 }).connect(m); nodes.push(bass);
+    const swell = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.2, decay: 0.3, sustain: 0 }, volume: -30 }).connect(verb); nodes.push(swell);
+    const dly = new Tone.PingPongDelay('8n.', 0.28); dly.wet.value = 0.32; dly.connect(verb); nodes.push(dly);
+    const bell = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.6 }, volume: -14 }).connect(dly); nodes.push(bell);
+    nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), LOFI_CH, '1m').start(0));
+    nodes.push(new Tone.Sequence((t, r) => bass.triggerAttackRelease(r, '2n', t), ROOTS, '1m').start(0));
+    nodes.push(new Tone.Loop(t => swell.triggerAttackRelease('2n', t), '1m').start(0)); // soft breath each bar
+    nodes.push(new Tone.Sequence((t, n) => { if (n) bell.triggerAttackRelease(n, '8n', t); }, MENU_MEL, '8n').start('1m'));
     return { nodes };
   }
 
@@ -187,6 +219,27 @@ class MusicManager {
     nodes.push(new Tone.Loop(t => hat.triggerAttackRelease('16n', t), '8n').start('8n'));
     nodes.push(new Tone.Loop(t => snare.triggerAttackRelease('16n', t), '2n').start('4n'));
     return { nodes, layerMid, layerHigh };
+  }
+
+  _build_arena() { // dev test arena — "Test Chamber": sparse, eerie, bitcrushed lab
+    const m = this.master, nodes = [];
+    // group gains preserve the audition mix balance (master is the bus here)
+    const gFilt  = new Tone.Gain(0.70).connect(m); nodes.push(gFilt);
+    const gCrush = new Tone.Gain(0.85).connect(m); nodes.push(gCrush);
+    const gTick  = new Tone.Gain(0.60).connect(m); nodes.push(gTick);
+    const gSub   = new Tone.Gain(0.80).connect(m); nodes.push(gSub);
+    const filt  = new Tone.Filter({ type: 'lowpass', frequency: 600, Q: 1 }).connect(gFilt); nodes.push(filt);
+    const drone = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'square' }, envelope: { attack: 1.2, decay: 0.5, sustain: 0.8, release: 2 }, detune: 8, volume: -30 }).connect(filt); nodes.push(drone);
+    const crush = new Tone.BitCrusher({ bits: 5 }); crush.wet.value = 0.7; crush.connect(gCrush); nodes.push(crush);
+    const dly   = new Tone.FeedbackDelay('4n', 0.35); dly.wet.value = 0.4; dly.connect(crush); nodes.push(dly);
+    const bleep = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.002, decay: 0.18, sustain: 0, release: 0.1 }, volume: -16 }).connect(dly); nodes.push(bleep);
+    const tick  = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.06, release: 0.02 }, harmonicity: 8, resonance: 2000, volume: -34 }).connect(gTick); nodes.push(tick);
+    const sub   = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 3, volume: -12 }).connect(gSub); nodes.push(sub);
+    nodes.push(new Tone.Sequence((t, c) => drone.triggerAttackRelease(c, '1m', t), [['A2', 'E3'], ['C3', 'G3']], '1m').start(0));
+    nodes.push(new Tone.Sequence((t, n) => { if (n) bleep.triggerAttackRelease(n, '16n', t); }, ARENA_MEL, '8n').start(0));
+    nodes.push(new Tone.Loop(t => tick.triggerAttackRelease('16n', t), '4n').start('8n')); // dry data-tick metronome
+    nodes.push(new Tone.Loop(t => sub.triggerAttackRelease('A1', '8n', t), '1m').start(0)); // distant heartbeat thud
+    return { nodes };
   }
 
   // ---- one-shot infra ----
@@ -286,6 +339,32 @@ class MusicManager {
     s.triggerAttackRelease('E6', '64n', t);
     s.triggerAttackRelease('B6', '32n', t + 0.045);
     this._disposeLater([s, verb], 500);
+  }
+
+  _fx_pickup() { // salvage grabbed — classic two-note coin "ding" (low blip up a 5th)
+    const out = this._fxDest();
+    const verb = new Tone.Freeverb(0.3, 5000).connect(out);
+    const s = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.12 }, volume: -9 }).connect(verb);
+    const t = Tone.now() + 0.001;
+    const wob = (Math.random() * 2 - 1) * 1.5; // ±1.5 semitone so a salvage run doesn't sound machine-gunned
+    s.triggerAttackRelease(Tone.Frequency('B5').transpose(wob), '32n', t);
+    s.triggerAttackRelease(Tone.Frequency('E6').transpose(wob), '16n', t + 0.075);
+    this._disposeLater([s, verb], 500);
+  }
+
+  _fx_needleLift() { // PAUSE — turntable needle lifts: platter spins down + a stylus scrape
+    const out = this._fxDest();
+    const osc = new Tone.Oscillator({ type: 'sawtooth', frequency: 320, volume: -16 }).connect(out);
+    const bp  = new Tone.Filter({ type: 'bandpass', frequency: 2600, Q: 2 }).connect(out);
+    const scr = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.18, sustain: 0 }, volume: -22 }).connect(bp);
+    const t = Tone.now() + 0.01;
+    osc.start(t).stop(t + 0.4);
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.36);   // platter winds down to a halt
+    scr.triggerAttackRelease(0.12, t);                          // stylus scrape as it lifts
+    bp.frequency.setValueAtTime(2600, t);
+    bp.frequency.exponentialRampToValueAtTime(700, t + 0.18);
+    this._disposeLater([osc, scr, bp], 900);
   }
 }
 
