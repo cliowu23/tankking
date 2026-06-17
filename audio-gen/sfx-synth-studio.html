@@ -204,6 +204,27 @@ const SOUNDS = {
     params:{ freq:{min:400,max:1000,val:620,step:10}, gap:{min:.08,max:.25,val:.12,step:.01} },
     build(ctx,t0,p){ const mk=(t)=>{ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.value=p.freq; const g=ctx.createGain(); o.connect(g).connect(ctx.destination); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.4,t+.008); g.gain.setValueAtTime(.4,t+.07); g.gain.exponentialRampToValueAtTime(.0001,t+.09); o.start(t);o.stop(t+.11); };
       mk(t0); mk(t0+p.gap); return p.gap+0.14; } },
+
+  // ===== P2 ambience beds (long seamless loops; LFOs do whole cycles over dur) =====
+  "amb.hangar": { tag:"loopable", intent:"hangar room tone — warm low electrical hum + faint machinery",
+    params:{ base:{min:40,max:120,val:62,step:1}, warmth:{min:0,max:1,val:.5,step:.05}, hum:{min:0,max:1,val:.4,step:.05}, dur:{min:8,max:24,val:16,step:1} },
+    build(ctx,t0,p){
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=400; lp.Q.value=1;
+      const dg=ctx.createGain(); dg.gain.value=.12*(0.5+p.warmth); lp.connect(dg).connect(ctx.destination);
+      [p.base, p.base*1.5, p.base*2].forEach((f,i)=>{ const o=ctx.createOscillator(); o.type=i===0?"triangle":"sine"; o.frequency.value=f; o.detune.value=(i-1)*4; o.connect(lp); o.start(t0); o.stop(t0+p.dur); });
+      const ho=ctx.createOscillator(); ho.type="sawtooth"; ho.frequency.value=120; const hf=ctx.createBiquadFilter(); hf.type="bandpass"; hf.frequency.value=120; hf.Q.value=8; const hg=ctx.createGain(); hg.gain.value=.03*p.hum; ho.connect(hf).connect(hg).connect(ctx.destination); ho.start(t0);ho.stop(t0+p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const nf=ctx.createBiquadFilter(); nf.type="lowpass"; nf.frequency.value=300; const ng=ctx.createGain(); ng.gain.value=.05*p.hum; ns.connect(nf).connect(ng).connect(ctx.destination);
+      const lfo=ctx.createOscillator(); lfo.frequency.value=1/p.dur; const lg=ctx.createGain(); lg.gain.value=140; lfo.connect(lg).connect(nf.frequency); lfo.start(t0);lfo.stop(t0+p.dur);
+      ns.start(t0);ns.stop(t0+p.dur); return p.dur; } },
+
+  "amb.arena": { tag:"loopable", intent:"battlefield bed — wind gusts + distant machine drone",
+    params:{ wind:{min:0,max:1,val:.6,step:.05}, drone:{min:0,max:1,val:.35,step:.05}, dur:{min:8,max:24,val:16,step:1} },
+    build(ctx,t0,p){
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=500; bp.Q.value=0.7; const wg=ctx.createGain(); wg.gain.value=0; ns.connect(bp).connect(wg).connect(ctx.destination);
+      const cf=ctx.createOscillator(); cf.frequency.value=2/p.dur; const cfg=ctx.createGain(); cfg.gain.value=320; cf.connect(cfg).connect(bp.frequency); cf.start(t0);cf.stop(t0+p.dur);
+      const gust=ctx.createOscillator(); gust.frequency.value=3/p.dur; const gg=ctx.createGain(); gg.gain.value=.05*p.wind; const goff=ctx.createConstantSource(); goff.offset.value=.07*p.wind; gust.connect(gg).connect(wg.gain); goff.connect(wg.gain); gust.start(t0);gust.stop(t0+p.dur);goff.start(t0);goff.stop(t0+p.dur);
+      const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.value=55; const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=180; const og=ctx.createGain(); og.gain.value=.06*p.drone; o.connect(lp).connect(og).connect(ctx.destination); o.start(t0);o.stop(t0+p.dur);
+      ns.start(t0);ns.stop(t0+p.dur); return p.dur; } },
 };
 
 // ---- WAV encoder (mono, 16-bit) ----

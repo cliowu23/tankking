@@ -387,6 +387,7 @@ export default class ArenaScene {
     this.tank = new Tank(this.scene, spawn.x, spawn.z);
     audio.attachListener(this.tank.root); // 3D audio relative to the player
     audio.startLoop('tank.engine', { emitter: this.tank.root }); // idle hum; swells with speed
+    audio.startLoop('amb.arena'); // battlefield ambience bed (2D)
     this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 

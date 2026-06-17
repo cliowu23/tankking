@@ -54,4 +54,8 @@ export const SOUNDS = {
   'ui.select':          { url: 'ui/select.ogg',  bus: 'ui', gain: 0.70 },
   'ui.confirm':         { url: 'ui/confirm.ogg', bus: 'ui', gain: 0.80 },
   'ui.wave_start':      { url: 'ui/wave_start.ogg', bus: 'ui', gain: 0.80 },
+
+  // --- Ambience (2D looping beds, sit under everything) ---
+  'amb.hangar':         { url: 'ambience/hangar.ogg', bus: 'ambience', loop: true, gain: 0.85 },
+  'amb.arena':          { url: 'ambience/arena.ogg',  bus: 'ambience', loop: true, gain: 0.85 },
 };

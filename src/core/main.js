@@ -62,6 +62,7 @@ function silenceArena() {
   audio.releaseAllPooled();
   audio.stopLoop('tank.engine');
   audio.stopLoop('tank.shield_loop');
+  audio.stopLoop('amb.arena');
 }
 
 let arenaScene    = null;
@@ -211,6 +212,7 @@ function startHangar() {
       const hs = document.getElementById('hangar-salvage');
       if (hs) { hs.textContent = `BANKED SALVAGE: ${getBankedSalvage()}`; hs.style.display = 'block'; }
       engine.runRenderLoop(() => hangarScene.scene.render());
+      audio.startLoop('amb.hangar'); // warm hangar room tone (2D)
     },
     'iris'
   );
@@ -255,6 +257,7 @@ function deployToArena(dev = false) {
   document.getElementById('hangar-panel').style.display   = 'none';
   document.getElementById('hangar-salvage').style.display = 'none';
   engine.stopRenderLoop();
+  audio.stopLoop('amb.hangar');
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
 
   // Build on the next frame so the overlay paints before the heavy work starts.
@@ -325,6 +328,7 @@ function goToMenu() {
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
   silenceArena(); // after _restart (which restarts engine) so the menu is quiet
+  audio.stopLoop('amb.hangar');
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
