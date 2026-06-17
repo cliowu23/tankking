@@ -263,6 +263,7 @@ export default class Tank {
     this.speed = 0;
     audio.play('tank.destroyed');
     audio.stopLoop('tank.engine');
+    audio.stopLoop('tank.turret_servo'); this._servoPlaying = false;
     this.hullMat.diffuseColor  = new Color3(0.15, 0.12, 0.08);
     this.hullMat.emissiveColor = new Color3(0.05, 0.03, 0.01);
   }
@@ -316,6 +317,21 @@ export default class Tank {
       this._engineVol = engineTarget;
       audio.setVolume('tank.engine', engineTarget);
     }
+
+    // --- Turret servo: soft whine while traversing (hysteresis hold avoids start/stop thrash) ---
+    const turretVel = (this._prevTA !== undefined) ? Math.abs(shortAngle(this._prevTA, this.turretAimAngle)) / Math.max(dt, 1e-3) : 0;
+    this._prevTA = this.turretAimAngle;
+    if (turretVel > 0.15) this._servoHold = 0.12;
+    else this._servoHold = Math.max(0, (this._servoHold ?? 0) - dt);
+    const servoOn = this._servoHold > 0;
+    if (servoOn && !this._servoPlaying) { audio.startLoop('tank.turret_servo', { emitter: this.root }); this._servoPlaying = true; }
+    else if (!servoOn && this._servoPlaying) { audio.stopLoop('tank.turret_servo'); this._servoPlaying = false; }
+
+    // --- Low-fuel warning: periodic beep while fuel is critical ---
+    if (this.fuel < 20) {
+      this._lowFuelT = (this._lowFuelT ?? 0) - dt;
+      if (this._lowFuelT <= 0) { audio.play('tank.low_fuel'); this._lowFuelT = 1.6; }
+    } else this._lowFuelT = 0;
 
     // --- Dash ---
     if (this.dashTimeLeft > 0) {

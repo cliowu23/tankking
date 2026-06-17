@@ -887,7 +887,9 @@ export default class ArenaScene {
       this._checkHazards(dt);
       this._checkCollisions();
       this._checkObstacleCollisions();
+      const _cdBefore = this._fireCooldown;
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
+      if (_cdBefore > 0 && this._fireCooldown === 0) audio.play('tank.reload', { emitter: this.tank.root }); // cannon ready
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
       this._updateExtraction(dt);

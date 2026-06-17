@@ -36,6 +36,9 @@ export const SOUNDS = {
   'tank.shield_break':  { url: 'sfx/tank/shield_break.ogg',  bus: 'sfx', gain: 0.80 },
   'tank.destroyed':     { url: 'sfx/tank/destroyed.ogg',     bus: 'sfx', duck: true, gain: 1.00 },
   'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.10 },
+  'tank.reload':        { url: 'sfx/tank/reload.ogg',        bus: 'sfx', spatial: true, pitchVar: 0.05, gain: 0.55 },
+  'tank.turret_servo':  { url: 'sfx/tank/turret_servo.ogg',  bus: 'sfx', spatial: true, loop: true, gain: 0.28 },
+  'tank.low_fuel':      { url: 'sfx/tank/low_fuel.ogg',      bus: 'ui',  gain: 0.50 },
 
   // --- The King's machines (spatial — emit from the bot) ---
   'enemy.sentinel_step':        { url: 'sfx/enemy/sentinel_step.ogg',        bus: 'sfx', spatial: true, pitchVar: 0.04, gain: 0.22, maxInstances: 4 },

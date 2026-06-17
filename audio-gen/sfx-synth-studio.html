@@ -181,6 +181,29 @@ const SOUNDS = {
     params:{ freq:{min:300,max:900,val:520,step:10}, dur:{min:.04,max:.16,val:.09,step:.01} },
     build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.9,t0+p.dur);
       const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.005,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.04; } },
+
+  // ===== tank mechanical feedback =====
+  "tank.reload": { tag:"synth", intent:"cannon reload — mechanical clunk then a metallic lock-click",
+    params:{ thunk:{min:60,max:220,val:110,step:5}, click:{min:1500,max:5000,val:3000,step:50}, dur:{min:.12,max:.4,val:.22,step:.01} },
+    build(ctx,t0,p){
+      const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.thunk*1.5,t0); o.frequency.exponentialRampToValueAtTime(p.thunk*0.6,t0+p.dur*0.5);
+      const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.003,.5,p.dur*0.6);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.05); const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=600; const ng=ctx.createGain(); ns.connect(lp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.002,.35,p.dur*0.4);
+      const t2=t0+p.dur*0.55; const ns2=ctx.createBufferSource(); ns2.buffer=noiseBuf(ctx,.06); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=p.click; bp.Q.value=8; const ng2=ctx.createGain(); ns2.connect(bp).connect(ng2).connect(ctx.destination); env(ctx,ng2,t2,.001,.4,.05);
+      o.start(t0);o.stop(t0+p.dur+.05);ns.start(t0);ns.stop(t0+p.dur+.05);ns2.start(t2);ns2.stop(t2+.07); return p.dur+.05; } },
+
+  "tank.turret_servo": { tag:"loopable", intent:"turret traverse — soft servo whine (looped while rotating)",
+    params:{ base:{min:150,max:500,val:260,step:5}, wob:{min:2,max:20,val:8,step:1}, cutoff:{min:400,max:2500,val:1100,step:20}, dur:{min:1,max:3,val:1.5,step:.5} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.value=p.base;
+      const lfo=ctx.createOscillator(),lg=ctx.createGain(); lfo.frequency.value=p.wob; lg.gain.value=p.base*0.03; lfo.connect(lg).connect(o.frequency); lfo.start(t0);lfo.stop(t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff; lp.Q.value=3;
+      const g=ctx.createGain(); g.gain.value=.18; o.connect(lp).connect(g).connect(ctx.destination);
+      o.start(t0);o.stop(t0+p.dur); return p.dur; } },
+
+  "tank.low_fuel": { tag:"synth", intent:"low-fuel warning — terse double warning beep",
+    params:{ freq:{min:400,max:1000,val:620,step:10}, gap:{min:.08,max:.25,val:.12,step:.01} },
+    build(ctx,t0,p){ const mk=(t)=>{ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.value=p.freq; const g=ctx.createGain(); o.connect(g).connect(ctx.destination); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.4,t+.008); g.gain.setValueAtTime(.4,t+.07); g.gain.exponentialRampToValueAtTime(.0001,t+.09); o.start(t);o.stop(t+.11); };
+      mk(t0); mk(t0+p.gap); return p.gap+0.14; } },
 };
 
 // ---- WAV encoder (mono, 16-bit) ----
