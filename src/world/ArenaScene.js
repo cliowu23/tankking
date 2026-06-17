@@ -477,20 +477,10 @@ export default class ArenaScene {
       if (this._paused) { music.pause(); music.playNeedleLift(); } // freeze music + needle-off
       else music.resume();                                         // un-freeze where it left off
     });
-    document.getElementById('pause-restart').addEventListener('click', () => {
-      this._restart();
-      this._paused = false;
-      window.__state = 'GAME';
-      document.getElementById('pause').style.display = 'none';
-    });
-
-    document.getElementById('death-restart').addEventListener('click', () => {
-      this._restart();
-      this._paused = false;
-      window.__state = 'GAME';
-      // music restart is owned by the main.js death-restart handler (music.restart())
-      document.getElementById('death').style.display = 'none';
-    });
+    // NOTE: the #pause-restart and #death-restart buttons are owned solely by
+    // main.js (it restarts the scene, restores the HUD, and restarts the music).
+    // They used to be bound here too, which fired _restart() twice per click —
+    // removed. ESC (above) is the only restart-adjacent handler this scene owns.
 
     // Fetch model manifest then load — manifest provides node name overrides per model
     fetch('/assets/models/manifest.json')
