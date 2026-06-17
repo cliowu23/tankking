@@ -84,11 +84,29 @@ if (localStorage.getItem(MUTE_KEY) === '1') music.setMuted(true);
 const _settingsBtn = document.createElement('button');
 _settingsBtn.id = 'settings-btn';
 _settingsBtn.title = 'Audio settings';
-_settingsBtn.textContent = '⚙';
+// Chunky pixel-art cog (inline SVG, crisp edges) — toylike + retro, on-brand with
+// the Press Start 2P / Tron UI. 4-fold cog on a 12-unit grid with a 2×2 hub hole.
+_settingsBtn.innerHTML =
+  '<svg viewBox="0 0 12 12" width="22" height="22" shape-rendering="crispEdges" fill="#4fd6ff" aria-hidden="true">' +
+    '<rect x="4" y="0" width="4" height="2"/>' +
+    '<rect x="2" y="2" width="8" height="2"/>' +
+    '<rect x="0" y="4" width="12" height="1"/>' +
+    '<rect x="0" y="5" width="5" height="2"/>' +
+    '<rect x="7" y="5" width="5" height="2"/>' +
+    '<rect x="0" y="7" width="12" height="1"/>' +
+    '<rect x="2" y="8" width="8" height="2"/>' +
+    '<rect x="4" y="10" width="4" height="2"/>' +
+  '</svg>';
 _settingsBtn.style.cssText =
   'position:fixed;top:12px;right:12px;z-index:9999;width:38px;height:38px;border-radius:8px;' +
-  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);color:#cdd6e2;font-size:19px;' +
-  'cursor:pointer;backdrop-filter:blur(4px);line-height:1;padding:0;';
+  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);' +
+  'cursor:pointer;backdrop-filter:blur(4px);padding:0;display:flex;align-items:center;justify-content:center;';
+// playful spring-y quarter-turn on hover (toy feel)
+const _settingsStyle = document.createElement('style');
+_settingsStyle.textContent =
+  '#settings-btn svg{display:block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}' +
+  '#settings-btn:hover svg{transform:rotate(45deg)}';
+document.head.appendChild(_settingsStyle);
 
 const _settingsPanel = document.createElement('div');
 _settingsPanel.id = 'settings-panel';
