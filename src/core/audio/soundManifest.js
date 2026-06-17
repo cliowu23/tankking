@@ -30,14 +30,26 @@ export const SOUNDS = {
   // --- Player tank ---
   'tank.cannon_fire':   { url: 'sfx/tank/cannon_fire.ogg',   bus: 'sfx', spatial: true,  duck: true, pitchVar: 0.12, gain: 1.00, maxInstances: 4 },
   'tank.hit_heavy':     { url: 'sfx/tank/hit_heavy.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.10, gain: 0.90, maxInstances: 3 },
+  'tank.hit_light':     { url: 'sfx/tank/hit_light.ogg',     bus: 'sfx', spatial: false, pitchVar: 0.12, gain: 0.75, maxInstances: 3 },
   'tank.shield_activate': { url: 'sfx/tank/shield_activate.ogg', bus: 'sfx', gain: 0.80 },
   'tank.shield_loop':   { url: 'sfx/tank/shield_loop.ogg',   bus: 'sfx', loop: true, gain: 0.45 },
   'tank.shield_break':  { url: 'sfx/tank/shield_break.ogg',  bus: 'sfx', gain: 0.80 },
+  'tank.destroyed':     { url: 'sfx/tank/destroyed.ogg',     bus: 'sfx', duck: true, gain: 1.00 },
+  'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.10 },
 
   // --- The King's machines (spatial — emit from the bot) ---
+  'enemy.sentinel_whir':        { url: 'sfx/enemy/sentinel_whir.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.30 },
   'enemy.sentinel_beam_charge': { url: 'sfx/enemy/sentinel_beam_charge.ogg', bus: 'sfx', spatial: true, gain: 0.85 },
   'enemy.sentinel_beam_fire':   { url: 'sfx/enemy/sentinel_beam_fire.ogg',   bus: 'sfx', spatial: true, duck: true, gain: 1.00, maxInstances: 4 },
+  'enemy.sentinel_beam_impact': { url: 'sfx/enemy/sentinel_beam_impact.ogg', bus: 'sfx', spatial: true, gain: 0.80, maxInstances: 3 },
+  'enemy.sentinel_death':       { url: 'sfx/enemy/sentinel_death.ogg',       bus: 'sfx', spatial: true, gain: 0.90, maxInstances: 3 },
+  'enemy.chaff_skitter':        { url: 'sfx/enemy/chaff_skitter.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.25 },
+  'enemy.chaff_laser_fire':     { url: 'sfx/enemy/chaff_laser_fire.ogg',     bus: 'sfx', spatial: true, pitchVar: 0.15, gain: 0.65, maxInstances: 6 },
+  'enemy.chaff_death':          { url: 'sfx/enemy/chaff_death.ogg',          bus: 'sfx', spatial: true, pitchVar: 0.12, gain: 0.65, maxInstances: 4 },
 
   // --- UI ---
+  'ui.hover':           { url: 'ui/hover.ogg',   bus: 'ui', gain: 0.45 },
+  'ui.select':          { url: 'ui/select.ogg',  bus: 'ui', gain: 0.70 },
+  'ui.confirm':         { url: 'ui/confirm.ogg', bus: 'ui', gain: 0.80 },
   'ui.wave_start':      { url: 'ui/wave_start.ogg', bus: 'ui', gain: 0.80 },
 };

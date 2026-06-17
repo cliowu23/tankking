@@ -254,13 +254,15 @@ export default class Tank {
   takeDamage(amount) {
     if (!this.alive) return;
     this.hp = Math.max(0, this.hp - amount * shieldDamageMultiplier(this.shield));
-    if (amount > 0) audio.play('tank.hit_heavy');
+    if (amount > 0) audio.play(amount >= 20 ? 'tank.hit_heavy' : 'tank.hit_light');
     if (this.hp <= 0) this._die();
   }
 
   _die() {
     this.alive = false;
     this.speed = 0;
+    audio.play('tank.destroyed');
+    audio.stopLoop('tank.engine');
     this.hullMat.diffuseColor  = new Color3(0.15, 0.12, 0.08);
     this.hullMat.emissiveColor = new Color3(0.05, 0.03, 0.01);
   }
@@ -307,6 +309,13 @@ export default class Tank {
       audio.stopLoop('tank.shield_loop');
     }
     const shieldMove = this.shield.active ? SHIELD_MOVE_MULT : 1;
+
+    // --- Engine swell: louder/fuller with speed (throttled to avoid click thrash) ---
+    const engineTarget = 0.07 + 0.55 * Math.min(1, Math.abs(this.speed) / this.maxSpeed);
+    if (this._engineVol === undefined || Math.abs(engineTarget - this._engineVol) > 0.04) {
+      this._engineVol = engineTarget;
+      audio.setVolume('tank.engine', engineTarget);
+    }
 
     // --- Dash ---
     if (this.dashTimeLeft > 0) {

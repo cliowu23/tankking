@@ -18,6 +18,7 @@ import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, 
 import AIEnemy from './AIEnemy.js';
 import LaserBolt from '../combat/LaserBolt.js';
 import { loadEnemyTemplate } from './enemyModels.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 const LASER_POOL     = 14;                  // bolts in flight at once (stream needs depth)
 const LASER_HSPEED   = 60;                  // bolt travels faster than a shell (35)
@@ -256,6 +257,7 @@ export default class ChaffEnemy extends AIEnemy {
       Math.sin(aim) * LASER_HSPEED, 0, Math.cos(aim) * LASER_HSPEED,
       LASER_RANGE,
     );
+    audio.play('enemy.chaff_laser_fire', { emitter: this.root });
 
     // Burst cadence: after LASER_BURST bolts, take a longer regroup pause.
     this._burstLeft -= 1;
@@ -315,6 +317,7 @@ export default class ChaffEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
+    audio.play('enemy.chaff_death', { emitter: this.root });
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
     else if (this.hullMat) {   // primitive fallback
       this.hullMat.diffuseColor.set(...DEATH_TINT);

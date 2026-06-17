@@ -112,6 +112,17 @@ class AudioManager {
     try { entry.snd.stop(); } catch (_) {}
   }
 
+  // Live volume change on a playing sound (e.g. engine swell with speed).
+  // Throttled by the caller; uses a short ramp to avoid clicks.
+  setVolume(id, v, dur = 0.12) {
+    const entry = this.sounds[id];
+    if (!entry) return;
+    try {
+      if (typeof entry.snd.setVolume === 'function') entry.snd.setVolume(v, { duration: dur });
+      else entry.snd.volume = v;
+    } catch (_) {}
+  }
+
   // Briefly pull down music/ambience so an impactful SFX reads, then restore.
   _duck() {
     clearTimeout(this._duckTimer);

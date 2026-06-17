@@ -335,6 +335,7 @@ export default class SentinelEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
+    audio.play('enemy.sentinel_death', { emitter: this.root });
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.22, 0.22, 0.24, 1);
     else if (this.bodyMat) {   // primitive fallback
       this.bodyMat.diffuseColor.set(...DEATH_TINT);
