@@ -113,8 +113,9 @@ class MusicManager {
     const m = this.master, nodes = [];
     const verb = new Tone.Freeverb(0.7, 2200).connect(m); nodes.push(verb);
     const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -16 }).connect(verb); nodes.push(pad);
-    const dly = new Tone.FeedbackDelay('4n', 0.25); dly.wet.value = 0.3; dly.connect(verb); nodes.push(dly);
-    const arp = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0, release: 0.3 }, volume: -20 }).connect(dly); nodes.push(arp);
+    // arp runs straight into reverb — no feedback delay, so its echoes don't pile
+    // up under the melody and clash (user feedback 2026-06-17).
+    const arp = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0, release: 0.3 }, volume: -18 }).connect(verb); nodes.push(arp);
     nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), CHORDS, '1m').start(0));
     nodes.push(new Tone.Sequence((t, n) => arp.triggerAttackRelease(n, '8n', t), MENU_ARP, '4n').start(0));
     return { nodes };
