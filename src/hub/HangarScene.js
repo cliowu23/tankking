@@ -688,6 +688,17 @@ export default class HangarScene {
     this.driver.ready
       .then(() => this.driver.applyConfig(this._driverConfig))
       .then(applied => { if (applied) this._adoptDriverConfig(applied); });
+
+    // Click-on-part nav (only while the lounge panel is open): click a body region
+    // of the driver to jump the panel to that section. The clicked region is
+    // resolved on the tap itself (scene.pick is reliable for dynamically-grafted
+    // meshes in Babylon 7.x), so there's no per-frame hover work or highlight.
+    this.scene.onPointerObservable.add((pi) => {
+      if (!this._panelOpen || pi.type !== PointerEventTypes.POINTERTAP) return;
+      const hit = this.scene.pick(this.scene.pointerX, this.scene.pointerY)?.pickedMesh;
+      const region = this.driver.regionOfMesh(hit);
+      if (region) window.dispatchEvent(new CustomEvent('crewpart', { detail: { region } }));
+    });
   }
 
   _adoptDriverConfig(applied) {

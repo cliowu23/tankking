@@ -655,15 +655,19 @@ async function buildCrewPanel() {
     }
     btns.appendChild(grp);
   };
-  const br = row('Outfit');
-  for (const it of _wardrobe.bodies ?? []) {
-    addGrouped(br, it, id => {
-      // outfit drives head+body together (unified character — no head grafting)
-      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
-    });
-  }
-  for (const [slot, items] of Object.entries(_wardrobe.slots)) {
-    const btns = row(slot[0].toUpperCase() + slot.slice(1));
+  // Slot-row builder (None + items, + the Bedroll add-on toggle on the back slot).
+  const SLOT_LABELS = { face: 'Eyewear', facialhair: 'Facial Hair', hair: 'Hair', headwear: 'Headwear', back: 'Back' };
+  const section = (title) => {
+    const s = document.createElement('div');
+    s.className = 'lng-section';
+    s.id = 'lng-sec-' + title.toLowerCase();   // lng-sec-body / lng-sec-head (matches pick regions)
+    s.textContent = title;
+    host.appendChild(s);
+  };
+  const buildSlot = (slot) => {
+    const items = _wardrobe.slots[slot];
+    if (!items) return;
+    const btns = row(SLOT_LABELS[slot] ?? (slot[0].toUpperCase() + slot.slice(1)));
     mkBtn(btns, 'None', { gid: 'none', slot }, () => {
       if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: 'none' }));
     });
@@ -685,7 +689,22 @@ async function buildCrewPanel() {
       });
       btns.appendChild(b);
     }
+  };
+  // Grouped into sections so the panel reads cleanly (Skin sits up top as the base).
+  section('BODY');
+  const br = row('Outfit');
+  for (const it of _wardrobe.bodies ?? []) {
+    addGrouped(br, it, id => {
+      // outfit drives head+body together (unified character — no head grafting)
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
+    });
   }
+  buildSlot('back');
+  section('HEAD');
+  buildSlot('hair');
+  buildSlot('facialhair');
+  buildSlot('headwear');
+  buildSlot('face');
 }
 function syncCrewPanel(cfg) {
   _driverCfg = cfg;
@@ -707,5 +726,16 @@ function syncCrewPanel(cfg) {
   document.querySelectorAll('#lounge-slots [data-gmodel]').forEach(b =>
     b.classList.toggle('on', [...active].some(v => typeof v === 'string' && v.startsWith(b.dataset.gmodel))));
 }
+
+// Click-on-part nav: the hangar fires 'crewpart' (region = head|body) when the
+// player clicks a body region of the driver → scroll that panel section in + pulse it.
+window.addEventListener('crewpart', (e) => {
+  const sec = document.getElementById('lng-sec-' + e.detail.region);
+  if (!sec) return;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sec.classList.remove('lng-pulse');
+  void sec.offsetWidth;          // restart the animation
+  sec.classList.add('lng-pulse');
+});
 
 window.addEventListener('resize', () => engine.resize());
