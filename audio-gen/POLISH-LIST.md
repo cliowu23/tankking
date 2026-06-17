@@ -13,6 +13,7 @@ as `STEP_INTERVAL` in each enemy's `_moveBeep`.
 - [ ] **enemy.chaff_step / enemy.sentinel_step** (movement beeps) — concept approved but "okay, will need to revisit"; dialled volume down for now (chaff gain 0.16, sentinel 0.22). Revisit tone/cadence/feel later (2026-06-17).
 
 ## Ideas / reserved
+- [ ] **"Theme C" hopeful synthwave** (100 BPM, with a hopeful lead melody) — user liked it, reserved for a future **level / minigame**. Recipe lives in `audio-gen/hangar-theme-preview.html` (buildSynthwave). Port to MusicManager when that level exists.
 - [ ] **amb.sea** (`ambience/sea.ogg`) — the old "arena wind" reads as ocean surf; user liked it for a future **coastal / sea leg**. Baked + in manifest, NOT wired. Use when a sea/ocean zone exists.
 - [ ] **Grassy-zone ambience (W1)** — PARKED 2026-06-17, blocked on Freesound (down). Plan = CC0 nature 3-layer: gentle breeze bed + crickets/birdsong life layer + procedural bird spot-calls (sampler-style). Needs good CC0 bird/cricket field recordings (Freesound when up, or hand-grabbed). No-auth GitHub CC0 repos lack good ones. Research: `_docs/design/2026-06-17-cozy-grassland-ambience.md`. Hangar hum kept (liked).
 

@@ -56,8 +56,16 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
-// music: Tone graph is built lazily on first scene entry (music.start) so node
-// creation happens after the audio context is running — no autoplay-warning spam.
+// music: Tone graph is built lazily (music.start) after the audio context is
+// running — no autoplay-warning spam. Kick off the MENU theme on the very first
+// user gesture (so the title screen has music before the player presses start).
+function _menuMusicOnGesture() {
+  if (window.__state === 'MENU') music.playMenu();
+  window.removeEventListener('pointerdown', _menuMusicOnGesture);
+  window.removeEventListener('keydown', _menuMusicOnGesture);
+}
+window.addEventListener('pointerdown', _menuMusicOnGesture);
+window.addEventListener('keydown', _menuMusicOnGesture);
 
 // Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
 // or rebuilding the arena, so they don't bleed into the hangar/menu.
@@ -352,7 +360,7 @@ function goToMenu() {
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
   silenceArena(); // after _restart (which restarts engine) so the menu is quiet
   audio.stopLoop('amb.hangar');
-  music.stop();
+  music.playMenu();
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
