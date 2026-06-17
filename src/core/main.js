@@ -379,6 +379,8 @@ function goToMenu() {
   document.getElementById('death').style.display = 'none';
   document.getElementById('hud').style.display   = 'none';
   document.getElementById('hangar-salvage').style.display = 'none';
+  document.getElementById('extract-indicator').style.display = 'none'; // sweep the extraction bar
+  document.getElementById('extract-summary').style.display = 'none';   // and the summary, so neither leaks onto the menu
   canvas.style.display = 'none';
   engine.stopRenderLoop();
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
