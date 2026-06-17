@@ -111,13 +111,11 @@ class MusicManager {
   // ---- theme builders (return { nodes, layerMid?, layerHigh? }) ----
   _build_menu() {
     const m = this.master, nodes = [];
+    // Just the warm held chords — the arp/melody was dropped (user liked the pad
+    // alone for the title screen, 2026-06-17).
     const verb = new Tone.Freeverb(0.7, 2200).connect(m); nodes.push(verb);
-    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -16 }).connect(verb); nodes.push(pad);
-    // arp runs straight into reverb — no feedback delay, so its echoes don't pile
-    // up under the melody and clash (user feedback 2026-06-17).
-    const arp = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0, release: 0.3 }, volume: -18 }).connect(verb); nodes.push(arp);
+    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -13 }).connect(verb); nodes.push(pad);
     nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), CHORDS, '1m').start(0));
-    nodes.push(new Tone.Sequence((t, n) => arp.triggerAttackRelease(n, '8n', t), MENU_ARP, '4n').start(0));
     return { nodes };
   }
 
