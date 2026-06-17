@@ -51,8 +51,9 @@ export const SOUNDS = {
 
   // --- UI ---
   'ui.hover':           { url: 'ui/hover.ogg',   bus: 'ui', gain: 0.45 },
+  'ui.interact':        { url: 'ui/interact.ogg', bus: 'ui', pitchVar: 0.03, gain: 0.65 }, // single blip — E-press / resume / enter / general buttons
   'ui.select':          { url: 'ui/select.ogg',  bus: 'ui', gain: 0.70 },
-  'ui.confirm':         { url: 'ui/confirm.ogg', bus: 'ui', gain: 0.80 },
+  'ui.confirm':         { url: 'ui/confirm.ogg', bus: 'ui', gain: 0.80 }, // weighty multi-note jingle — reserved for big commits (deploy)
   'ui.wave_start':      { url: 'ui/wave_start.ogg', bus: 'ui', gain: 0.80 },
 
   // --- Ambience (2D looping beds, sit under everything) ---

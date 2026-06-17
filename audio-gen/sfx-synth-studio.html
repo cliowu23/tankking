@@ -225,6 +225,29 @@ const SOUNDS = {
       const gust=ctx.createOscillator(); gust.frequency.value=3/p.dur; const gg=ctx.createGain(); gg.gain.value=.05*p.wind; const goff=ctx.createConstantSource(); goff.offset.value=.07*p.wind; gust.connect(gg).connect(wg.gain); goff.connect(wg.gain); gust.start(t0);gust.stop(t0+p.dur);goff.start(t0);goff.stop(t0+p.dur);
       const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.value=55; const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=180; const og=ctx.createGain(); og.gain.value=.06*p.drone; o.connect(lp).connect(og).connect(ctx.destination); o.start(t0);o.stop(t0+p.dur);
       ns.start(t0);ns.stop(t0+p.dur); return p.dur; } },
+
+  // ===== UI =====
+  "ui.interact": { tag:"synth", intent:"general interaction blip — single clean beep (E-press / button / resume / enter)",
+    params:{ freq:{min:500,max:1200,val:760,step:10}, dur:{min:.04,max:.12,val:.06,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*1.06,t0+p.dur*0.5);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.5,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.03; } },
+
+  // ===== hit confirmation (restored — lost in an editor save) =====
+  "enemy.hit": { tag:"synth", intent:"normal hit confirm — crisp single tick (tonal tok + noise snap)",
+    params:{ freq:{min:400,max:1200,val:720,step:10}, dur:{min:.04,max:.14,val:.07,step:.01}, snap:{min:0,max:1,val:.5,step:.05} },
+    build(ctx,t0,p){
+      const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.7,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.002,.5,p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,.04); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=2500; bp.Q.value=2; const ng=ctx.createGain(); ns.connect(bp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.001,.4*p.snap,.03);
+      o.start(t0);o.stop(t0+p.dur+.02);ns.start(t0);ns.stop(t0+.05); return p.dur+.04; } },
+
+  "enemy.hit_crit": { tag:"synth", intent:"CRIT confirm — brighter snap + ascending two-note ding (longer/louder/rewarding)",
+    params:{ f1:{min:600,max:1400,val:900,step:10}, f2:{min:1000,max:2200,val:1500,step:20}, gap:{min:.03,max:.1,val:.05,step:.01}, snap:{min:0,max:1,val:.7,step:.05} },
+    build(ctx,t0,p){
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,.05); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=3500; bp.Q.value=1.5; const ng=ctx.createGain(); ns.connect(bp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.001,.5*p.snap,.04);
+      const note=(t,f)=>{ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*0.85,t+.09); const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t,.002,.5,.1); o.start(t);o.stop(t+.12); };
+      note(t0,p.f1); note(t0+p.gap,p.f2);
+      return p.gap+0.14; } },
 };
 
 // ---- WAV encoder (mono, 16-bit) ----

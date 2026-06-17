@@ -76,7 +76,9 @@ document.addEventListener('pointerover', (e) => {
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  audio.play(/deploy|resume|return|restart/.test(b.id || '') ? 'ui.confirm' : 'ui.select');
+  // deploy = the one weighty "commit to a run" action → the multi-note jingle.
+  // everything else (resume, restart, menu, close, return) = single interact blip.
+  audio.play(/deploy/.test(b.id || '') ? 'ui.confirm' : 'ui.interact');
 });
 
 let arenaScene    = null;
@@ -184,7 +186,7 @@ function transition(hideFn, showFn, type = 'checker') {
 }
 
 function startGame() {
-  audio.play('ui.confirm'); // keyboard-driven start (not a button, so wire it here)
+  audio.play('ui.interact'); // keyboard-driven start (single blip; may revisit later)
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
