@@ -25,16 +25,12 @@ import { BUSES, DUCK, SOUNDS } from './soundManifest.js';
 
 const BASE = `${import.meta.env.BASE_URL}assets/audio/`;
 
-// iOS/Safari can't reliably decode OGG/Vorbis, so SFX went silent there. Use
-// .ogg only where the browser clearly supports it; everywhere else load the AAC
-// (.m4a) sibling we ship alongside each file. Zero regression on Chrome/Firefox.
-const AUDIO_EXT = (() => {
-  try {
-    const a = document.createElement('audio');
-    return a.canPlayType('audio/ogg; codecs="vorbis"') === 'probably' ? '.ogg' : '.m4a';
-  } catch { return '.m4a'; }
-})();
-const srcUrl = (url) => BASE + url.replace(/\.ogg$/, AUDIO_EXT);
+// Every browser loads the 48 kHz AAC (.m4a). The original .ogg sources were
+// 192 kHz — out of spec, so iOS Safari was silent AND real Chrome couldn't
+// actually produce sound from them (it only "played" them in name). AAC at
+// 48 kHz is universally decodable (Chrome/Firefox/Safari/iOS/Android), so the
+// manifest's .ogg paths are simply mapped to their .m4a sibling.
+const srcUrl = (url) => BASE + url.replace(/\.ogg$/, '.m4a');
 
 class AudioManager {
   constructor() {
@@ -113,12 +109,17 @@ class AudioManager {
       return;
     }
     const { snd, def } = entry;
-    if (def.pitchVar) snd.playbackRate = 1 + (Math.random() * 2 - 1) * def.pitchVar;
-    if (def.spatial && opts.emitter && snd.spatial && typeof snd.spatial.attach === 'function') {
-      snd.spatial.attach(opts.emitter);
-    }
-    if (def.duck) this._duck();
-    try { snd.play(); } catch (_) { /* not yet unlocked */ }
+    // Pre-play tweaks must NEVER prevent the sound — a throw here (e.g. a duck or
+    // spatial-attach failing on some browser) used to silently swallow the whole
+    // play() and the sound went mute. Each step is isolated; play() always runs.
+    try {
+      if (def.pitchVar) snd.playbackRate = 1 + (Math.random() * 2 - 1) * def.pitchVar;
+      if (def.spatial && opts.emitter && snd.spatial && typeof snd.spatial.attach === 'function') {
+        snd.spatial.attach(opts.emitter);
+      }
+    } catch (e) { console.warn('[audio] pre-play tweak failed:', id, e); }
+    try { snd.play(); } catch (e) { console.warn('[audio] play failed:', id, e); }
+    try { if (def.duck) this._duck(); } catch (e) { console.warn('[audio] duck failed:', id, e); }
   }
 
   startLoop(id, opts = {}) {
