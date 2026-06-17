@@ -354,6 +354,35 @@ function dehintStatic() {
   if (md) md.textContent = 'SELECT TANK';   // was "[ T ] SELECT TANK"
 }
 
+// Touch how-to-play, injected into the controls screen where the (now hidden)
+// keyboard grid used to be. Explains the finger controls in the game's voice.
+function injectTutorial() {
+  const panel = document.getElementById('controls-panel');
+  const grid  = document.getElementById('controls-grid');
+  if (!panel || document.getElementById('mc-tutorial')) return;
+  const block = document.createElement('div');
+  block.id = 'mc-tutorial';
+  block.style.cssText =
+    "display:flex;flex-direction:column;gap:13px;margin:6px auto 22px;width:88%;max-width:320px;box-sizing:border-box;" +
+    "font-family:'Press Start 2P',monospace;";
+  const rows = [
+    ['MOVE',   'Drag the left side — the tank turns and drives the way you point.'],
+    ['FIRE',   'Tap the battlefield to aim the turret there and shoot.'],
+    ['BOOST',  'Hold the BOOST button to dash.'],
+    ['SHIELD', 'Hold SHIELD to brace against incoming fire.'],
+    ['ACT',    'Tap the orange button to LOOT / MOUNT / ENTER.'],
+  ];
+  for (const [label, desc] of rows) {
+    const r = document.createElement('div');
+    r.style.cssText = 'display:flex;align-items:flex-start;gap:10px;text-align:left;line-height:1.55;';
+    r.innerHTML =
+      `<span style="flex:0 0 58px;color:#00eedd;font-size:9px;letter-spacing:1px;text-shadow:0 0 8px rgba(0,238,221,0.4)">${label}</span>` +
+      `<span style="flex:1;color:#9fb6b3;font-size:8px;letter-spacing:0.4px">${desc}</span>`;
+    block.appendChild(r);
+  }
+  (grid || panel.firstChild).insertAdjacentElement?.('afterend', block) ?? panel.appendChild(block);
+}
+
 // ── Public entry — call once from main.js. No-op on non-touch (desktop safe).
 export function initMobileControls() {
   if (!touchDevice()) return;          // desktop / no touch → nothing injected
@@ -362,6 +391,7 @@ export function initMobileControls() {
   injectStyles();
   buildDom();
   dehintStatic();
+  injectTutorial();
   startContextLoop();
   window.__mobile = { refresh, key, active: true, version: 2 }; // debug hook (mirrors __arena/__hangar)
   window.__camZoom = camZoomFactor;    // scenes multiply their camera radius by this (1 on desktop)
