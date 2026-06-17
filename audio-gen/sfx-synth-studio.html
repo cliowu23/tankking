@@ -170,6 +170,17 @@ const SOUNDS = {
       const lfo=ctx.createOscillator(); lfo.type="sawtooth"; lfo.frequency.value=p.chug; const lg=ctx.createGain(); lg.gain.value=.12; const off=ctx.createConstantSource(); off.offset.value=.22; lfo.connect(lg); lg.connect(g.gain); off.connect(g.gain);
       o1.start(t0);o2.start(t0);ns.start(t0);lfo.start(t0);off.start(t0);
       o1.stop(t0+p.dur);o2.stop(t0+p.dur);ns.stop(t0+p.dur);lfo.stop(t0+p.dur);off.stop(t0+p.dur); return p.dur; } },
+
+  // ===== movement beeps (played on a cadence WHILE the enemy moves) =====
+  "enemy.sentinel_step": { tag:"synth", intent:"sentinel move beep — deep low note, slow cadence",
+    params:{ freq:{min:180,max:520,val:300,step:5}, dur:{min:.06,max:.2,val:.11,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.85,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.004,.5,p.dur); o.start(t0);o.stop(t0+p.dur+.03); return p.dur+.05; } },
+
+  "enemy.chaff_step": { tag:"synth", intent:"chaff move beep — high quick blip, fast cadence",
+    params:{ freq:{min:600,max:1700,val:1050,step:10}, dur:{min:.03,max:.12,val:.06,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="square"; o.frequency.setValueAtTime(p.freq,t0);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.04; } },
 };
 
 // ---- WAV encoder (mono, 16-bit) ----

@@ -270,9 +270,23 @@ export default class SentinelEnemy extends AIEnemy {
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
-      if (!this._whir) this._whir = audio.attachLoop('enemy.sentinel_whir', this.root); // lazy: retries until ready
+      this._moveBeep(dt);   // deep beep on a slow cadence while relocating
       this._updateCharge(dt);
       this._updateEye(dt);
+    }
+  }
+
+  // Deep movement beep: fires on a slow cadence only while the bot is actually
+  // moving (distance/sec over a small threshold). No drone — just "it's coming".
+  _moveBeep(dt) {
+    const STEP_INTERVAL = 0.7, MOVE_THRESH = 0.6;
+    const { x, z } = this.root.position;
+    const sp = (this._bpx !== undefined) ? Math.hypot(x - this._bpx, z - this._bpz) / Math.max(dt, 1e-3) : 0;
+    this._bpx = x; this._bpz = z;
+    this._stepT = (this._stepT ?? 0) - dt;
+    if (sp > MOVE_THRESH && this._stepT <= 0) {
+      audio.play('enemy.sentinel_step', { emitter: this.root });
+      this._stepT = STEP_INTERVAL;
     }
   }
 
@@ -337,7 +351,6 @@ export default class SentinelEnemy extends AIEnemy {
 
   _deathVisuals() {
     audio.play('enemy.sentinel_death', { emitter: this.root });
-    audio.detachLoop(this._whir); this._whir = null;
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.22, 0.22, 0.24, 1);
     else if (this.bodyMat) {   // primitive fallback
       this.bodyMat.diffuseColor.set(...DEATH_TINT);

@@ -38,12 +38,12 @@ export const SOUNDS = {
   'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: true, loop: true, gain: 0.10 },
 
   // --- The King's machines (spatial — emit from the bot) ---
-  'enemy.sentinel_whir':        { url: 'sfx/enemy/sentinel_whir.ogg',        bus: 'sfx', spatial: true, poolSize: 8,  gain: 0.30 },
+  'enemy.sentinel_step':        { url: 'sfx/enemy/sentinel_step.ogg',        bus: 'sfx', spatial: true, pitchVar: 0.04, gain: 0.40, maxInstances: 4 },
   'enemy.sentinel_beam_charge': { url: 'sfx/enemy/sentinel_beam_charge.ogg', bus: 'sfx', spatial: true, gain: 0.85 },
   'enemy.sentinel_beam_fire':   { url: 'sfx/enemy/sentinel_beam_fire.ogg',   bus: 'sfx', spatial: true, duck: true, gain: 1.00, maxInstances: 4 },
   'enemy.sentinel_beam_impact': { url: 'sfx/enemy/sentinel_beam_impact.ogg', bus: 'sfx', spatial: true, gain: 0.80, maxInstances: 3 },
   'enemy.sentinel_death':       { url: 'sfx/enemy/sentinel_death.ogg',       bus: 'sfx', spatial: true, gain: 0.90, maxInstances: 3 },
-  'enemy.chaff_skitter':        { url: 'sfx/enemy/chaff_skitter.ogg',        bus: 'sfx', spatial: true, poolSize: 16, gain: 0.25 },
+  'enemy.chaff_step':           { url: 'sfx/enemy/chaff_step.ogg',           bus: 'sfx', spatial: true, pitchVar: 0.06, gain: 0.30, maxInstances: 8 },
   'enemy.chaff_laser_fire':     { url: 'sfx/enemy/chaff_laser_fire.ogg',     bus: 'sfx', spatial: true, pitchVar: 0.15, gain: 0.65, maxInstances: 6 },
   'enemy.chaff_death':          { url: 'sfx/enemy/chaff_death.ogg',          bus: 'sfx', spatial: true, pitchVar: 0.12, gain: 0.65, maxInstances: 4 },
 
