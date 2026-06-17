@@ -5,6 +5,7 @@ import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { generateRoadLeg } from '../world/zones/roadLeg.js';
+import { initMobileControls } from './MobileControls.js';
 
 // The Long Road: wrap a generated leg into an ArenaScene-compatible zone. Provides the
 // generic fields ArenaScene's setup expects (empty enemies/loot, extraction at the
@@ -57,6 +58,11 @@ let hangarScene   = null;
 let controlsSeen  = false;   // HOW-TO-PLAY shows on the first arena entry per session only
 
 window.__state = 'MENU'; // 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
+
+// Additive touch layer for phone playtesting. No-op on non-touch devices; never
+// modifies a keyboard handler (it dispatches the game's own key events). See
+// MobileControls.js. Pass ?touch=1 to force it on desktop for testing.
+initMobileControls();
 
 // ── Transition engine ────────────────────────────────────────────────────────
 const _tc   = document.getElementById('transition-canvas');
