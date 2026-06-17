@@ -22,6 +22,7 @@ import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, 
 import AIEnemy from './AIEnemy.js';
 import EyeBeam from '../combat/EyeBeam.js';
 import { loadEnemyTemplate } from './enemyModels.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 // Mesh names (Blender object names) that belong on the rotating turret/dome.
 const TURRET_PARTS = ['dome', 'eye', 'eyering', 'eyesocket', 'antenna', 'anttip'];
@@ -263,13 +264,29 @@ export default class SentinelEnemy extends AIEnemy {
     this._charging = true;
     this._chargeT  = 0;
     this.fireCooldown = 999;
+    audio.play('enemy.sentinel_beam_charge', { emitter: this.root }); // the dodge tell
   }
 
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
+      this._moveBeep(dt);   // deep beep on a slow cadence while relocating
       this._updateCharge(dt);
       this._updateEye(dt);
+    }
+  }
+
+  // Deep movement beep: fires on a slow cadence only while the bot is actually
+  // moving (distance/sec over a small threshold). No drone — just "it's coming".
+  _moveBeep(dt) {
+    const STEP_INTERVAL = 0.7, MOVE_THRESH = 0.6;
+    const { x, z } = this.root.position;
+    const sp = (this._bpx !== undefined) ? Math.hypot(x - this._bpx, z - this._bpz) / Math.max(dt, 1e-3) : 0;
+    this._bpx = x; this._bpz = z;
+    this._stepT = (this._stepT ?? 0) - dt;
+    if (sp > MOVE_THRESH && this._stepT <= 0) {
+      audio.play('enemy.sentinel_step', { emitter: this.root });
+      this._stepT = STEP_INTERVAL;
     }
   }
 
@@ -303,6 +320,7 @@ export default class SentinelEnemy extends AIEnemy {
       );
     }
     this._eyeFlash = 1;                              // bright discharge flash
+    audio.play('enemy.sentinel_beam_fire', { emitter: this.root });
     this.fireCooldown = this._fireCooldownDuration;  // recovery before next charge
   }
 
@@ -332,6 +350,7 @@ export default class SentinelEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
+    audio.play('enemy.sentinel_death', { emitter: this.root });
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.22, 0.22, 0.24, 1);
     else if (this.bodyMat) {   // primitive fallback
       this.bodyMat.diffuseColor.set(...DEATH_TINT);

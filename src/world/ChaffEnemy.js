@@ -18,6 +18,7 @@ import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, 
 import AIEnemy from './AIEnemy.js';
 import LaserBolt from '../combat/LaserBolt.js';
 import { loadEnemyTemplate } from './enemyModels.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 const LASER_POOL     = 14;                  // bolts in flight at once (stream needs depth)
 const LASER_HSPEED   = 60;                  // bolt travels faster than a shell (35)
@@ -256,6 +257,7 @@ export default class ChaffEnemy extends AIEnemy {
       Math.sin(aim) * LASER_HSPEED, 0, Math.cos(aim) * LASER_HSPEED,
       LASER_RANGE,
     );
+    audio.play('enemy.chaff_laser_fire', { emitter: this.root });
 
     // Burst cadence: after LASER_BURST bolts, take a longer regroup pause.
     this._burstLeft -= 1;
@@ -271,8 +273,25 @@ export default class ChaffEnemy extends AIEnemy {
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
+      this._moveBeep(dt, playerPos);   // soft blip while advancing, only when near
       this._animateLegs(dt);
       this._updateEye(dt);
+    }
+  }
+
+  // Movement blip: fires only while actually moving AND within earshot of the
+  // player. Distance-gating keeps a whole aggro'd swarm from beeping at once —
+  // only the ones closing on you are heard. Slow cadence + slight per-bot jitter.
+  _moveBeep(dt, playerPos) {
+    const STEP_INTERVAL = 0.5, MOVE_THRESH = 0.6, BEEP_RANGE = 18;
+    const { x, z } = this.root.position;
+    const sp = (this._bpx !== undefined) ? Math.hypot(x - this._bpx, z - this._bpz) / Math.max(dt, 1e-3) : 0;
+    this._bpx = x; this._bpz = z;
+    this._stepT = (this._stepT ?? 0) - dt;
+    const near = playerPos ? Math.hypot(x - playerPos.x, z - playerPos.z) <= BEEP_RANGE : true;
+    if (near && sp > MOVE_THRESH && this._stepT <= 0) {
+      audio.play('enemy.chaff_step', { emitter: this.root });
+      this._stepT = STEP_INTERVAL + Math.random() * 0.12;   // jitter so a pack doesn't sync
     }
   }
 
@@ -315,6 +334,7 @@ export default class ChaffEnemy extends AIEnemy {
   }
 
   _deathVisuals() {
+    audio.play('enemy.chaff_death', { emitter: this.root });
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
     else if (this.hullMat) {   // primitive fallback
       this.hullMat.diffuseColor.set(...DEATH_TINT);

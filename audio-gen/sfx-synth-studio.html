@@ -1,0 +1,283 @@
+<!doctype html><html><head><meta charset="utf-8"><title>TanKING — Procedural SFX Synth Studio</title>
+<style>
+  :root{--bg:#0a0d12;--pnl:#131a24;--ln:#1f2a38;--cy:#4fd6ff;--am:#ffb454;--tx:#cdd6e2;--dim:#7f8da0;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 ui-monospace,Menlo,monospace;padding:26px}
+  h1{color:var(--cy);font-size:18px;letter-spacing:.06em;margin:0 0 4px}
+  .sub{color:var(--dim);margin-bottom:22px;max-width:880px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+  .card{background:var(--pnl);border:1px solid var(--ln);border-radius:10px;padding:14px 16px}
+  .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .sid{color:var(--cy);font-weight:600;letter-spacing:.03em}
+  .tag{font-size:10px;color:var(--am);border:1px solid var(--am);border-radius:4px;padding:1px 5px}
+  .intent{color:var(--dim);font-style:italic;margin:5px 0 10px;min-height:30px}
+  .row{display:flex;align-items:center;gap:8px;margin:3px 0}
+  .row label{width:96px;color:var(--dim);font-size:11px;text-align:right}
+  .row input[type=range]{flex:1}
+  .row .val{width:54px;color:var(--tx);font-size:11px}
+  .btns{display:flex;gap:8px;margin-top:12px}
+  button{background:var(--cy);color:#04121a;border:0;border-radius:6px;padding:7px 14px;font:inherit;font-weight:700;cursor:pointer}
+  button.ghost{background:transparent;color:var(--cy);border:1px solid var(--cy)}
+  button.am{background:var(--am)}
+  .foot{margin-top:22px;color:var(--dim)}
+  a.dl{color:var(--am)}
+</style></head><body>
+<h1>TanKING — Procedural SFX Synth Studio</h1>
+<div class="sub">Each sound is <b>composed in code</b> — oscillators + noise + envelopes + filters, no recording, no AI model. 100% original &amp; license-clean. Drag sliders, hit <b>Play</b> to audition live, <b>Random</b> to hear a variation-pool take, <b>Render .wav</b> to export a bakeable file. Tune the ones you like and tell me the slider values (or just which to bake) — I'll wire them into the game. Grounded foley (cannon/hit) may still favor your Kenney picks; the synthetic ones (laser/shield/charge/klaxon) are where this shines.</div>
+<div class="grid" id="grid"></div>
+<div class="foot">Tip: <b>shield_loop</b> is built to loop seamlessly. Use headphones. AudioContext starts on first click.</div>
+
+<script>
+const AC = window.AudioContext || window.webkitAudioContext;
+let live = null;
+const ctxLive = () => (live ||= new AC());
+
+// ---- white-noise buffer helper (works on live + offline contexts) ----
+function noiseBuf(ctx, secs){
+  const n = Math.floor(ctx.sampleRate*secs), b = ctx.createBuffer(1,n,ctx.sampleRate), d = b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i] = Math.random()*2-1;
+  return b;
+}
+// soft distortion curve
+function drive(ctx, amount){
+  const ws = ctx.createWaveShaper(), n=1024, c=new Float32Array(n), k=amount*100;
+  for(let i=0;i<n;i++){const x=i*2/n-1; c[i]=(1+k)*x/(1+k*Math.abs(x));}
+  ws.curve=c; return ws;
+}
+function env(ctx, node, t0, a, peak, dur, sustain=0){
+  const g=node.gain; g.setValueAtTime(0.0001,t0);
+  g.exponentialRampToValueAtTime(peak,t0+a);
+  g.exponentialRampToValueAtTime(Math.max(0.0001,sustain||0.0001),t0+dur);
+  return g;
+}
+
+// ===== RECIPES =====  build(ctx,t0,p) -> returns total duration (s)
+const SOUNDS = {
+  "enemy.sentinel_beam_fire": { tag:"synth", intent:"laser blast — saw + fast downward pitch sweep + grit",
+    params:{ f0:{min:300,max:2500,val:1400,step:10}, f1:{min:60,max:600,val:140,step:5}, dur:{min:.1,max:.6,val:.28,step:.01}, grit:{min:0,max:1,val:.4,step:.05}, cutoff:{min:600,max:8000,val:3200,step:100} },
+    build(ctx,t0,p){ const o=ctx.createOsc?ctx.createOsc():ctx.createOscillator(); o.type="sawtooth";
+      o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff;
+      const d=drive(ctx,p.grit), g=ctx.createGain();
+      o.connect(d).connect(lp).connect(g).connect(ctx.destination);
+      env(ctx,g,t0,.005,.5,p.dur); o.start(t0); o.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  "enemy.sentinel_beam_charge": { tag:"synth", intent:"charge-up tell — rising whine + opening filter + vibrato",
+    params:{ f0:{min:120,max:600,val:220,step:10}, f1:{min:600,max:2400,val:1500,step:20}, dur:{min:.3,max:1.2,val:.7,step:.05}, vib:{min:0,max:30,val:9,step:1} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth";
+      o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur);
+      const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=p.vib; lg.gain.value=p.f0*0.06;
+      lfo.connect(lg).connect(o.frequency); lfo.start(t0); lfo.stop(t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(400,t0); lp.frequency.exponentialRampToValueAtTime(p.f1*1.5,t0+p.dur);
+      const g=ctx.createGain(); o.connect(lp).connect(g).connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(.4,t0+p.dur*.8); g.gain.exponentialRampToValueAtTime(.0001,t0+p.dur);
+      o.start(t0); o.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  "tank.shield_activate": { tag:"synth", intent:"force field ON — noise swell + quick rising tone",
+    params:{ f0:{min:200,max:600,val:320,step:10}, f1:{min:400,max:1200,val:760,step:10}, dur:{min:.15,max:.6,val:.3,step:.01}, noise:{min:0,max:1,val:.5,step:.05} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur);
+      const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.01,.4,p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.1); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.setValueAtTime(p.f0*2,t0); bp.frequency.exponentialRampToValueAtTime(p.f1*2,t0+p.dur); bp.Q.value=4;
+      const ng=ctx.createGain(); ns.connect(bp).connect(ng).connect(ctx.destination); ng.gain.setValueAtTime(0.0001,t0); ng.gain.exponentialRampToValueAtTime(.3*p.noise,t0+p.dur*.4); ng.gain.exponentialRampToValueAtTime(.0001,t0+p.dur);
+      o.start(t0);o.stop(t0+p.dur+.05);ns.start(t0);ns.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  "tank.shield_loop": { tag:"loopable", intent:"shield hold — two detuned saws + tremolo drone (loops)",
+    params:{ base:{min:60,max:240,val:110,step:2}, detune:{min:0,max:30,val:10,step:1}, trem:{min:1,max:14,val:5,step:.5}, cutoff:{min:200,max:2000,val:700,step:20}, dur:{min:1,max:4,val:2,step:.5} },
+    build(ctx,t0,p){ const o1=ctx.createOscillator(),o2=ctx.createOscillator(); o1.type=o2.type="sawtooth"; o1.frequency.value=p.base; o2.frequency.value=p.base; o2.detune.value=p.detune;
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff; lp.Q.value=2;
+      const g=ctx.createGain(); g.gain.value=.0001; o1.connect(lp); o2.connect(lp); lp.connect(g).connect(ctx.destination);
+      g.gain.setValueAtTime(.0001,t0); g.gain.exponentialRampToValueAtTime(.28,t0+.08); // fade in
+      const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=p.trem; lg.gain.value=.08; lfo.connect(lg).connect(g.gain); lfo.start(t0); lfo.stop(t0+p.dur);
+      g.gain.setValueAtTime(.28,t0+p.dur-.08); g.gain.exponentialRampToValueAtTime(.0001,t0+p.dur); // fade out (seamless-ish)
+      o1.start(t0);o2.start(t0);o1.stop(t0+p.dur+.02);o2.stop(t0+p.dur+.02); return p.dur+.05; } },
+
+  "tank.shield_break": { tag:"synth", intent:"shield collapse — falling sweep + noise burst",
+    params:{ f0:{min:400,max:1200,val:720,step:10}, f1:{min:60,max:300,val:120,step:5}, dur:{min:.2,max:.7,val:.35,step:.01}, noise:{min:0,max:1,val:.6,step:.05} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur);
+      const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.005,.4,p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.1); const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(3000,t0); lp.frequency.exponentialRampToValueAtTime(300,t0+p.dur);
+      const ng=ctx.createGain(); ns.connect(lp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.005,.4*p.noise,p.dur);
+      o.start(t0);o.stop(t0+p.dur+.05);ns.start(t0);ns.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  "ui.wave_start": { tag:"synth", intent:"klaxon — two-tone square alarm, repeated",
+    params:{ fa:{min:300,max:900,val:520,step:10}, fb:{min:300,max:900,val:700,step:10}, beep:{min:.08,max:.3,val:.16,step:.01}, reps:{min:1,max:4,val:2,step:1} },
+    build(ctx,t0,p){ let t=t0; const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2400; lp.connect(ctx.destination);
+      for(let r=0;r<p.reps;r++){ for(const f of [p.fa,p.fb]){ const o=ctx.createOscillator(); o.type="square"; o.frequency.value=f; const g=ctx.createGain(); o.connect(g).connect(lp);
+        g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.3,t+.01); g.gain.setValueAtTime(.3,t+p.beep-.02); g.gain.exponentialRampToValueAtTime(.0001,t+p.beep);
+        o.start(t); o.stop(t+p.beep+.02); t+=p.beep; } }
+      return t-t0+.05; } },
+
+  "tank.cannon_fire": { tag:"synth/exp", intent:"BOOM (synth attempt) — noise body + low sine drop + grit (vs your Kenney pick)",
+    params:{ thump:{min:40,max:140,val:80,step:2}, dur:{min:.2,max:.7,val:.42,step:.01}, cutoff:{min:300,max:4000,val:1600,step:50}, grit:{min:0,max:1,val:.5,step:.05} },
+    build(ctx,t0,p){ const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.1); const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(p.cutoff,t0); lp.frequency.exponentialRampToValueAtTime(150,t0+p.dur);
+      const d=drive(ctx,p.grit), ng=ctx.createGain(); ns.connect(d).connect(lp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.004,.6,p.dur);
+      const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.thump*2,t0); o.frequency.exponentialRampToValueAtTime(p.thump*.5,t0+p.dur*.6);
+      const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.004,.7,p.dur*.7);
+      ns.start(t0);ns.stop(t0+p.dur+.05);o.start(t0);o.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  "tank.hit_heavy": { tag:"synth/exp", intent:"metal clank (synth attempt) — resonant noise hit (vs your Kenney pick)",
+    params:{ res:{min:200,max:1600,val:680,step:10}, dur:{min:.1,max:.4,val:.18,step:.01}, q:{min:2,max:20,val:9,step:1} },
+    build(ctx,t0,p){ const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.1);
+      const mk=(f)=>{const bp=ctx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=f;bp.Q.value=p.q;return bp;};
+      const g=ctx.createGain(); [p.res,p.res*1.6,p.res*2.7].forEach(f=>{const bp=mk(f);ns.connect(bp).connect(g);}); g.connect(ctx.destination);
+      env(ctx,g,t0,.002,.5,p.dur); ns.start(t0);ns.stop(t0+p.dur+.05); return p.dur+.1; } },
+
+  // ===== P1 rest: King's machines (robotic) + tank engine =====
+  "enemy.sentinel_whir": { tag:"loopable", intent:"sentinel idle — electronic servo hum (loops)",
+    params:{ base:{min:120,max:400,val:200,step:5}, wob:{min:1,max:8,val:3,step:.5}, cutoff:{min:300,max:2000,val:900,step:20}, dur:{min:1,max:3,val:2,step:.5} },
+    build(ctx,t0,p){ const o1=ctx.createOscillator(),o2=ctx.createOscillator(); o1.type="triangle"; o2.type="sawtooth"; o1.frequency.value=p.base; o2.frequency.value=p.base*2.01;
+      const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=p.wob; lg.gain.value=p.base*0.04; lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency); lfo.start(t0); lfo.stop(t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff; lp.Q.value=3;
+      const g=ctx.createGain(); g.gain.value=.20; o1.connect(lp); o2.connect(lp); lp.connect(g).connect(ctx.destination);
+      o1.start(t0);o2.start(t0);o1.stop(t0+p.dur);o2.stop(t0+p.dur); return p.dur; } },
+
+  "enemy.sentinel_beam_impact": { tag:"synth", intent:"beam hit — electric crack + low thud",
+    params:{ thud:{min:60,max:200,val:110,step:5}, dur:{min:.1,max:.4,val:.2,step:.01}, bright:{min:1000,max:8000,val:4000,step:100} },
+    build(ctx,t0,p){ const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.05); const hp=ctx.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=p.bright; const ng=ctx.createGain(); ns.connect(hp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.002,.4,p.dur*.5);
+      const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.thud*2,t0); o.frequency.exponentialRampToValueAtTime(p.thud*.6,t0+p.dur); const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.003,.6,p.dur);
+      ns.start(t0);ns.stop(t0+p.dur+.05);o.start(t0);o.stop(t0+p.dur+.05); return p.dur+.05; } },
+
+  "enemy.sentinel_death": { tag:"synth", intent:"sentinel shutdown — descending power-down + thud",
+    params:{ f0:{min:300,max:900,val:600,step:10}, f1:{min:40,max:160,val:70,step:5}, dur:{min:.4,max:1,val:.7,step:.05} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(3000,t0); lp.frequency.exponentialRampToValueAtTime(300,t0+p.dur); lp.Q.value=4;
+      const g=ctx.createGain(); o.connect(lp).connect(g).connect(ctx.destination); g.gain.setValueAtTime(.4,t0); g.gain.exponentialRampToValueAtTime(.0001,t0+p.dur);
+      o.start(t0);o.stop(t0+p.dur+.05); return p.dur+.05; } },
+
+  "enemy.chaff_laser_fire": { tag:"synth", intent:"chaff bolt — small fast laser zap",
+    params:{ f0:{min:800,max:3000,val:1800,step:20}, f1:{min:200,max:900,val:420,step:10}, dur:{min:.06,max:.25,val:.12,step:.01}, grit:{min:0,max:1,val:.3,step:.05} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f1,t0+p.dur); const d=drive(ctx,p.grit), g=ctx.createGain(); o.connect(d).connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.03); return p.dur+.05; } },
+
+  "enemy.chaff_skitter": { tag:"loopable", intent:"chaff legs — fast skittering ticks (loops)",
+    params:{ rate:{min:8,max:40,val:22,step:1}, tone:{min:600,max:4000,val:1800,step:50}, dur:{min:.5,max:2,val:1,step:.25} },
+    build(ctx,t0,p){ const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=p.tone; bp.Q.value=6;
+      const g=ctx.createGain(); g.gain.value=0; ns.connect(bp).connect(g).connect(ctx.destination);
+      const lfo=ctx.createOscillator(); lfo.type="square"; lfo.frequency.value=p.rate; const lg=ctx.createGain(); lg.gain.value=.2; const off=ctx.createConstantSource(); off.offset.value=.2; lfo.connect(lg); lg.connect(g.gain); off.connect(g.gain);
+      lfo.start(t0); off.start(t0); ns.start(t0); lfo.stop(t0+p.dur); off.stop(t0+p.dur); ns.stop(t0+p.dur); return p.dur; } },
+
+  "enemy.chaff_death": { tag:"synth", intent:"chaff pop — quick electronic glitch-pop",
+    params:{ f0:{min:300,max:1200,val:700,step:10}, dur:{min:.1,max:.35,val:.18,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="square"; o.frequency.setValueAtTime(p.f0,t0); o.frequency.exponentialRampToValueAtTime(p.f0*.25,t0+p.dur); const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.4,p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); const hp=ctx.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=1500; const ng=ctx.createGain(); ns.connect(hp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.002,.3,p.dur*.5); o.start(t0);o.stop(t0+p.dur+.03);ns.start(t0);ns.stop(t0+p.dur+.03); return p.dur+.05; } },
+
+  "tank.engine": { tag:"loopable", intent:"tank engine — low rumble + chug (loops; pitched by speed in-game)",
+    params:{ base:{min:40,max:120,val:70,step:2}, chug:{min:6,max:20,val:11,step:.5}, cutoff:{min:200,max:1200,val:500,step:20}, dur:{min:1,max:3,val:2,step:.5} },
+    build(ctx,t0,p){ const o1=ctx.createOscillator(),o2=ctx.createOscillator(); o1.type="sawtooth"; o2.type="square"; o1.frequency.value=p.base; o2.frequency.value=p.base*.5;
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff; lp.Q.value=4;
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const nlp=ctx.createBiquadFilter(); nlp.type="lowpass"; nlp.frequency.value=p.cutoff*.8; const ng=ctx.createGain(); ng.gain.value=.15; ns.connect(nlp).connect(ng).connect(lp);
+      o1.connect(lp); o2.connect(lp);
+      const g=ctx.createGain(); g.gain.value=0; lp.connect(g).connect(ctx.destination);
+      const lfo=ctx.createOscillator(); lfo.type="sawtooth"; lfo.frequency.value=p.chug; const lg=ctx.createGain(); lg.gain.value=.12; const off=ctx.createConstantSource(); off.offset.value=.22; lfo.connect(lg); lg.connect(g.gain); off.connect(g.gain);
+      o1.start(t0);o2.start(t0);ns.start(t0);lfo.start(t0);off.start(t0);
+      o1.stop(t0+p.dur);o2.stop(t0+p.dur);ns.stop(t0+p.dur);lfo.stop(t0+p.dur);off.stop(t0+p.dur); return p.dur; } },
+
+  // ===== movement beeps (played on a cadence WHILE the enemy moves) =====
+  "enemy.sentinel_step": { tag:"synth", intent:"sentinel move beep — deep low note, slow cadence",
+    params:{ freq:{min:180,max:520,val:300,step:5}, dur:{min:.06,max:.2,val:.11,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.85,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.004,.5,p.dur); o.start(t0);o.stop(t0+p.dur+.03); return p.dur+.05; } },
+
+  "enemy.chaff_step": { tag:"synth", intent:"chaff move beep — soft mid 'boop', distance-gated + slow cadence in-game",
+    params:{ freq:{min:300,max:900,val:520,step:10}, dur:{min:.04,max:.16,val:.09,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.9,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.005,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.04; } },
+
+  // ===== tank mechanical feedback =====
+  "tank.reload": { tag:"synth", intent:"cannon reload — mechanical clunk then a metallic lock-click",
+    params:{ thunk:{min:60,max:220,val:110,step:5}, click:{min:1500,max:5000,val:3000,step:50}, dur:{min:.12,max:.4,val:.22,step:.01} },
+    build(ctx,t0,p){
+      const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.thunk*1.5,t0); o.frequency.exponentialRampToValueAtTime(p.thunk*0.6,t0+p.dur*0.5);
+      const og=ctx.createGain(); o.connect(og).connect(ctx.destination); env(ctx,og,t0,.003,.5,p.dur*0.6);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur+.05); const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=600; const ng=ctx.createGain(); ns.connect(lp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.002,.35,p.dur*0.4);
+      const t2=t0+p.dur*0.55; const ns2=ctx.createBufferSource(); ns2.buffer=noiseBuf(ctx,.06); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=p.click; bp.Q.value=8; const ng2=ctx.createGain(); ns2.connect(bp).connect(ng2).connect(ctx.destination); env(ctx,ng2,t2,.001,.4,.05);
+      o.start(t0);o.stop(t0+p.dur+.05);ns.start(t0);ns.stop(t0+p.dur+.05);ns2.start(t2);ns2.stop(t2+.07); return p.dur+.05; } },
+
+  "tank.turret_servo": { tag:"loopable", intent:"turret traverse — soft servo whine (looped while rotating)",
+    params:{ base:{min:150,max:500,val:260,step:5}, wob:{min:2,max:20,val:8,step:1}, cutoff:{min:400,max:2500,val:1100,step:20}, dur:{min:1,max:3,val:1.5,step:.5} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.value=p.base;
+      const lfo=ctx.createOscillator(),lg=ctx.createGain(); lfo.frequency.value=p.wob; lg.gain.value=p.base*0.03; lfo.connect(lg).connect(o.frequency); lfo.start(t0);lfo.stop(t0+p.dur);
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=p.cutoff; lp.Q.value=3;
+      const g=ctx.createGain(); g.gain.value=.18; o.connect(lp).connect(g).connect(ctx.destination);
+      o.start(t0);o.stop(t0+p.dur); return p.dur; } },
+
+  "tank.low_fuel": { tag:"synth", intent:"low-fuel warning — terse double warning beep",
+    params:{ freq:{min:400,max:1000,val:620,step:10}, gap:{min:.08,max:.25,val:.12,step:.01} },
+    build(ctx,t0,p){ const mk=(t)=>{ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.value=p.freq; const g=ctx.createGain(); o.connect(g).connect(ctx.destination); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.4,t+.008); g.gain.setValueAtTime(.4,t+.07); g.gain.exponentialRampToValueAtTime(.0001,t+.09); o.start(t);o.stop(t+.11); };
+      mk(t0); mk(t0+p.gap); return p.gap+0.14; } },
+
+  // ===== P2 ambience beds (long seamless loops; LFOs do whole cycles over dur) =====
+  "amb.hangar": { tag:"loopable", intent:"hangar room tone — warm low electrical hum + faint machinery",
+    params:{ base:{min:40,max:120,val:62,step:1}, warmth:{min:0,max:1,val:.5,step:.05}, hum:{min:0,max:1,val:.4,step:.05}, dur:{min:8,max:24,val:16,step:1} },
+    build(ctx,t0,p){
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=400; lp.Q.value=1;
+      const dg=ctx.createGain(); dg.gain.value=.12*(0.5+p.warmth); lp.connect(dg).connect(ctx.destination);
+      [p.base, p.base*1.5, p.base*2].forEach((f,i)=>{ const o=ctx.createOscillator(); o.type=i===0?"triangle":"sine"; o.frequency.value=f; o.detune.value=(i-1)*4; o.connect(lp); o.start(t0); o.stop(t0+p.dur); });
+      const ho=ctx.createOscillator(); ho.type="sawtooth"; ho.frequency.value=120; const hf=ctx.createBiquadFilter(); hf.type="bandpass"; hf.frequency.value=120; hf.Q.value=8; const hg=ctx.createGain(); hg.gain.value=.03*p.hum; ho.connect(hf).connect(hg).connect(ctx.destination); ho.start(t0);ho.stop(t0+p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const nf=ctx.createBiquadFilter(); nf.type="lowpass"; nf.frequency.value=300; const ng=ctx.createGain(); ng.gain.value=.05*p.hum; ns.connect(nf).connect(ng).connect(ctx.destination);
+      const lfo=ctx.createOscillator(); lfo.frequency.value=1/p.dur; const lg=ctx.createGain(); lg.gain.value=140; lfo.connect(lg).connect(nf.frequency); lfo.start(t0);lfo.stop(t0+p.dur);
+      ns.start(t0);ns.stop(t0+p.dur); return p.dur; } },
+
+  "amb.arena": { tag:"loopable", intent:"battlefield bed — wind gusts + distant machine drone",
+    params:{ wind:{min:0,max:1,val:.6,step:.05}, drone:{min:0,max:1,val:.35,step:.05}, dur:{min:8,max:24,val:16,step:1} },
+    build(ctx,t0,p){
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,p.dur); ns.loop=true; const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=500; bp.Q.value=0.7; const wg=ctx.createGain(); wg.gain.value=0; ns.connect(bp).connect(wg).connect(ctx.destination);
+      const cf=ctx.createOscillator(); cf.frequency.value=2/p.dur; const cfg=ctx.createGain(); cfg.gain.value=320; cf.connect(cfg).connect(bp.frequency); cf.start(t0);cf.stop(t0+p.dur);
+      const gust=ctx.createOscillator(); gust.frequency.value=3/p.dur; const gg=ctx.createGain(); gg.gain.value=.05*p.wind; const goff=ctx.createConstantSource(); goff.offset.value=.07*p.wind; gust.connect(gg).connect(wg.gain); goff.connect(wg.gain); gust.start(t0);gust.stop(t0+p.dur);goff.start(t0);goff.stop(t0+p.dur);
+      const o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.value=55; const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=180; const og=ctx.createGain(); og.gain.value=.06*p.drone; o.connect(lp).connect(og).connect(ctx.destination); o.start(t0);o.stop(t0+p.dur);
+      ns.start(t0);ns.stop(t0+p.dur); return p.dur; } },
+
+  // ===== UI =====
+  "ui.interact": { tag:"synth", intent:"general interaction blip — single clean beep (E-press / button / resume / enter)",
+    params:{ freq:{min:500,max:1200,val:760,step:10}, dur:{min:.04,max:.12,val:.06,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*1.06,t0+p.dur*0.5);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.5,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.03; } },
+
+  // ===== hit confirmation (restored — lost in an editor save) =====
+  "enemy.hit": { tag:"synth", intent:"normal hit confirm — crisp single tick (tonal tok + noise snap)",
+    params:{ freq:{min:400,max:1200,val:720,step:10}, dur:{min:.04,max:.14,val:.07,step:.01}, snap:{min:0,max:1,val:.5,step:.05} },
+    build(ctx,t0,p){
+      const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.7,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.002,.5,p.dur);
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,.04); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=2500; bp.Q.value=2; const ng=ctx.createGain(); ns.connect(bp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.001,.4*p.snap,.03);
+      o.start(t0);o.stop(t0+p.dur+.02);ns.start(t0);ns.stop(t0+.05); return p.dur+.04; } },
+
+  "enemy.hit_crit": { tag:"synth", intent:"CRIT confirm — brighter snap + ascending two-note ding (longer/louder/rewarding)",
+    params:{ f1:{min:600,max:1400,val:900,step:10}, f2:{min:1000,max:2200,val:1500,step:20}, gap:{min:.03,max:.1,val:.05,step:.01}, snap:{min:0,max:1,val:.7,step:.05} },
+    build(ctx,t0,p){
+      const ns=ctx.createBufferSource(); ns.buffer=noiseBuf(ctx,.05); const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=3500; bp.Q.value=1.5; const ng=ctx.createGain(); ns.connect(bp).connect(ng).connect(ctx.destination); env(ctx,ng,t0,.001,.5*p.snap,.04);
+      const note=(t,f)=>{ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*0.85,t+.09); const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t,.002,.5,.1); o.start(t);o.stop(t+.12); };
+      note(t0,p.f1); note(t0+p.gap,p.f2);
+      return p.gap+0.14; } },
+};
+
+// ---- WAV encoder (mono, 16-bit) ----
+function toWav(buf){ const ch=buf.getChannelData(0), n=ch.length, sr=buf.sampleRate, ab=new ArrayBuffer(44+n*2), v=new DataView(ab);
+  const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  W(0,"RIFF");v.setUint32(4,36+n*2,true);W(8,"WAVE");W(12,"fmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);W(36,"data");v.setUint32(40,n*2,true);
+  let o=44;for(let i=0;i<n;i++){let s=Math.max(-1,Math.min(1,ch[i]));v.setInt16(o,s<0?s*0x8000:s*0x7fff,true);o+=2;}
+  return new Blob([ab],{type:"audio/wav"}); }
+
+function play(id){ const ctx=ctxLive(); if(ctx.state==="suspended")ctx.resume(); SOUNDS[id].build(ctx,ctx.currentTime+0.02,getP(id)); }
+function randomize(id){ const s=SOUNDS[id]; for(const k in s.params){const pr=s.params[k]; if(k==="reps")continue; const span=(pr.max-pr.min); const j=(Math.random()*2-1)*span*0.18; setP(id,k,Math.min(pr.max,Math.max(pr.min,getP(id)[k]+j)));} play(id); }
+async function render(id){ const s=SOUNDS[id]; const p=getP(id);
+  // dry-run in a scratch offline ctx to learn the clip length, then render tight
+  const oc=new OfflineAudioContext(1,44100*6,44100); const total=s.build(oc,0,p); const oc2=new OfflineAudioContext(1,Math.ceil(44100*(total+0.05)),44100);
+  s.build(oc2,0,p); const rendered=await oc2.startRendering(); const blob=toWav(rendered);
+  const a=document.getElementById("dl_"+CSS.escape(id)); a.href=URL.createObjectURL(blob); a.download=id+".wav"; a.style.display="inline"; a.textContent="↓ "+id+".wav"; a.click(); }
+
+const P={}; // params state
+function getP(id){return P[id];}
+function setP(id,k,val){P[id][k]=val; const el=document.getElementById("sl_"+id+"_"+k); if(el){el.value=val; el.nextElementSibling.textContent=(+val).toFixed(el.step<1?2:0);} }
+
+// ---- build UI ----
+const grid=document.getElementById("grid");
+for(const id in SOUNDS){ const s=SOUNDS[id]; P[id]={}; for(const k in s.params)P[id][k]=s.params[k].val;
+  const card=document.createElement("div"); card.className="card";
+  let rows=""; for(const k in s.params){const pr=s.params[k]; rows+=`<div class="row"><label>${k}</label><input type="range" id="sl_${id}_${k}" min="${pr.min}" max="${pr.max}" step="${pr.step}" value="${pr.val}" oninput="P['${id}']['${k}']=+this.value;this.nextElementSibling.textContent=(+this.value).toFixed(${pr.step<1?2:0})"><span class="val">${(+pr.val).toFixed(pr.step<1?2:0)}</span></div>`;}
+  card.innerHTML=`<div class="hd"><span class="sid">${id}</span><span class="tag">${s.tag}</span></div><div class="intent">${s.intent}</div>${rows}
+    <div class="btns"><button onclick="play('${id}')">▶ Play</button><button class="ghost" onclick="randomize('${id}')">⟳ Random</button><button class="am" onclick="render('${id}')">⬇ Render .wav</button></div>
+    <a class="dl" id="dl_${id}" style="display:none"></a>`;
+  grid.appendChild(card);
+}
+</script></body></html>
