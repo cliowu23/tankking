@@ -578,8 +578,9 @@ async function buildCrewPanel() {
       if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
     });
   }
+  const SLOT_LABELS = { face: 'Eyewear', facialhair: 'Facial Hair' };
   for (const [slot, items] of Object.entries(_wardrobe.slots)) {
-    const btns = row(slot[0].toUpperCase() + slot.slice(1));
+    const btns = row(SLOT_LABELS[slot] ?? (slot[0].toUpperCase() + slot.slice(1)));
     mkBtn(btns, 'None', { gid: 'none', slot }, () => {
       if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: 'none' }));
     });

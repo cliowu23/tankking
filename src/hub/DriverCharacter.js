@@ -28,7 +28,10 @@ export const DRIVER_ACCESSORIES = ['none'];
 export const ATTACH_SLOTS = {
   hair:     { boneRe: /(^|[^a-z])head/i },
   headwear: { boneRe: /(^|[^a-z])head/i },
-  face:     { boneRe: /(^|[^a-z])head/i },
+  face:     { boneRe: /(^|[^a-z])head/i },   // eyewear (glasses / shades)
+  // Facial hair is its own head-bone slot so a beard/stache can be worn together
+  // with eyewear (e.g. shades + beard).
+  facialhair: { boneRe: /(^|[^a-z])head/i },
   back:     { boneRe: /torso/i },
   // Bedroll is a satchel add-on, not a standalone back piece — it rides the same
   // torso bone alongside the satchel and only renders when the satchel is equipped
@@ -44,7 +47,7 @@ export const DRIVER_OPTIONS = {
 };
 export const DRIVER_DEFAULT = {
   head: 'char-driver-a', body: 'char-driver-a',
-  hair: 'none', headwear: 'none', face: 'none', back: 'none', bedroll: 'none',
+  hair: 'none', headwear: 'none', face: 'none', facialhair: 'none', back: 'none', bedroll: 'none',
   skin: '#eebb94',   // tints the skinMat material (skin verts authored white)
 };
 

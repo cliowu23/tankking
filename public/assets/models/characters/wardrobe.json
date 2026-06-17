@@ -328,7 +328,9 @@
       {
         "id": "face-shades",
         "label": "Shades"
-      },
+      }
+    ],
+    "facialhair": [
       {
         "model": "face-beard",
         "label": "Beard",
