@@ -750,6 +750,12 @@
       padding-bottom: 6px;
       border-bottom: 1px solid #1b4250;
     }
+    /* Pulse a section header when the player clicks that body part on the driver. */
+    @keyframes lngSecPulse {
+      0%   { background: rgba(0,229,255,0.30); color: #d8fbff; }
+      100% { background: transparent; color: #00e5ff; }
+    }
+    #lounge-panel .lng-section.lng-pulse { animation: lngSecPulse 0.9s ease-out; }
     #lounge-panel .lng-grp { display: flex; flex-direction: column; gap: 6px; }
     #lounge-panel .lng-lbl {
       color: #5fb8c4;

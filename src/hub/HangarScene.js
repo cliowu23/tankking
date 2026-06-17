@@ -687,6 +687,42 @@ export default class HangarScene {
     this.driver.ready
       .then(() => this.driver.applyConfig(this._driverConfig))
       .then(applied => { if (applied) this._adoptDriverConfig(applied); });
+
+    // Click-on-part nav (only while the lounge panel is open): hover a body region
+    // to highlight it; click to jump the panel to that section.
+    this._hoverRegion = null;
+    this._tinted = new Map();   // material -> original emissiveColor
+    this.scene.onPointerObservable.add((pi) => {
+      if (this._panelOpen && pi.type === PointerEventTypes.POINTERTAP && this._hoverRegion) {
+        window.dispatchEvent(new CustomEvent('crewpart', { detail: { region: this._hoverRegion } }));
+      }
+    });
+  }
+
+  // Per-frame hover pick while the lounge panel is open — cyan-glow the region
+  // under the cursor (head vs body). scene.pick is more reliable than the cached
+  // pointer pickInfo for dynamically-grafted meshes (Babylon 7.x). An emissive
+  // tint is used (no HighlightLayer/outline) so it needs no extra shaders.
+  _restoreTint() {
+    for (const [mat, orig] of this._tinted) { if (mat?.emissiveColor) mat.emissiveColor = orig; }
+    this._tinted = new Map();
+  }
+  _updatePartHover() {
+    const hit = this.scene.pick(this.scene.pointerX, this.scene.pointerY)?.pickedMesh;
+    const region = this.driver.regionOfMesh(hit);
+    if (region === this._hoverRegion) return;
+    this._hoverRegion = region;
+    this._restoreTint();
+    if (region) {
+      const tint = new Color3(0.0, 0.85, 1.0);
+      for (const m of this.driver.regionMeshes(region)) {
+        const mat = m.material;
+        if (mat?.emissiveColor && !this._tinted.has(mat)) {
+          this._tinted.set(mat, mat.emissiveColor.clone());
+          mat.emissiveColor = tint;
+        }
+      }
+    }
   }
 
   _adoptDriverConfig(applied) {
@@ -754,6 +790,8 @@ export default class HangarScene {
           this.driver.mesh.position.y,
           this.driver.mesh.position.z + this.driver.camera.radius * this._camNorthRatio
         );
+      } else if (this._loungeOpen) {
+        this._updatePartHover();
       }
     });
   }
@@ -864,6 +902,8 @@ export default class HangarScene {
     this._loungeOpen  = false;
     this._panelOpen   = false;
     this._nearStation = null;
+    this._restoreTint();
+    this._hoverRegion = null;
     document.getElementById('lounge-panel').style.display = 'none';
     // Put the driver back where it was standing before customization.
     if (this._driverHomePos) {

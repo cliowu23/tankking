@@ -576,6 +576,7 @@ async function buildCrewPanel() {
   const section = (title) => {
     const s = document.createElement('div');
     s.className = 'lng-section';
+    s.id = 'lng-sec-' + title.toLowerCase();   // lng-sec-body / lng-sec-head (matches pick regions)
     s.textContent = title;
     host.appendChild(s);
   };
@@ -641,5 +642,16 @@ function syncCrewPanel(cfg) {
   document.querySelectorAll('#lounge-slots [data-gmodel]').forEach(b =>
     b.classList.toggle('on', [...active].some(v => typeof v === 'string' && v.startsWith(b.dataset.gmodel))));
 }
+
+// Click-on-part nav: the hangar fires 'crewpart' (region = head|body) when the
+// player clicks a body region of the driver → scroll that panel section in + pulse it.
+window.addEventListener('crewpart', (e) => {
+  const sec = document.getElementById('lng-sec-' + e.detail.region);
+  if (!sec) return;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sec.classList.remove('lng-pulse');
+  void sec.offsetWidth;          // restart the animation
+  sec.classList.add('lng-pulse');
+});
 
 window.addEventListener('resize', () => engine.resize());
