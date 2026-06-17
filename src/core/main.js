@@ -141,6 +141,16 @@ initMobileControls();
 const _tc   = document.getElementById('transition-canvas');
 const _tctx = _tc.getContext('2d');
 let   _tBusy = false;
+let   _tWatchdog = null;
+// A transition must never lock the UI permanently. If one stalls (e.g. tapping
+// Play before the first frame settles), force-clear the cover + release the lock
+// so the next tap works. iris/checker finish in <1s, so 2s is a safe ceiling.
+function _clearTransition() {
+  clearTimeout(_tWatchdog);
+  _tBusy = false;
+  try { _tctx.clearRect(0, 0, _tc.width, _tc.height); } catch (_) {}
+  _tc.style.display = 'none';
+}
 
 function _resizeTC() { _tc.width = window.innerWidth; _tc.height = window.innerHeight; }
 window.addEventListener('resize', _resizeTC);
@@ -170,12 +180,13 @@ function _iris(hideFn, showFn) {
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'close') {
       // Screen fully covered — swap now so the open reveals the live scene
-      hideFn(); showFn();
+      try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
       phase = 'open'; start = null;
       requestAnimationFrame(tick);
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
+      clearTimeout(_tWatchdog);
       _tBusy = false;
     }
   }
@@ -213,13 +224,14 @@ function _checker(hideFn, showFn) {
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'in') {
       // Screen fully covered — swap now so the reveal shows the live scene
-      hideFn(); showFn();
+      try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
       phase = 'out'; start = null;
       order.sort(() => Math.random() - 0.5); // re-shuffle for reveal
       requestAnimationFrame(tick);
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
+      clearTimeout(_tWatchdog);
       _tBusy = false;
     }
   }
@@ -229,6 +241,8 @@ function _checker(hideFn, showFn) {
 function transition(hideFn, showFn, type = 'checker') {
   if (_tBusy) return;
   _tBusy = true;
+  clearTimeout(_tWatchdog);
+  _tWatchdog = setTimeout(_clearTransition, 2000); // never lock the UI permanently
   _resizeTC();
   if (type === 'iris') _iris(hideFn, showFn);
   else                 _checker(hideFn, showFn);
