@@ -7,21 +7,20 @@ const SPEED       = 7;   // units/sec — walk (was 5; bumped between old walk a
 const CAM_RADIUS  = 20;  // fixed follow-cam distance (locked zoom); was 24
 const MODEL_DIR = '/assets/models/characters/';
 
-// Kenney "Mini Characters" (CC0). Each character GLB is rigged on an identical
-// rig (root/legs/torso/arms/head — SAME bone order across all 12, so meshes can
-// be grafted between them with no skin-index remap) and ships NATIVE baked anims
-// (idle/walk/…). Each char = two skinned meshes: `body-mesh` (torso+limbs+outfit)
-// and `head-mesh` (head+hair+face). Accessories are static meshes attached to the
-// head bone. So: pick a body, graft any character's head onto it, add an accessory.
+// Native characters (CHARACTER_MODEL_SPEC). Each character GLB is rigged on the
+// shared rig (root/legs/torso/arms/head — SAME bone order, so meshes graft
+// between characters with no skin-index remap) and ships baked anims (idle/walk/…).
+// Each char = two skinned meshes: `body-mesh` (torso+limbs+outfit) and `head-mesh`
+// (head+hair+face). Wardrobe pieces are static meshes attached to a bone. So: pick
+// a body, graft a character's head onto it, add wardrobe. The Kenney "Mini
+// Characters" CC0 set was the build reference only — purged once natives landed.
 export const DRIVER_CHARACTERS = [
-  'character-male-a', 'character-male-b', 'character-male-c',
-  'character-male-d', 'character-male-e', 'character-male-f',
-  'character-female-a', 'character-female-b', 'character-female-c',
-  'character-female-d', 'character-female-e', 'character-female-f',
-  'char-calib',    // Batch C0 calibration dummy (original) — remove after C1 ships
+  'char-calib',    // Batch C0 calibration dummy
   'char-driver-a', // Batch C1 — first ORIGINAL character (CHARACTER_MODEL_SPEC)
 ];
-export const DRIVER_ACCESSORIES = ['none', 'aid-glasses', 'aid-sunglasses', 'aid-mask'];
+// Legacy Kenney aid-* face accessories were purged; the `face` wardrobe slot
+// (glasses/shades/beard/stache) replaces them.
+export const DRIVER_ACCESSORIES = ['none'];
 
 // Wardrobe attachment slots (CHARACTER_MODEL_SPEC customization section).
 // Each is a static GLB attached to a bone; pieces authored at the bone origin
