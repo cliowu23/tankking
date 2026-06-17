@@ -62,7 +62,7 @@ function silenceArena() {
   audio.releaseAllPooled();
   audio.stopLoop('tank.engine');
   audio.stopLoop('tank.shield_loop');
-  audio.stopLoop('amb.arena');
+  audio.stopLoop('amb.sea');
 }
 
 let arenaScene    = null;

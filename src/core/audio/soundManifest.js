@@ -57,5 +57,6 @@ export const SOUNDS = {
 
   // --- Ambience (2D looping beds, sit under everything) ---
   'amb.hangar':         { url: 'ambience/hangar.ogg', bus: 'ambience', loop: true, gain: 0.85 },
-  'amb.arena':          { url: 'ambience/arena.ogg',  bus: 'ambience', loop: true, gain: 0.85 },
+  // amb.sea: the old "arena wind" — reads as ocean surf, reserved for a future coastal/sea leg. Not wired yet.
+  'amb.sea':            { url: 'ambience/sea.ogg',    bus: 'ambience', loop: true, gain: 0.85 },
 };
