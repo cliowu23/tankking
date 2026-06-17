@@ -316,12 +316,14 @@
         "label": "Beanie"
       },
       {
-        "id": "hw-headset",
-        "label": "Headset"
-      },
-      {
         "id": "hw-woolcap",
         "label": "Wool Cap"
+      }
+    ],
+    "comms": [
+      {
+        "id": "hw-headset",
+        "label": "Headset"
       }
     ],
     "face": [
