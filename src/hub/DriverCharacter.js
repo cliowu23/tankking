@@ -31,6 +31,10 @@ export const ATTACH_SLOTS = {
   headwear: { boneRe: /(^|[^a-z])head/i },
   face:     { boneRe: /(^|[^a-z])head/i },
   back:     { boneRe: /torso/i },
+  // Bedroll is a satchel add-on, not a standalone back piece — it rides the same
+  // torso bone alongside the satchel and only renders when the satchel is equipped
+  // (coupling enforced in _applyConfigNow). See normalizeDriverConfig for migration.
+  bedroll:  { boneRe: /torso/i },
 };
 const WARDROBE_DIR = MODEL_DIR + 'wardrobe/';
 // Legacy Kenney accessories live in the characters/ root, wardrobe pieces in wardrobe/.
@@ -41,9 +45,12 @@ export const DRIVER_OPTIONS = {
 };
 export const DRIVER_DEFAULT = {
   head: 'char-driver-a', body: 'char-driver-a',
-  hair: 'none', headwear: 'none', face: 'none', back: 'none',
+  hair: 'none', headwear: 'none', face: 'none', back: 'none', bedroll: 'none',
   skin: '#eebb94',   // tints the skinMat material (skin verts authored white)
 };
+
+// The only back piece the bedroll add-on pairs with.
+export const BEDROLL_HOST = 'back-satchel';
 
 // Stale/legacy config guard: maps the old `accessory` key to the `face` slot and
 // fills missing slots — old localStorage saves keep working.
@@ -51,6 +58,11 @@ export function normalizeDriverConfig(cfg) {
   const c = { ...DRIVER_DEFAULT, ...(cfg ?? {}) };
   if (cfg?.accessory && (!cfg.face || cfg.face === 'none')) c.face = cfg.accessory;
   delete c.accessory;
+  // Legacy: bedroll used to be a standalone back piece. Migrate old saves to the
+  // satchel + bedroll pairing so the bedroll never appears on its own.
+  if (c.back === 'back-bedroll') { c.back = BEDROLL_HOST; c.bedroll = 'back-bedroll'; }
+  // Coupling: the bedroll only exists as a satchel add-on.
+  if (c.back !== BEDROLL_HOST) c.bedroll = 'none';
   return c;
 }
 
@@ -243,6 +255,8 @@ export default class DriverCharacter {
     }
     const prev    = this._config;
     const next    = { ...prev, ...partial };
+    // Bedroll rides the satchel — drop it whenever the back piece isn't the satchel.
+    if (next.back !== BEDROLL_HOST) next.bedroll = 'none';
     const changed = k => initial || next[k] !== prev[k];
     this._config  = next;
 
