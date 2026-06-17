@@ -486,6 +486,7 @@ export default class ArenaScene {
       this._restart();
       this._paused = false;
       window.__state = 'GAME';
+      music.playCombat(); // resume combat music (stopped on death)
       document.getElementById('death').style.display = 'none';
     });
 
@@ -1084,6 +1085,8 @@ export default class ArenaScene {
     this._paused = true;
     window.__state = 'DEAD';
     this._aimEl.style.display = 'none';
+    music.stop();       // world/combat music ends on death (defeat sting plays over the fade)
+    music.playDefeat(); // short descending downer when the death screen appears
     document.getElementById('death').style.display = 'flex';
   }
 
@@ -1514,6 +1517,7 @@ export default class ArenaScene {
           shell.deactivate();
           enemy.takeDamage(damage);
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
+          music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
           if (!enemy.alive && this.lockedEnemy === enemy) {
             this._prevLockedEnemy = enemy;
             this._fadeOutTime     = 0;

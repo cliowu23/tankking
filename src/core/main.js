@@ -218,6 +218,7 @@ function transition(hideFn, showFn, type = 'checker') {
 
 function startGame() {
   audio.play('ui.interact'); // keyboard-driven start (single blip; may revisit later)
+  music.playShutter();       // iris/aperture whoosh under the wipe
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
@@ -242,6 +243,7 @@ function startGame() {
 }
 
 function startHangar() {
+  music.playShutter();       // iris/aperture whoosh under the wipe
   transition(
     () => {
       document.getElementById('menu').style.display          = 'none';
@@ -308,6 +310,7 @@ function deployToArena(dev = false) {
   document.getElementById('hangar-salvage').style.display = 'none';
   engine.stopRenderLoop();
   audio.stopLoop('amb.hangar');
+  music.stop();  // cut hangar music for the loading screen; combat music starts on drop-in
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
 
   // Build on the next frame so the overlay paints before the heavy work starts.
@@ -349,6 +352,8 @@ function deployToArena(dev = false) {
 }
 
 function onExtractFromArena(gained, banked) {
+  music.stop();              // world/combat music ends when the extract overlay appears
+  music.playExtract();       // Duckov-style reward jingle on the extract summary (over the fade)
   document.getElementById('hud').style.display = 'none';
   document.getElementById('extract-indicator').style.display = 'none';
   document.getElementById('extract-summary-gained').textContent = `+${gained} SALVAGE`;
@@ -381,6 +386,7 @@ function goToMenu() {
   silenceArena(); // after _restart (which restarts engine) so the menu is quiet
   audio.stopLoop('amb.hangar');
   music.playMenu();
+  music.playCrtOff();        // power-down whine + thunk, synced to the CRT-off visual
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
@@ -390,6 +396,7 @@ function goToMenu() {
 }
 
 function startDesigner() {
+  music.playRetro();         // 8-bit blip cascade under the checker/pixelated wipe
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
@@ -411,6 +418,7 @@ function startDesigner() {
 }
 
 function exitDesigner() {
+  music.playRetro();         // 8-bit blip cascade under the checker/pixelated wipe
   transition(
     () => {
       document.getElementById('designer-ui').style.display          = 'none';
@@ -496,6 +504,7 @@ document.getElementById('death-restart').addEventListener('click', () => {
   document.getElementById('hud').style.display   = 'block';
   arenaScene._paused = false;
   arenaScene._restart();
+  music.playCombat(); // resume combat music (stopped on death)
   window.__state = 'GAME';
 });
 
