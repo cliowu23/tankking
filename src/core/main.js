@@ -67,6 +67,26 @@ function _menuMusicOnGesture() {
 window.addEventListener('pointerdown', _menuMusicOnGesture);
 window.addEventListener('keydown', _menuMusicOnGesture);
 
+// Persistent music mute toggle (top-right corner, all screens). Saves to localStorage.
+const _musicMuteBtn = document.createElement('button');
+_musicMuteBtn.id = 'music-mute';
+_musicMuteBtn.title = 'Toggle music (M)';
+_musicMuteBtn.style.cssText =
+  'position:fixed;top:12px;right:12px;z-index:9999;width:38px;height:38px;border-radius:8px;' +
+  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);color:#cdd6e2;font-size:17px;' +
+  'cursor:pointer;backdrop-filter:blur(4px);line-height:1;padding:0;';
+if (localStorage.getItem('tk_music_muted') === '1') music.setMuted(true);
+const _renderMute = () => { _musicMuteBtn.textContent = music.muted ? '🔇' : '🎵'; _musicMuteBtn.style.opacity = music.muted ? '0.55' : '1'; };
+function _toggleMusicMute() {
+  const m = music.toggleMuted();
+  localStorage.setItem('tk_music_muted', m ? '1' : '0');
+  _renderMute();
+}
+_musicMuteBtn.addEventListener('click', (e) => { e.stopPropagation(); _toggleMusicMute(); });
+window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') _toggleMusicMute(); });
+document.body.appendChild(_musicMuteBtn);
+_renderMute();
+
 // Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
 // or rebuilding the arena, so they don't bleed into the hangar/menu.
 function silenceArena() {

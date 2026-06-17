@@ -40,6 +40,8 @@ class MusicManager {
     this._theme = null;     // { nodes:[], layerMid?, layerHigh? }
     this._intensity = 0;
     this._swT = null;
+    this._muted = false;
+    this._baseVol = 0.55;
   }
 
   // ---- public ----
@@ -48,7 +50,13 @@ class MusicManager {
   playCombat() { this._setMode('combat'); }
 
   setIntensity(x) { this._intensity = Math.max(0, Math.min(1, x)); this._applyIntensity(); }
-  setMasterVolume(v) { if (this.master) this.master.gain.rampTo(v, 0.2); }
+  setMasterVolume(v) { this._baseVol = v; if (this.master && !this._muted) this.master.gain.rampTo(v, 0.2); }
+
+  get muted() { return this._muted; }
+  setMuted(b) { this._muted = !!b; if (this.master) this.master.gain.rampTo(this._muted ? 0 : this._baseVol, 0.3); }
+  toggleMuted() { this.setMuted(!this._muted); return this._muted; }
+
+  _activeVol() { return this._muted ? 0 : this._baseVol; }
 
   stop(fade = 0.6) {
     this._pending = null;
@@ -89,7 +97,7 @@ class MusicManager {
       this._mode = id;
       T.start();
       if (id === 'combat') this._applyIntensity();
-      this.master.gain.rampTo(0.55, 0.5);
+      this.master.gain.rampTo(this._activeVol(), 0.5); // respects mute across switches
     };
     if (immediate || !this._mode) build();
     else { this.master.gain.rampTo(0, 0.4); clearTimeout(this._swT); this._swT = setTimeout(build, 430); }
@@ -111,11 +119,14 @@ class MusicManager {
   // ---- theme builders (return { nodes, layerMid?, layerHigh? }) ----
   _build_menu() {
     const m = this.master, nodes = [];
-    // Just the warm held chords — the arp/melody was dropped (user liked the pad
-    // alone for the title screen, 2026-06-17).
+    // Warm held chords + a gentle SINE arp an octave ABOVE the pad — keeps the
+    // sparkle clearly over the chords instead of clashing/muddying in the same
+    // register (user: likes the arp, but it clashed with the chords — 2026-06-17).
     const verb = new Tone.Freeverb(0.7, 2200).connect(m); nodes.push(verb);
-    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -13 }).connect(verb); nodes.push(pad);
+    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 }, volume: -15 }).connect(verb); nodes.push(pad);
+    const arp = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.3, sustain: 0, release: 0.4 }, volume: -19 }).connect(verb); nodes.push(arp);
     nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), CHORDS, '1m').start(0));
+    nodes.push(new Tone.Sequence((t, n) => arp.triggerAttackRelease(Tone.Frequency(n).transpose(12), '8n', t), MENU_ARP, '4n').start(0));
     return { nodes };
   }
 
