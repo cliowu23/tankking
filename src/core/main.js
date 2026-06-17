@@ -57,6 +57,7 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
+window.__audio = audio; window.__music = music; // debug hooks (mirror __arena/__hangar)
 // music: Tone graph is built lazily (music.start) after the audio context is
 // running — no autoplay-warning spam. Kick off the MENU theme on the very first
 // user gesture (so the title screen has music before the player presses start).
@@ -78,10 +79,21 @@ _musicMuteBtn.style.cssText =
   'cursor:pointer;backdrop-filter:blur(4px);line-height:1;padding:0;';
 if (localStorage.getItem('tk_music_muted') === '1') music.setMuted(true);
 const _renderMute = () => { _musicMuteBtn.textContent = music.muted ? '🔇' : '🎵'; _musicMuteBtn.style.opacity = music.muted ? '0.55' : '1'; };
+// Unmuting should make music play *now*, not on the next scene change. The
+// music graph starts lazily, so on unmute we (re)kick the current state's theme
+// (idempotent — _switch no-ops if it's already that theme). The click/keypress
+// itself is the user gesture Tone.start() needs.
+function _kickMusicForState() {
+  const s = window.__state;
+  if (s === 'HANGAR' || s === 'INSPECTOR') music.playHangar();
+  else if (s === 'GAME' || s === 'PAUSED') music.playCombat();
+  else music.playMenu();
+}
 function _toggleMusicMute() {
   const m = music.toggleMuted();
   localStorage.setItem('tk_music_muted', m ? '1' : '0');
   _renderMute();
+  if (!m) _kickMusicForState();   // just unmuted → start/keep the right theme audible
 }
 _musicMuteBtn.addEventListener('click', (e) => { e.stopPropagation(); _toggleMusicMute(); });
 window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') _toggleMusicMute(); });

@@ -25,6 +25,17 @@ import { BUSES, DUCK, SOUNDS } from './soundManifest.js';
 
 const BASE = `${import.meta.env.BASE_URL}assets/audio/`;
 
+// iOS/Safari can't reliably decode OGG/Vorbis, so SFX went silent there. Use
+// .ogg only where the browser clearly supports it; everywhere else load the AAC
+// (.m4a) sibling we ship alongside each file. Zero regression on Chrome/Firefox.
+const AUDIO_EXT = (() => {
+  try {
+    const a = document.createElement('audio');
+    return a.canPlayType('audio/ogg; codecs="vorbis"') === 'probably' ? '.ogg' : '.m4a';
+  } catch { return '.m4a'; }
+})();
+const srcUrl = (url) => BASE + url.replace(/\.ogg$/, AUDIO_EXT);
+
 class AudioManager {
   constructor() {
     this.engine = null;
@@ -41,7 +52,10 @@ class AudioManager {
     if (this._initStarted) return;
     this._initStarted = true;
     try {
-      this.engine = await CreateAudioEngineAsync();
+      // disableDefaultUI: suppress Babylon's built-in "unmute" overlay button
+      // (the stray top-left button) — we have our own music toggle, and
+      // resumeOnInteraction (default true) still unlocks audio on first gesture.
+      this.engine = await CreateAudioEngineAsync({ disableDefaultUI: true });
 
       // Category buses — everything routes through one of these for group mixing.
       for (const [name, cfg] of Object.entries(BUSES)) {
@@ -56,7 +70,7 @@ class AudioManager {
         if (def.poolSize) {
           const free = [];
           for (let k = 0; k < def.poolSize; k++) {
-            const s = await CreateSoundAsync(`${id}#${k}`, BASE + def.url, { spatialEnabled: true, maxInstances: 1 });
+            const s = await CreateSoundAsync(`${id}#${k}`, srcUrl(def.url), { spatialEnabled: true, maxInstances: 1 });
             if (this.buses[def.bus]) s.outBus = this.buses[def.bus];
             if (def.gain != null) s.volume = def.gain;
             free.push(s);
@@ -64,7 +78,7 @@ class AudioManager {
           this.pools[id] = { def, free, used: new Map() };
           return;
         }
-        const snd = await CreateSoundAsync(id, BASE + def.url, {
+        const snd = await CreateSoundAsync(id, srcUrl(def.url), {
           spatialEnabled: !!def.spatial,
           maxInstances: def.maxInstances ?? 1,
         });
