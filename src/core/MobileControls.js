@@ -102,7 +102,12 @@ function injectStyles() {
   body.mc-touch #loot-prompt,       /* "[ E ] LOOT"            -> orange LOOT btn */
   body.mc-touch #controls-grid,     /* WASD/mouse how-to-play grid               */
   body.mc-touch #controls-tip,      /* keyboard tip line                         */
-  body.mc-touch #controls-start{ display:none !important; } /* -> centered TAP TO START */
+  body.mc-touch #controls-start,    /* -> centered TAP TO START                  */
+  body.mc-touch #reticle{ display:none !important; } /* mouse cursor crosshair — meaningless on touch */
+
+  /* Health/Energy HUD is desktop-sized; scale it down on phones (anchored to its
+     bottom-left corner so it stays put). */
+  body.mc-touch #hud{ transform:scale(0.7); transform-origin:bottom left; }
   `;
   const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
 }
@@ -269,9 +274,10 @@ function buildDom() {
   _btnBack.className = 'mc-btn mc-pill'; _btnBack.innerHTML = 'II';
   bindTap(_btnBack, () => tapKey('Escape'));
 
-  // Fullscreen — top-right.
+  // Fullscreen — top-right, offset LEFT of the global music-mute button (right:12,
+  // w:38) so the two don't overlap on browsers that support fullscreen (Android).
   _btnFs = el('button',
-    `right:max(16px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));width:50px;height:50px;font-size:18px;`, _root);
+    `right:max(62px,calc(env(safe-area-inset-right) + 56px));top:max(14px,env(safe-area-inset-top));width:50px;height:50px;font-size:18px;`, _root);
   _btnFs.className = 'mc-btn mc-pill'; _btnFs.innerHTML = '⛶';
   bindTap(_btnFs, toggleFs);
 
