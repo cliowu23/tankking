@@ -2,6 +2,7 @@ import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicT
 import { shortAngle } from '../utils/mathUtils.js';
 import { hullFootprint } from '../utils/meshBounds.js';
 import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
+import { audio } from '../core/audio/AudioManager.js';
 
 export default class Tank {
   constructor(scene, x, z) {
@@ -253,12 +254,15 @@ export default class Tank {
   takeDamage(amount) {
     if (!this.alive) return;
     this.hp = Math.max(0, this.hp - amount * shieldDamageMultiplier(this.shield));
+    if (amount > 0) audio.play(amount >= 20 ? 'tank.hit_heavy' : 'tank.hit_light');
     if (this.hp <= 0) this._die();
   }
 
   _die() {
     this.alive = false;
     this.speed = 0;
+    audio.play('tank.destroyed');
+    audio.stopLoop('tank.engine');
     this.hullMat.diffuseColor  = new Color3(0.15, 0.12, 0.08);
     this.hullMat.emissiveColor = new Color3(0.05, 0.03, 0.01);
   }
@@ -291,11 +295,33 @@ export default class Tank {
     if (!this.alive) return;
 
     // --- Shield step (before movement so the slow applies this frame) ---
+    const prevShieldActive = this.shield.active;
     const { fuelSpent } = stepShield(this.shield, dt, this._qPressed, this.fuel);
     this.fuel = Math.max(0, this.fuel - fuelSpent);
     this._qPressed = false;
     this.shieldBubble.isVisible = this.shield.active;
+    // Shield audio: edge-triggered activate/break + a hold loop while up.
+    if (this.shield.active && !prevShieldActive) {
+      audio.play('tank.shield_activate');
+      audio.startLoop('tank.shield_loop');
+    } else if (!this.shield.active && prevShieldActive) {
+      audio.play('tank.shield_break');
+      audio.stopLoop('tank.shield_loop');
+    }
     const shieldMove = this.shield.active ? SHIELD_MOVE_MULT : 1;
+
+    // --- Engine swell: louder/fuller with speed (throttled to avoid click thrash) ---
+    const engineTarget = 0.07 + 0.55 * Math.min(1, Math.abs(this.speed) / this.maxSpeed);
+    if (this._engineVol === undefined || Math.abs(engineTarget - this._engineVol) > 0.04) {
+      this._engineVol = engineTarget;
+      audio.setVolume('tank.engine', engineTarget);
+    }
+
+    // --- Low-fuel warning: periodic beep while fuel is critical ---
+    if (this.fuel < 20) {
+      this._lowFuelT = (this._lowFuelT ?? 0) - dt;
+      if (this._lowFuelT <= 0) { audio.play('tank.low_fuel'); this._lowFuelT = 1.6; }
+    } else this._lowFuelT = 0;
 
     // --- Dash ---
     if (this.dashTimeLeft > 0) {

@@ -3,6 +3,8 @@ import ArenaScene        from '../world/ArenaScene.js';
 import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
+import { audio } from './audio/AudioManager.js';
+import { music } from './audio/MusicManager.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { generateRoadLeg } from '../world/zones/roadLeg.js';
 import { initMobileControls } from './MobileControls.js';
@@ -51,6 +53,65 @@ const maxVertexUniformBlocks = gl2 ? gl2.getParameter(gl2.MAX_VERTEX_UNIFORM_BLO
 if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS) {
   engine.disableUniformBuffers = true;
 }
+
+// Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
+// grants playback on the first user gesture (the START / deploy click).
+audio.init();
+// music: Tone graph is built lazily (music.start) after the audio context is
+// running — no autoplay-warning spam. Kick off the MENU theme on the very first
+// user gesture (so the title screen has music before the player presses start).
+function _menuMusicOnGesture() {
+  if (window.__state === 'MENU') music.playMenu();
+  window.removeEventListener('pointerdown', _menuMusicOnGesture);
+  window.removeEventListener('keydown', _menuMusicOnGesture);
+}
+window.addEventListener('pointerdown', _menuMusicOnGesture);
+window.addEventListener('keydown', _menuMusicOnGesture);
+
+// Persistent music mute toggle (top-right corner, all screens). Saves to localStorage.
+const _musicMuteBtn = document.createElement('button');
+_musicMuteBtn.id = 'music-mute';
+_musicMuteBtn.title = 'Toggle music (M)';
+_musicMuteBtn.style.cssText =
+  'position:fixed;top:12px;right:12px;z-index:9999;width:38px;height:38px;border-radius:8px;' +
+  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);color:#cdd6e2;font-size:17px;' +
+  'cursor:pointer;backdrop-filter:blur(4px);line-height:1;padding:0;';
+if (localStorage.getItem('tk_music_muted') === '1') music.setMuted(true);
+const _renderMute = () => { _musicMuteBtn.textContent = music.muted ? '🔇' : '🎵'; _musicMuteBtn.style.opacity = music.muted ? '0.55' : '1'; };
+function _toggleMusicMute() {
+  const m = music.toggleMuted();
+  localStorage.setItem('tk_music_muted', m ? '1' : '0');
+  _renderMute();
+}
+_musicMuteBtn.addEventListener('click', (e) => { e.stopPropagation(); _toggleMusicMute(); });
+window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') _toggleMusicMute(); });
+document.body.appendChild(_musicMuteBtn);
+_renderMute();
+
+// Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
+// or rebuilding the arena, so they don't bleed into the hangar/menu.
+function silenceArena() {
+  audio.releaseAllPooled();
+  audio.stopLoop('tank.engine');
+  audio.stopLoop('tank.shield_loop');
+  audio.stopLoop('amb.sea');
+}
+
+// UI sounds — delegated so it covers menu buttons shown/hidden at runtime.
+// hover on entering any button; click → confirm for go-forward actions, else select.
+let _uiHover = null;
+document.addEventListener('pointerover', (e) => {
+  const b = e.target.closest('button');
+  if (b && b !== _uiHover) { _uiHover = b; audio.play('ui.hover'); }
+  else if (!b) _uiHover = null;
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  // deploy = the one weighty "commit to a run" action → the multi-note jingle.
+  // everything else (resume, restart, menu, close, return) = single interact blip.
+  audio.play(/deploy/.test(b.id || '') ? 'ui.confirm' : 'ui.interact');
+});
 
 let arenaScene    = null;
 let designerScene = null;
@@ -162,6 +223,8 @@ function transition(hideFn, showFn, type = 'checker') {
 }
 
 function startGame() {
+  audio.play('ui.interact'); // keyboard-driven start (single blip; may revisit later)
+  music.playShutter();       // iris/aperture whoosh under the wipe
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
@@ -176,6 +239,7 @@ function startGame() {
         arenaScene._restart();
       }
       engine.runRenderLoop(() => arenaScene.scene.render());
+      music.playCombat();
       arenaScene._paused = true;
       window.__state = 'CONTROLS';
       document.getElementById('controls-screen').style.display = 'flex';
@@ -185,6 +249,7 @@ function startGame() {
 }
 
 function startHangar() {
+  music.playShutter();       // iris/aperture whoosh under the wipe
   transition(
     () => {
       document.getElementById('menu').style.display          = 'none';
@@ -193,6 +258,7 @@ function startHangar() {
       document.getElementById('hangar-prompt').style.display = 'none';
       document.getElementById('hangar-panel').style.display  = 'none';
       engine.stopRenderLoop();
+      silenceArena();
       if (arenaScene) { arenaScene._paused = false; arenaScene = null; }
     },
     () => {
@@ -203,6 +269,8 @@ function startHangar() {
       const hs = document.getElementById('hangar-salvage');
       if (hs) { hs.textContent = `BANKED SALVAGE: ${getBankedSalvage()}`; hs.style.display = 'block'; }
       engine.runRenderLoop(() => hangarScene.scene.render());
+      audio.startLoop('amb.hangar'); // warm hangar room tone (2D)
+      music.playHangar();
     },
     'iris'
   );
@@ -247,6 +315,8 @@ function deployToArena(dev = false) {
   document.getElementById('hangar-panel').style.display   = 'none';
   document.getElementById('hangar-salvage').style.display = 'none';
   engine.stopRenderLoop();
+  audio.stopLoop('amb.hangar');
+  music.stop();  // cut hangar music for the loading screen; combat music starts on drop-in
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
 
   // Build on the next frame so the overlay paints before the heavy work starts.
@@ -268,6 +338,10 @@ function deployToArena(dev = false) {
       setTimeout(() => {
         document.getElementById('hud').style.display = 'block';
         engine.runRenderLoop(() => arenaScene.scene.render());
+        audio.play('ui.wave_start'); // dropped into combat
+        if (dev) music.playArena();  // dev test arena gets its own "Test Chamber" track
+        else     music.playCombat(); // World 1 keeps the combat theme
+
         // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
         if (!controlsSeen) {
           controlsSeen = true;
@@ -285,6 +359,8 @@ function deployToArena(dev = false) {
 }
 
 function onExtractFromArena(gained, banked) {
+  music.stop();              // world/combat music ends when the extract overlay appears
+  music.playExtract();       // Duckov-style reward jingle on the extract summary (over the fade)
   document.getElementById('hud').style.display = 'none';
   document.getElementById('extract-indicator').style.display = 'none';
   document.getElementById('extract-summary-gained').textContent = `+${gained} SALVAGE`;
@@ -310,10 +386,16 @@ function goToMenu() {
   document.getElementById('death').style.display = 'none';
   document.getElementById('hud').style.display   = 'none';
   document.getElementById('hangar-salvage').style.display = 'none';
+  document.getElementById('extract-indicator').style.display = 'none'; // sweep the extraction bar
+  document.getElementById('extract-summary').style.display = 'none';   // and the summary, so neither leaks onto the menu
   canvas.style.display = 'none';
   engine.stopRenderLoop();
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
+  silenceArena(); // after _restart (which restarts engine) so the menu is quiet
+  audio.stopLoop('amb.hangar');
+  music.playMenu();
+  music.playCrtOff();        // power-down whine + thunk, synced to the CRT-off visual
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
@@ -323,6 +405,7 @@ function goToMenu() {
 }
 
 function startDesigner() {
+  music.playRetro();         // 8-bit blip cascade under the checker/pixelated wipe
   transition(
     () => {
       document.getElementById('menu').style.display = 'none';
@@ -344,6 +427,7 @@ function startDesigner() {
 }
 
 function exitDesigner() {
+  music.playRetro();         // 8-bit blip cascade under the checker/pixelated wipe
   transition(
     () => {
       document.getElementById('designer-ui').style.display          = 'none';
@@ -406,6 +490,7 @@ function resumeGame() {
   if (window.__state !== 'PAUSED') return;
   document.getElementById('pause').style.display = 'none';
   if (arenaScene) arenaScene._paused = false;
+  music.resume(); // un-freeze the soundtrack from where it paused
   window.__state = 'GAME';
 }
 
@@ -419,6 +504,7 @@ document.getElementById('pause-restart').addEventListener('click', () => {
   document.getElementById('hud').style.display   = 'block';
   arenaScene._paused = false;
   arenaScene._restart();
+  music.restart(); // soundtrack restarts from the top with the run
   window.__state = 'GAME';
 });
 document.getElementById('death-hangar').addEventListener('click', startHangar);
@@ -429,6 +515,7 @@ document.getElementById('death-restart').addEventListener('click', () => {
   document.getElementById('hud').style.display   = 'block';
   arenaScene._paused = false;
   arenaScene._restart();
+  music.restart(); // replay whatever track was playing (combat or dev arena), from the top
   window.__state = 'GAME';
 });
 
@@ -436,6 +523,8 @@ function autoPause() {
   if (window.__state !== 'GAME') return;
   window.__state = 'PAUSED';
   if (arenaScene) arenaScene._paused = true;
+  music.pause();           // freeze the soundtrack with the game
+  music.playNeedleLift();  // record-needle-off transition
   document.getElementById('pause').style.display = 'flex';
 }
 
@@ -577,15 +666,19 @@ async function buildCrewPanel() {
     }
     btns.appendChild(grp);
   };
-  const br = row('Outfit');
-  for (const it of _wardrobe.bodies ?? []) {
-    addGrouped(br, it, id => {
-      // outfit drives head+body together (unified character — no head grafting)
-      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
-    });
-  }
-  for (const [slot, items] of Object.entries(_wardrobe.slots)) {
-    const btns = row(slot[0].toUpperCase() + slot.slice(1));
+  // Slot-row builder (None + items, + the Bedroll add-on toggle on the back slot).
+  const SLOT_LABELS = { face: 'Eyewear', facialhair: 'Facial Hair', hair: 'Hair', headwear: 'Headwear', back: 'Back' };
+  const section = (title) => {
+    const s = document.createElement('div');
+    s.className = 'lng-section';
+    s.id = 'lng-sec-' + title.toLowerCase();   // lng-sec-body / lng-sec-head (matches pick regions)
+    s.textContent = title;
+    host.appendChild(s);
+  };
+  const buildSlot = (slot) => {
+    const items = _wardrobe.slots[slot];
+    if (!items) return;
+    const btns = row(SLOT_LABELS[slot] ?? (slot[0].toUpperCase() + slot.slice(1)));
     mkBtn(btns, 'None', { gid: 'none', slot }, () => {
       if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: 'none' }));
     });
@@ -607,7 +700,22 @@ async function buildCrewPanel() {
       });
       btns.appendChild(b);
     }
+  };
+  // Grouped into sections so the panel reads cleanly (Skin sits up top as the base).
+  section('BODY');
+  const br = row('Outfit');
+  for (const it of _wardrobe.bodies ?? []) {
+    addGrouped(br, it, id => {
+      // outfit drives head+body together (unified character — no head grafting)
+      if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ character: id }));
+    });
   }
+  buildSlot('back');
+  section('HEAD');
+  buildSlot('hair');
+  buildSlot('facialhair');
+  buildSlot('headwear');
+  buildSlot('face');
 }
 function syncCrewPanel(cfg) {
   _driverCfg = cfg;
@@ -629,5 +737,16 @@ function syncCrewPanel(cfg) {
   document.querySelectorAll('#lounge-slots [data-gmodel]').forEach(b =>
     b.classList.toggle('on', [...active].some(v => typeof v === 'string' && v.startsWith(b.dataset.gmodel))));
 }
+
+// Click-on-part nav: the hangar fires 'crewpart' (region = head|body) when the
+// player clicks a body region of the driver → scroll that panel section in + pulse it.
+window.addEventListener('crewpart', (e) => {
+  const sec = document.getElementById('lng-sec-' + e.detail.region);
+  if (!sec) return;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sec.classList.remove('lng-pulse');
+  void sec.offsetWidth;          // restart the animation
+  sec.classList.add('lng-pulse');
+});
 
 window.addEventListener('resize', () => engine.resize());

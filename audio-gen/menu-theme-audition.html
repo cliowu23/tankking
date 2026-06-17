@@ -1,0 +1,121 @@
+<!doctype html><html><head><meta charset="utf-8"><title>TanKING — Menu Theme Audition</title>
+<script src="https://unpkg.com/tone@15.1.22/build/Tone.js"></script>
+<style>
+  :root{--bg:#0a0d12;--pnl:#131a24;--ln:#1f2a38;--cy:#4fd6ff;--am:#ffb454;--tx:#cdd6e2;--dim:#7f8da0;--ok:#7CFFA0;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 ui-monospace,Menlo,monospace;padding:30px;max-width:780px;margin:0 auto}
+  h1{color:var(--cy);font-size:19px;letter-spacing:.05em;margin:0 0 4px}
+  .sub{color:var(--dim);margin-bottom:24px}
+  .card{background:var(--pnl);border:1px solid var(--ln);border-radius:12px;padding:18px 20px;margin-bottom:14px;transition:border-color .2s}
+  .card.playing{border-color:var(--ok)}
+  .card.ref{opacity:.85;border-style:dashed}
+  .name{color:var(--cy);font-weight:700;font-size:15px;letter-spacing:.03em}
+  .bpm{color:var(--am);font-size:11px;margin-left:8px}
+  .tag{font-size:9px;letter-spacing:.1em;color:var(--dim);border:1px solid var(--ln);border-radius:5px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .desc{color:var(--dim);margin:6px 0 14px;font-style:italic}
+  button{background:var(--cy);color:#04121a;border:0;border-radius:7px;padding:9px 20px;font:inherit;font-weight:700;cursor:pointer;margin-right:8px}
+  button.stop{background:transparent;color:var(--dim);border:1px solid var(--ln)}
+  .status{color:var(--ok);font-size:11px;margin-left:6px}
+  .foot{margin-top:20px;color:var(--dim);font-size:12px}
+</style></head><body>
+<h1>TanKING — Menu Theme Audition</h1>
+<div class="sub"><b>Menu-music palette / archive.</b> <b style="color:var(--ok)">M3 "Signal Home" is now the live menu theme.</b> <b>M1 "Long Road"</b> and the <b>old menu theme</b> are saved here as parked alternates (M2 was dropped). One plays at a time, each loops (give each ~20s — they bloom in). Use headphones.</div>
+<div id="cards"></div>
+<div class="foot">All A minor (Am–F–C–G), first drafts, all tunable — tempo, how lush, how prominent the melody. Whatever you pick gets ported into <code>MusicManager._build_menu()</code>.</div>
+
+<script>
+let master = null, current = null, currentId = null;
+
+const CH = { Am:['A3','C4','E4','G4'], F:['F3','A3','C4','E4'], C:['C4','E4','G4','B4'], G:['G3','B3','D4','E4'] };
+const PROG = [CH.Am, CH.F, CH.C, CH.G];
+const ROOT = ['A1','F1','C1','G1'];
+// triads + arp for the current-menu reference
+const CHORDS = [['A3','C4','E4'], ['F3','A3','C4'], ['C4','E4','G4'], ['G3','B3','D4']];
+const MENU_ARP = [];
+[['A4','C5','E5','C5'], ['F4','A4','C5','A4'], ['C5','E5','G5','E5'], ['G4','B4','D5','B4']].forEach(a => MENU_ARP.push(...a));
+
+function gain(v){ return new Tone.Gain(v).connect(master); }
+
+// ---------- M1: Long Road — cinematic ambient, catchy wistful lead ----------
+function buildLongRoad(){
+  const d=[]; Tone.getTransport().swing=0;
+  const verb=new Tone.Freeverb(0.9,3200).connect(gain(.85)); d.push(verb);
+  const pad=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'sawtooth'},envelope:{attack:1.4,decay:.6,sustain:.7,release:3},volume:-24}).connect(verb); d.push(pad);
+  const sub=new Tone.MonoSynth({oscillator:{type:'sine'},envelope:{attack:.4,decay:.4,sustain:.8,release:1.5},volume:-16}).connect(gain(.9)); d.push(sub);
+  const dly=new Tone.FeedbackDelay('4n',0.32); dly.wet.value=.4; dly.connect(verb); d.push(dly); // 4n stays <1s (FeedbackDelay max) at this tempo
+  const shimmer=new Tone.Synth({oscillator:{type:'triangle'},envelope:{attack:.005,decay:.4,sustain:0,release:.6},volume:-26}).connect(dly); d.push(shimmer);
+  const lead=new Tone.Synth({oscillator:{type:'triangle'},envelope:{attack:.04,decay:.3,sustain:.3,release:.8},volume:-15}).connect(dly); d.push(lead);
+  const ARP=[]; PROG.forEach(c=>{ARP.push(c[0],c[2],c[3],c[2]);});
+  // wistful, hopeful, catchy — the "long road ahead" motif
+  const MEL=[ 'E5',null,null,'A5', null,'G5',null,null, 'F5',null,null,'A5', null,null,null,null,
+              'E5',null,'G5',null, 'C6',null,'B5',null, 'A5',null,null,null, null,null,null,null ];
+  d.push(new Tone.Sequence((t,c)=>pad.triggerAttackRelease(c,'1m',t),PROG,'1m').start(0));
+  d.push(new Tone.Sequence((t,r)=>sub.triggerAttackRelease(r,'1m',t),ROOT,'1m').start(0));
+  d.push(new Tone.Sequence((t,n)=>shimmer.triggerAttackRelease(Tone.Frequency(n).transpose(24),'16n',t),ARP,'4n').start('2m')); // shimmer blooms in
+  d.push(new Tone.Sequence((t,n)=>{if(n)lead.triggerAttackRelease(n,'8n',t);},MEL,'8n').start('1m'));                          // lead enters after a bar
+  return d;
+}
+
+// ---------- M3: Signal Home — hummable, motif-forward ----------
+function buildSignalHome(){
+  const d=[]; Tone.getTransport().swing=0;
+  const verb=new Tone.Freeverb(0.7,3500).connect(gain(.85)); d.push(verb);
+  const pad=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'triangle'},envelope:{attack:.6,decay:.5,sustain:.6,release:1.5},volume:-23}).connect(verb); d.push(pad);
+  const bass=new Tone.MonoSynth({oscillator:{type:'sine'},envelope:{attack:.05,decay:.3,sustain:.6,release:.4},volume:-13}).connect(gain(.9)); d.push(bass);
+  const swell=new Tone.NoiseSynth({noise:{type:'pink'},envelope:{attack:.2,decay:.3,sustain:0},volume:-30}).connect(verb); d.push(swell);
+  const dly=new Tone.PingPongDelay('8n.',0.28); dly.wet.value=.32; dly.connect(verb); d.push(dly);
+  const bell=new Tone.Synth({oscillator:{type:'triangle'},envelope:{attack:.005,decay:.4,sustain:.1,release:.6},volume:-14}).connect(dly); d.push(bell);
+  // a tune you'd hum — hopeful, a signal worth driving toward
+  const MEL=[ 'A4','C5','E5',null, 'E5','D5',null,null, 'F4','A4','C5',null, 'C5','B4',null,null,
+              'C5','E5','G5',null, 'G5','E5',null,null, 'G4','B4','D5',null, 'E5',null,null,null ];
+  d.push(new Tone.Sequence((t,c)=>pad.triggerAttackRelease(c,'1m',t),PROG,'1m').start(0));
+  d.push(new Tone.Sequence((t,r)=>bass.triggerAttackRelease(r,'2n',t),ROOT,'1m').start(0));
+  d.push(new Tone.Loop(t=>swell.triggerAttackRelease('2n',t),'1m').start(0)); // soft breath each bar
+  d.push(new Tone.Sequence((t,n)=>{if(n)bell.triggerAttackRelease(n,'8n',t);},MEL,'8n').start('1m'));
+  return d;
+}
+
+// ---------- Reference: current menu theme (calm pad + sine arp "drop") ----------
+function buildCurrentMenu(){
+  const d=[]; Tone.getTransport().swing=0;
+  const verb=new Tone.Freeverb(0.7,2200).connect(gain(.9)); d.push(verb);
+  const pad=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'triangle'},envelope:{attack:.6,decay:.4,sustain:.7,release:1.6},volume:-15}).connect(verb); d.push(pad);
+  const arp=new Tone.Synth({oscillator:{type:'sine'},envelope:{attack:.005,decay:.3,sustain:0,release:.4},volume:-19}).connect(verb); d.push(arp);
+  d.push(new Tone.Sequence((t,c)=>pad.triggerAttackRelease(c,'1m',t),CHORDS,'1m').start(0));
+  d.push(new Tone.Sequence((t,n)=>arp.triggerAttackRelease(Tone.Frequency(n).transpose(12),'8n',t),MENU_ARP,'4n').start('4m')); // arp drops in after 4 bars
+  return d;
+}
+
+const THEMES = [
+  { id:'signal',   name:'M3 — Signal Home',  bpm:84,  tag:'★ NOW THE MENU THEME', desc:'motif-forward — a hummable plucked-bell hook over a warm bed + soft breath pulse; gentle but a tune you remember. Ported into MusicManager._build_menu().', build:buildSignalHome },
+  { id:'longroad', name:'M1 — Long Road',    bpm:72,  tag:'SAVED', desc:'cinematic ambient — lush evolving pad, deep reverb, a wistful catchy lead that blooms in. Chill "Minecraft-y" vibe — parked for a calm context (not the title screen).', build:buildLongRoad },
+  { id:'current',  name:'Old menu theme',    bpm:100, tag:'SAVED', desc:'the original — calm triangle pad with a sine arp that drops in. Still good; kept as an alternate menu option.', build:buildCurrentMenu },
+];
+
+function stopCurrent(){
+  if(current){ Tone.getTransport().stop(); current.forEach(n=>{try{n.stop&&n.stop();}catch(e){} try{n.dispose&&n.dispose();}catch(e){}}); current=null; }
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('playing'));
+  document.querySelectorAll('.status').forEach(s=>s.textContent='');
+}
+async function play(theme){
+  await Tone.start();
+  stopCurrent();
+  if(!master) master=new Tone.Gain(0.7).toDestination();
+  Tone.getTransport().bpm.value=theme.bpm;
+  current=theme.build(); currentId=theme.id;
+  Tone.getTransport().position=0; Tone.getTransport().start();
+  const card=document.getElementById('card_'+theme.id); card.classList.add('playing');
+  card.querySelector('.status').textContent='▶ playing…';
+}
+
+const wrap=document.getElementById('cards');
+THEMES.forEach(t=>{
+  const c=document.createElement('div'); c.className='card'+(t.tag==='REFERENCE'?' ref':''); c.id='card_'+t.id;
+  c.innerHTML=`<div><span class="name">${t.name}</span><span class="bpm">${t.bpm} BPM</span><span class="tag">${t.tag}</span></div>
+    <div class="desc">${t.desc}</div>
+    <button id="play_${t.id}">▶ Play</button><button class="stop" id="stop_${t.id}">■ Stop</button><span class="status"></span>`;
+  wrap.appendChild(c);
+  c.querySelector('#play_'+t.id).onclick=()=>play(t);
+  c.querySelector('#stop_'+t.id).onclick=stopCurrent;
+});
+</script></body></html>

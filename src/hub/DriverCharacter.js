@@ -7,21 +7,20 @@ const SPEED       = 7;   // units/sec — walk (was 5; bumped between old walk a
 const CAM_RADIUS  = 20;  // fixed follow-cam distance (locked zoom); was 24
 const MODEL_DIR = '/assets/models/characters/';
 
-// Kenney "Mini Characters" (CC0). Each character GLB is rigged on an identical
-// rig (root/legs/torso/arms/head — SAME bone order across all 12, so meshes can
-// be grafted between them with no skin-index remap) and ships NATIVE baked anims
-// (idle/walk/…). Each char = two skinned meshes: `body-mesh` (torso+limbs+outfit)
-// and `head-mesh` (head+hair+face). Accessories are static meshes attached to the
-// head bone. So: pick a body, graft any character's head onto it, add an accessory.
+// Native characters (CHARACTER_MODEL_SPEC). Each character GLB is rigged on the
+// shared rig (root/legs/torso/arms/head — SAME bone order, so meshes graft
+// between characters with no skin-index remap) and ships baked anims (idle/walk/…).
+// Each char = two skinned meshes: `body-mesh` (torso+limbs+outfit) and `head-mesh`
+// (head+hair+face). Wardrobe pieces are static meshes attached to a bone. So: pick
+// a body, graft a character's head onto it, add wardrobe. The Kenney "Mini
+// Characters" CC0 set was the build reference only — purged once natives landed.
 export const DRIVER_CHARACTERS = [
-  'character-male-a', 'character-male-b', 'character-male-c',
-  'character-male-d', 'character-male-e', 'character-male-f',
-  'character-female-a', 'character-female-b', 'character-female-c',
-  'character-female-d', 'character-female-e', 'character-female-f',
-  'char-calib',    // Batch C0 calibration dummy (original) — remove after C1 ships
+  'char-calib',    // Batch C0 calibration dummy
   'char-driver-a', // Batch C1 — first ORIGINAL character (CHARACTER_MODEL_SPEC)
 ];
-export const DRIVER_ACCESSORIES = ['none', 'aid-glasses', 'aid-sunglasses', 'aid-mask'];
+// Legacy Kenney aid-* face accessories were purged; the `face` wardrobe slot
+// (glasses/shades/beard/stache) replaces them.
+export const DRIVER_ACCESSORIES = ['none'];
 
 // Wardrobe attachment slots (CHARACTER_MODEL_SPEC customization section).
 // Each is a static GLB attached to a bone; pieces authored at the bone origin
@@ -29,7 +28,10 @@ export const DRIVER_ACCESSORIES = ['none', 'aid-glasses', 'aid-sunglasses', 'aid
 export const ATTACH_SLOTS = {
   hair:     { boneRe: /(^|[^a-z])head/i },
   headwear: { boneRe: /(^|[^a-z])head/i },
-  face:     { boneRe: /(^|[^a-z])head/i },
+  face:     { boneRe: /(^|[^a-z])head/i },   // eyewear (glasses / shades)
+  // Facial hair is its own head-bone slot so a beard/stache can be worn together
+  // with eyewear (e.g. shades + beard).
+  facialhair: { boneRe: /(^|[^a-z])head/i },
   back:     { boneRe: /torso/i },
   // Bedroll is a satchel add-on, not a standalone back piece — it rides the same
   // torso bone alongside the satchel and only renders when the satchel is equipped
@@ -45,12 +47,16 @@ export const DRIVER_OPTIONS = {
 };
 export const DRIVER_DEFAULT = {
   head: 'char-driver-a', body: 'char-driver-a',
-  hair: 'none', headwear: 'none', face: 'none', back: 'none', bedroll: 'none',
+  hair: 'none', headwear: 'none', face: 'none', facialhair: 'none', back: 'none', bedroll: 'none',
   skin: '#eebb94',   // tints the skinMat material (skin verts authored white)
 };
 
 // The only back piece the bedroll add-on pairs with.
 export const BEDROLL_HOST = 'back-satchel';
+
+// Wardrobe slots that live on the head — used to classify a picked mesh into a
+// customization region (head vs body) for the click-to-section panel nav.
+const HEAD_SLOTS = ['hair', 'headwear', 'face', 'facialhair'];
 
 // Stale/legacy config guard: maps the old `accessory` key to the `face` slot and
 // fills missing slots — old localStorage saves keep working.
@@ -79,12 +85,14 @@ export default class DriverCharacter {
     this.mesh = MeshBuilder.CreateCapsule('driver', { radius: 0.3, height: 1.8 }, scene);
     this.mesh.position        = new Vector3(0, 0.9, -6);
     this.mesh.isVisible       = false;
+    this.mesh.isPickable      = false;   // picks pass through to the actual body/head meshes
     this.mesh.checkCollisions = true;
     this.mesh.ellipsoid       = new Vector3(0.3, 0.9, 0.3);
     this.mesh.ellipsoidOffset = new Vector3(0, 0.9, 0);
 
     this.modelRoot = MeshBuilder.CreateBox('driver-modelRoot', { size: 0.001 }, scene);
     this.modelRoot.isVisible = false;
+    this.modelRoot.isPickable = false;
     this.modelRoot.parent    = this.mesh;
     this.modelRoot.position.set(0, -0.9, 0);
     this.modelRoot.scaling.setAll(MODEL_SCALE);
@@ -270,6 +278,34 @@ export default class DriverCharacter {
   }
 
   getConfig() { return { ...this._config }; }
+
+  // ── Click-to-section nav helpers (used by the hangar customizer) ─────────────
+  // Classify a picked scene mesh into a customization region: 'head' | 'body' | null.
+  regionOfMesh(m) {
+    if (!m) return null;
+    if (m === (this._swappedHead ?? this._base?.headMesh)) return 'head';
+    if (m === this._base?.bodyMesh) return 'body';
+    for (const [slot, root] of Object.entries(this._attachRoots)) {
+      if (!root) continue;
+      for (let p = m; p; p = p.parent) {
+        if (p === root) return HEAD_SLOTS.includes(slot) ? 'head' : 'body';
+      }
+    }
+    return null;
+  }
+
+  // All renderable meshes belonging to a region (for the hover highlight).
+  regionMeshes(region) {
+    const out = [];
+    const push = (msh) => { if (msh?.getTotalVertices?.() > 0) out.push(msh); };
+    const slots = region === 'head' ? HEAD_SLOTS : ['back', 'bedroll'];
+    push(region === 'head' ? (this._swappedHead ?? this._base?.headMesh) : this._base?.bodyMesh);
+    for (const slot of slots) {
+      const root = this._attachRoots[slot];
+      if (root) { push(root); root.getChildMeshes().forEach(push); }
+    }
+    return out;
+  }
 
   // ── per-frame ────────────────────────────────────────────────────────────────
   update(dt) {

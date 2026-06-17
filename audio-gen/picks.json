@@ -1,0 +1,13 @@
+{
+  "_note": "User's top picks from CC0 (Kenney) audition, 2026-06-16. '__placeholder__' = no Kenney candidate chosen for that slot (these slots were later filled by procedural synth).",
+  "picks": {
+    "tank.cannon_fire": "tank.cannon_fire__v2__explosionCrunch_000.ogg",
+    "tank.hit_heavy": "__placeholder__",
+    "tank.shield_activate": "tank.shield_activate__v2__forceField_002.ogg",
+    "tank.shield_loop": "tank.shield_loop__v1__forceField_004.ogg",
+    "tank.shield_break": "tank.shield_break__v1__forceField_001.ogg",
+    "enemy.sentinel_beam_charge": "__placeholder__",
+    "enemy.sentinel_beam_fire": "enemy.sentinel_beam_fire__v1__laserLarge_000.ogg",
+    "ui.wave_start": "ui.wave_start__v1__bong_001.ogg"
+  }
+}

@@ -12,6 +12,7 @@ import { buildKitchen } from './HangarKitchen.js';
 import { buildMapTable } from './HangarMapTable.js';
 import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
+import { audio } from '../core/audio/AudioManager.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { buildPrimitiveTank } from '../tank/primitiveTank.js';
@@ -690,6 +691,17 @@ export default class HangarScene {
     this.driver.ready
       .then(() => this.driver.applyConfig(this._driverConfig))
       .then(applied => { if (applied) this._adoptDriverConfig(applied); });
+
+    // Click-on-part nav (only while the lounge panel is open): click a body region
+    // of the driver to jump the panel to that section. The clicked region is
+    // resolved on the tap itself (scene.pick is reliable for dynamically-grafted
+    // meshes in Babylon 7.x), so there's no per-frame hover work or highlight.
+    this.scene.onPointerObservable.add((pi) => {
+      if (!this._panelOpen || pi.type !== PointerEventTypes.POINTERTAP) return;
+      const hit = this.scene.pick(this.scene.pointerX, this.scene.pointerY)?.pickedMesh;
+      const region = this.driver.regionOfMesh(hit);
+      if (region) window.dispatchEvent(new CustomEvent('crewpart', { detail: { region } }));
+    });
   }
 
   _adoptDriverConfig(applied) {
@@ -802,6 +814,7 @@ export default class HangarScene {
   }
 
   openPanel(station) {
+    audio.play('ui.interact'); // E-press station interaction blip
     this._panelOpen = true;
     document.getElementById('hangar-prompt').style.display    = 'none';
     document.getElementById('hangar-panel-title').textContent = station.title;

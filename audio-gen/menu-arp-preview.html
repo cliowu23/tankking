@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8"><title>TanKING — Menu Arp Audition</title>
+<script src="https://unpkg.com/tone@15.1.22/build/Tone.js"></script>
+<style>
+  :root{--bg:#0a0d12;--pnl:#131a24;--ln:#1f2a38;--cy:#4fd6ff;--am:#ffb454;--tx:#cdd6e2;--dim:#7f8da0;--ok:#7CFFA0;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 ui-monospace,Menlo,monospace;padding:30px;max-width:780px;margin:0 auto}
+  h1{color:var(--cy);font-size:19px;letter-spacing:.05em;margin:0 0 4px}
+  .sub{color:var(--dim);margin-bottom:24px}
+  .card{background:var(--pnl);border:1px solid var(--ln);border-radius:12px;padding:18px 20px;margin-bottom:14px;transition:border-color .2s}
+  .card.playing{border-color:var(--ok)}
+  .name{color:var(--cy);font-weight:700;font-size:15px;letter-spacing:.03em}
+  .tag{color:var(--am);font-size:11px;margin-left:8px}
+  .desc{color:var(--dim);margin:6px 0 14px;font-style:italic}
+  button{background:var(--cy);color:#04121a;border:0;border-radius:7px;padding:9px 20px;font:inherit;font-weight:700;cursor:pointer;margin-right:8px}
+  button.stop{background:transparent;color:var(--dim);border:1px solid var(--ln)}
+  .status{color:var(--ok);font-size:11px;margin-left:6px}
+  .row{margin:18px 0 6px;color:var(--dim);font-size:12px}
+  label{cursor:pointer;color:var(--tx)}
+  .foot{margin-top:20px;color:var(--dim);font-size:12px;border-top:1px solid var(--ln);padding-top:14px}
+</style></head><body>
+<h1>TanKING — Menu Arp Audition</h1>
+<div class="sub">Same warm pad chords (A minor, Am–F–C–G, 100 BPM) under three arp options. Only one plays at a time — use <b>headphones</b>. Tell me which one (and I'll bake it into the menu theme).</div>
+
+<div id="cards"></div>
+
+<div class="row">
+  <label><input type="checkbox" id="drop"> Play the in-game <b>drop</b> (chords alone first for 4 bars ≈ 9.6s, then the arp enters). Off = arp from the start, for quick comparison.</label>
+</div>
+
+<div class="foot">
+  <b>Slow</b> = the current build (2 notes/chord at half-notes, fuller decay).<br>
+  <b>Normal</b> = the older busier arp (4 notes/chord at quarter-notes).<br>
+  <b>No arp</b> = warm held chords only.<br>
+  All tunable — say "slow but a touch faster", "no arp but add X", etc.
+</div>
+
+<script>
+let master = null, current = null, currentId = null;
+
+const BPM = 100;
+const CHORDS   = [['A3','C4','E4'], ['F3','A3','C4'], ['C4','E4','G4'], ['G3','B3','D4']];
+// 2 notes per chord (root + a higher chord tone) — aligns to the Am–F–C–G cycle
+const ARP_SLOW = [['A4','E5'], ['F4','C5'], ['C5','G5'], ['G4','D5']].reduce((a,b)=>a.concat(b),[]);
+// 4 notes per chord — the original busier pattern
+const ARP_FAST = [['A4','C5','E5','C5'], ['F4','A4','C5','A4'], ['C5','E5','G5','E5'], ['G4','B4','D5','B4']].reduce((a,b)=>a.concat(b),[]);
+
+const VARIANTS = [
+  { id:'melody', name:'A–C–E–C–F–A–C–A Melody', tag:'normal octave', desc:'Your line as the melody in its OWN register (no octave-up), warm and singing over soft chords. This is the one you want.' },
+  { id:'fast', name:'Normal Arp',  tag:'octave up — for the arp only', desc:'Same notes octave-up as a fast sparkle. The higher voicing you liked for the ARP, not the melody.' },
+  { id:'none', name:'Chords Only', tag:'static',  desc:'No melody — static triads, for reference.' },
+];
+
+function build(arpMode){
+  const d = [];
+  const T = Tone.getTransport();
+  T.stop(); T.cancel(); T.bpm.value = BPM; T.swing = 0; T.position = 0;
+  const verb = new Tone.Freeverb(0.7, 2200).connect(master); d.push(verb);
+  const dropAt = document.getElementById('drop').checked ? '4m' : 0;
+  const melody = arpMode === 'melody';
+
+  // warm held block-chord pads (softened a touch when the melody leads)
+  const pad = new Tone.PolySynth(Tone.Synth, { oscillator:{type:'triangle'}, envelope:{attack:0.6,decay:0.4,sustain:0.7,release:1.6}, volume: melody ? -20 : -15 }).connect(verb); d.push(pad);
+  d.push(new Tone.Sequence((t,c)=>pad.triggerAttackRelease(c,'1m',t), CHORDS, '1m').start(0));
+
+  if (melody) {
+    // The A-C-E-C-F-A-C-A progression as the MELODY, in its own register (NO octave-up),
+    // warm and singing over the soft chords.
+    const lead = new Tone.Synth({ oscillator:{type:'triangle'}, envelope:{attack:0.01, decay:0.3, sustain:0.3, release:0.5}, volume:-8 }).connect(verb); d.push(lead);
+    d.push(new Tone.Sequence((t,n)=>lead.triggerAttackRelease(n, '4n', t), ARP_FAST, '4n').start(dropAt));
+  } else if (arpMode !== 'none') {
+    const slow  = arpMode === 'slow';
+    const arp   = new Tone.Synth({ oscillator:{type:'sine'}, envelope:{attack:0.005, decay: slow?0.5:0.3, sustain:0, release: slow?0.6:0.4}, volume:-19 }).connect(verb); d.push(arp);
+    const notes = slow ? ARP_SLOW : ARP_FAST;
+    const rate  = slow ? '2n' : '4n';
+    const dur   = slow ? '4n' : '8n';
+    d.push(new Tone.Sequence((t,n)=>arp.triggerAttackRelease(Tone.Frequency(n).transpose(12), dur, t), notes, rate).start(dropAt));
+  }
+  T.start();
+  return d;
+}
+
+function stopAll(){
+  if (current){ for (const n of current){ try{ n.stop&&n.stop(); }catch(e){} try{ n.dispose&&n.dispose(); }catch(e){} } current = null; }
+  try{ Tone.getTransport().stop(); Tone.getTransport().cancel(); }catch(e){}
+  if (currentId){ const c=document.getElementById('card-'+currentId); if(c) c.classList.remove('playing'); const s=document.getElementById('st-'+currentId); if(s) s.textContent=''; currentId=null; }
+}
+
+async function play(id){
+  await Tone.start();
+  if (!master) master = new Tone.Gain(0.6).toDestination();
+  const wasSame = currentId === id;
+  stopAll();
+  if (wasSame) return;               // clicking the playing one again = stop
+  current = build(id);
+  currentId = id;
+  document.getElementById('card-'+id).classList.add('playing');
+  document.getElementById('st-'+id).textContent = '▶ playing';
+}
+
+const wrap = document.getElementById('cards');
+VARIANTS.forEach(v=>{
+  const el = document.createElement('div');
+  el.className = 'card'; el.id = 'card-'+v.id;
+  el.innerHTML = `<div class="name">${v.name}<span class="tag">${v.tag}</span><span class="status" id="st-${v.id}"></span></div>
+    <div class="desc">${v.desc}</div>
+    <button onclick="play('${v.id}')">Play / Stop</button>`;
+  wrap.appendChild(el);
+});
+</script>
+</body></html>

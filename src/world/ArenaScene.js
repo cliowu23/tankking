@@ -21,6 +21,8 @@ import SalvageCrate from './SalvageCrate.js';
 import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
+import { audio } from '../core/audio/AudioManager.js';
+import { music } from '../core/audio/MusicManager.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
 
@@ -386,6 +388,9 @@ export default class ArenaScene {
     const bounds = this.zone?.bounds.half ?? 48;
 
     this.tank = new Tank(this.scene, spawn.x, spawn.z);
+    audio.attachListener(this.tank.root); // 3D audio relative to the player
+    audio.startLoop('tank.engine', { emitter: this.tank.root }); // idle hum; swells with speed
+    // (grassy-zone ambience TBD — pending cozy-grassland ambient research; sea bed reserved for a coastal leg)
     this.tank.bounds = bounds;
     this.tank.addShadows(this.shadowGen);
 
@@ -471,6 +476,8 @@ export default class ArenaScene {
       this._paused = !this._paused;
       window.__state = this._paused ? 'PAUSED' : 'GAME';
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
+      if (this._paused) { music.pause(); music.playNeedleLift(); } // freeze music + needle-off
+      else music.resume();                                         // un-freeze where it left off
     });
     document.getElementById('pause-restart').addEventListener('click', () => {
       this._restart();
@@ -483,6 +490,7 @@ export default class ArenaScene {
       this._restart();
       this._paused = false;
       window.__state = 'GAME';
+      // music restart is owned by the main.js death-restart handler (music.restart())
       document.getElementById('death').style.display = 'none';
     });
 
@@ -892,10 +900,15 @@ export default class ArenaScene {
       this.tank.update(dt);
       this._clampCorridor();
 
+      let _aliveEnemies = 0;
       for (const enemy of this.enemies) {
         enemy.update(dt, this.tank.position);
         if (enemy.shells) for (const s of enemy.shells) s.update(dt);
+        if (enemy.alive) _aliveEnemies++;
       }
+      // Combat music intensity swells with the number of live threats (throttled).
+      this._musicT = (this._musicT ?? 0) - dt;
+      if (this._musicT <= 0) { music.setIntensity(Math.min(1, _aliveEnemies / 5)); this._musicT = 0.5; }
 
       // Barrel elevation disabled for flat-shot mode — re-enable with _elevationForHeight when arc shots return
       this.tank.barrelElevation = 0;
@@ -914,7 +927,9 @@ export default class ArenaScene {
       this._checkHazards(dt);
       this._checkCollisions();
       this._checkObstacleCollisions();
+      const _cdBefore = this._fireCooldown;
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
+      if (_cdBefore > 0 && this._fireCooldown === 0) audio.play('tank.reload', { emitter: this.tank.root }); // cannon ready
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
       this._updateExtraction(dt);
@@ -1117,6 +1132,8 @@ export default class ArenaScene {
     this._paused = true;
     window.__state = 'DEAD';
     this._aimEl.style.display = 'none';
+    music.stop();       // world/combat music ends on death (defeat sting plays over the fade)
+    music.playDefeat(); // short descending downer when the death screen appears
     document.getElementById('death').style.display = 'flex';
   }
 
@@ -1126,6 +1143,7 @@ export default class ArenaScene {
       this.enemies[i].reset(x, z);
     }
     this.tank.reset();
+    audio.startLoop('tank.engine', { emitter: this.tank.root }); // engine was stopped on death
     this.lockedEnemy      = null;
     this._prevLockedEnemy = null;
     this.lockRing.isVisible  = false;
@@ -1201,6 +1219,7 @@ export default class ArenaScene {
     if (!c || c.looted) return;
     c.looted = true;
     this._runSalvage += c.value;
+    music.playPickup(); // salvage coin ding
     this._nearContainer = null;
     if (this._lootPrompt) this._lootPrompt.style.display = 'none';
   }
@@ -1221,6 +1240,7 @@ export default class ArenaScene {
       if (dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
         crate.collect();
         this._runSalvage += crate.value;
+        music.playPickup(); // salvage coin ding
       }
     }
 
@@ -1497,6 +1517,7 @@ export default class ArenaScene {
     const vz = Math.cos(aim + azSpread) * HSPEED;
 
     shell.fire(tip.x, tip.y, tip.z, vx, 0, vz, 45);
+    audio.play('tank.cannon_fire', { emitter: this.tank.root });
     this.vfx.spawnMuzzleFlash(tip);
     this._triggerShake(0.06, 0.2);
     this._fireCooldown = 0.3;
@@ -1545,6 +1566,7 @@ export default class ArenaScene {
           shell.deactivate();
           enemy.takeDamage(damage);
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
+          music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
           if (!enemy.alive && this.lockedEnemy === enemy) {
             this._prevLockedEnemy = enemy;
             this._fadeOutTime     = 0;
