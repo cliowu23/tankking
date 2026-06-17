@@ -786,6 +786,21 @@ export default class ArenaScene {
     });
   }
 
+  // Nearest LIVING enemy that is actively engaging the player (state past IDLE/
+  // AMBUSH). All enemy types extend AIEnemy, so this aggro check is universal.
+  // Used by the mobile auto-aim so you can't target enemies outside their aggro.
+  _nearestAggroedEnemy() {
+    const px = this.tank.position.x, pz = this.tank.position.z;
+    let best = null, bestD = Infinity;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (e.state === 'IDLE' || e.state === 'AMBUSH') continue;   // hasn't aggroed onto us
+      const d = (e.position.x - px) ** 2 + (e.position.z - pz) ** 2;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
   _nearestToCursor() {
     let cx = this.tank.position.x;
     let cz = this.tank.position.z;
@@ -854,9 +869,22 @@ export default class ArenaScene {
         }
       }
 
+      // Mobile (Soul-Knight style): the turret auto-locks the nearest enemy that
+      // is actually aggroed onto the player — you can't snipe enemies outside
+      // their own aggro range. Desktop keeps manual mouse aim (this is skipped).
+      if (window.__mobile && window.__mobile.active) {
+        this.lockedEnemy = this._nearestAggroedEnemy();
+      }
+
       // Pass lock target to tank — use predicted position for moving targets
       if (this.lockedEnemy) {
         this.tank.lockTarget = this._predictTargetPos(this.lockedEnemy);
+      } else if (window.__mobile && window.__mobile.active) {
+        // No aggroed target → rest the gun facing the hull's heading.
+        this.tank.lockTarget = {
+          x: this.tank.position.x + Math.sin(this.tank.rotY) * 20,
+          z: this.tank.position.z + Math.cos(this.tank.rotY) * 20,
+        };
       } else {
         this.tank.lockTarget = null;
       }

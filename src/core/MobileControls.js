@@ -39,7 +39,7 @@ function el(tag, css, parent) {
   return n;
 }
 
-let _root, _moveZone, _stick, _stickKnob, _btnBoost, _btnShield, _btnInteract, _btnBack, _btnFs, _btnStart;
+let _root, _moveZone, _stick, _stickKnob, _btnBoost, _btnShield, _btnFire, _btnInteract, _btnBack, _btnFs, _btnStart;
 
 // Active WASD codes currently "held" by the joystick (so we only fire edges).
 const _heldDir = new Set();
@@ -196,6 +196,12 @@ function bindHold(btn, code) {
   btn.addEventListener('pointercancel', up);
   btn.addEventListener('pointerleave', up);
 }
+// Fire = a primary-button pointerdown on the game canvas (reuses ArenaScene's
+// existing fire handler, which shoots along the turret's current/auto-aimed angle).
+function fireShot() {
+  const cv = document.getElementById('renderCanvas');
+  if (cv) cv.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true }));
+}
 function bindTap(btn, fn) {
   btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
 }
@@ -242,9 +248,18 @@ function buildDom() {
   _btnBoost.className = 'mc-btn'; _btnBoost.innerHTML = 'BOOST';
   bindHold(_btnBoost, 'ShiftLeft');
 
+  // FIRE (primary) — turret auto-locks the nearest aggroed enemy; this shoots it.
+  // Warm accent + bigger so the right thumb falls on it. Reuses the canvas fire
+  // path (a pointerdown on the renderCanvas → _shoot along the auto-aimed angle).
+  _btnFire = el('button',
+    `right:max(22px,env(safe-area-inset-right));bottom:max(124px,calc(env(safe-area-inset-bottom) + 98px));` +
+    `width:104px;height:104px;color:#ff8a3a;border-color:#ff8a3a;box-shadow:0 0 14px rgba(255,138,58,0.4);font-size:13px;`, _root);
+  _btnFire.className = 'mc-btn'; _btnFire.innerHTML = 'FIRE';
+  bindTap(_btnFire, fireShot);
+
   // Contextual INTERACT / LOOT (E) — shows only when near a station/container.
   _btnInteract = el('button',
-    `right:max(22px,env(safe-area-inset-right));bottom:max(130px,calc(env(safe-area-inset-bottom) + 104px));width:96px;height:96px;color:#ffb000;border-color:#ffb00088;box-shadow:0 0 10px rgba(255,176,0,0.3);`, _root);
+    `right:max(22px,env(safe-area-inset-right));bottom:max(248px,calc(env(safe-area-inset-bottom) + 222px));width:96px;height:96px;color:#ffb000;border-color:#ffb00088;box-shadow:0 0 10px rgba(255,176,0,0.3);`, _root);
   _btnInteract.className = 'mc-btn'; _btnInteract.innerHTML = '◉<br>INTERACT';
   bindTap(_btnInteract, () => tapKey('KeyE'));
 
@@ -294,6 +309,7 @@ function refresh() {
   // Combat-only buttons.
   show(_btnBoost,  inGame);
   show(_btnShield, inGame);
+  show(_btnFire,   inGame);
   if (!inGame) {              // safety: drop any stuck holds when leaving combat
     if (_btnBoost.dataset.on)  { key('ShiftLeft', false); delete _btnBoost.dataset.on; }
     if (_btnShield.dataset.on) { key('KeyQ', false); delete _btnShield.dataset.on; }
@@ -367,7 +383,7 @@ function injectTutorial() {
     "font-family:'Press Start 2P',monospace;";
   const rows = [
     ['MOVE',   'Drag the left side — the tank turns and drives the way you point.'],
-    ['FIRE',   'Tap the battlefield to aim the turret there and shoot.'],
+    ['FIRE',   'The turret auto-locks the nearest enemy. Tap FIRE to shoot it.'],
     ['BOOST',  'Hold the BOOST button to dash.'],
     ['SHIELD', 'Hold SHIELD to brace against incoming fire.'],
     ['ACT',    'Tap the orange button to LOOT / MOUNT / ENTER.'],
