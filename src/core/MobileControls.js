@@ -92,14 +92,30 @@ function injectStyles() {
     margin-left:-27px;margin-top:-27px;border-radius:50%;
     background:rgba(0,238,221,0.35);border:2px solid #00eeddcc;
     box-shadow:0 0 12px rgba(0,238,221,0.4);}
+
+  /* ── Interface separation: on touch, suppress keyboard-only instructions.
+     The on-screen buttons already cover these actions, so the "press E /
+     press ENTER" prompts are redundant noise on a phone. !important beats the
+     scenes' inline display toggles. */
+  body.mc-touch #menu-start,        /* "PRESS ENTER TO START"  -> TAP TO PLAY    */
+  body.mc-touch #hangar-prompt,     /* "[E] INTERACT/MOUNT/..." -> orange button */
+  body.mc-touch #loot-prompt,       /* "[ E ] LOOT"            -> orange LOOT btn */
+  body.mc-touch #controls-grid,     /* WASD/mouse how-to-play grid               */
+  body.mc-touch #controls-tip,      /* keyboard tip line                         */
+  body.mc-touch #controls-start{ display:none !important; } /* -> centered TAP TO START */
   `;
   const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
 }
 
 // ── Move joystick (left side) → synthetic WASD ─────────────────────────────
-// Tank semantics: W/S drive forward/back, A/D rotate (steer). We map the stick
-// y-axis to W/S and x-axis to A/D — identical to the keys a desktop player uses.
-const DEAD = 0.28;            // deadzone fraction of stick radius
+// Tank semantics: W/S drive forward/back, A/D rotate (steer). The stick maps to
+// the SAME keys a desktop player presses, but with a forgiving "go-straight"
+// cone: small wobble off-vertical does NOT steer. Without it, A/D is a
+// full-speed rotation, so any tiny tilt while driving forward spun the tank
+// wildly — brutal for beginners. Only a deliberate sideways push now turns.
+const DEAD = 0.22;            // magnitude deadzone (below this = neutral)
+const STEER_CONE = 34;        // half-angle (deg) of the straight channel — inside it the tank does NOT turn
+const FWD_CONE   = 70;        // within this of straight up/down = drive forward / reverse
 const STICK_R = 60;           // px radius (matches #mc-stick 120px)
 let _moveId = null;           // active pointerId driving the stick
 let _ox = 0, _oy = 0;         // stick origin (where the finger first landed)
@@ -122,12 +138,17 @@ function moveMove(e) {
   const kx = (dx / len) * cl, ky = (dy / len) * cl;
   _stickKnob.style.transform = `translate(${kx}px,${ky}px)`;
 
-  const nx = dx / STICK_R, ny = dy / STICK_R;   // normalised -1..1 (clamped feel)
+  const mag = cl / STICK_R;                     // 0..1 push magnitude
   const want = new Set();
-  if (ny < -DEAD) want.add('KeyW');             // up    = forward
-  if (ny >  DEAD) want.add('KeyS');             // down  = reverse
-  if (nx < -DEAD) want.add('KeyA');             // left  = rotate left
-  if (nx >  DEAD) want.add('KeyD');             // right = rotate right
+  if (mag >= DEAD) {
+    // Angle from straight-up, clockwise positive: 0=up, ±180=down, +ve=right.
+    const ang = Math.atan2(dx, -dy) * 180 / Math.PI;
+    const a = Math.abs(ang);
+    if (a <= FWD_CONE)            want.add('KeyW');   // forward arc
+    else if (a >= 180 - FWD_CONE) want.add('KeyS');  // reverse arc
+    // Steer only OUTSIDE the straight cone (and its mirror near reverse).
+    if (a > STEER_CONE && a < 180 - STEER_CONE) want.add(ang < 0 ? 'KeyA' : 'KeyD');
+  }
   setDir(want);
 }
 function moveEnd(e) {
@@ -171,6 +192,7 @@ function buildDom() {
   // Left half = move zone (dynamic joystick appears under the finger).
   _moveZone = el('div',
     'pointer-events:auto;position:absolute;left:0;top:6%;width:46%;height:84%;', _root);
+  _moveZone.id = 'mc-move';
   _moveZone.addEventListener('pointerdown', moveStart);
   _moveZone.addEventListener('pointermove', moveMove);
   _moveZone.addEventListener('pointerup', moveEnd);
@@ -246,9 +268,17 @@ function refresh() {
   // Contextual INTERACT/LOOT — near a hangar station OR an arena container.
   const nearHangar = inHangar && hangar && (hangar._nearStation || hangar._nearContainer);
   const nearLoot   = inGame   && arena  && arena._nearContainer;
-  const interactOn = !!(nearHangar || nearLoot);
-  _btnInteract.innerHTML = nearLoot ? '◉<br>LOOT' : '◉<br>ENTER';
-  show(_btnInteract, interactOn);
+  // Single orange button carries the action word the game itself computes
+  // (MOUNT / EXIT / station name in the hangar, LOOT in combat) — so the hidden
+  // "[E] …" keyboard prompt isn't replaced by a vaguer label.
+  let interactLabel = null;
+  if (nearLoot) interactLabel = 'LOOT';
+  else if (nearHangar) {
+    const lbl = document.getElementById('hangar-prompt-label');
+    interactLabel = (lbl && lbl.textContent.trim()) || 'ENTER';
+  }
+  if (interactLabel) _btnInteract.innerHTML = '◉<br>' + interactLabel;
+  show(_btnInteract, !!interactLabel);
 
   // BACK/PAUSE — in combat (pause) and inspector (exit). Designer confirm is E.
   show(_btnBack, inGame || inInspect);
@@ -271,13 +301,35 @@ function startContextLoop() {
   requestAnimationFrame(tick);
 }
 
+// ── Visual split: phone wants a wider view than desktop ────────────────────
+// A fixed ArcRotateCamera radius that frames well on a wide monitor feels far
+// too zoomed-in on a tall phone (a narrow portrait viewport shows a thin
+// horizontal slice). Scenes read this multiplier when building their camera —
+// undefined → 1 on desktop, so desktop framing is byte-for-byte unchanged.
+// Portrait (the mode that plays best on phone) pulls back the most.
+function camZoomFactor() {
+  if (!(window.__mobile && window.__mobile.active)) return 1;
+  const portrait = window.innerHeight >= window.innerWidth;
+  return portrait ? 1.5 : 1.2;
+}
+
+// One-time relabel of static menu text that carries a keyboard glyph (the
+// dynamic prompts are hidden via the body.mc-touch CSS instead).
+function dehintStatic() {
+  const md = document.getElementById('menu-designer');
+  if (md) md.textContent = 'SELECT TANK';   // was "[ T ] SELECT TANK"
+}
+
 // ── Public entry — call once from main.js. No-op on non-touch (desktop safe).
 export function initMobileControls() {
   if (!touchDevice()) return;          // desktop / no touch → nothing injected
+  document.body.classList.add('mc-touch'); // gates the keyboard-hint CSS overrides
   injectMeta();
   injectStyles();
   buildDom();
+  dehintStatic();
   startContextLoop();
-  window.__mobile = { refresh, key, version: 1 }; // debug hook (mirrors __arena/__hangar)
+  window.__mobile = { refresh, key, active: true, version: 2 }; // debug hook (mirrors __arena/__hangar)
+  window.__camZoom = camZoomFactor;    // scenes multiply their camera radius by this (1 on desktop)
   console.log('[MobileControls] touch layer active (additive — keyboard untouched)');
 }

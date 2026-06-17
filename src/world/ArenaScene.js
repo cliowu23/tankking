@@ -99,7 +99,9 @@ export default class ArenaScene {
     this._camHeading      = this.zone?.spawn?.facing ?? 0;   // smoothed yaw the cam tracks
     this._camHeadingVel   = 0;                               // spring velocity state
     this._camYawSmoothTime = CAM_YAW_SMOOTH_TIME;            // live-tunable (seconds)
-    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, CAM_RADIUS,
+    // Phone/portrait pulls the camera back (wider view); desktop = ×1 (unchanged).
+    const camRadius = CAM_RADIUS * (window.__camZoom ? window.__camZoom() : 1);
+    this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, camRadius,
       new Vector3(this._camX, 0, this._camZ), this.scene);
   }
 
