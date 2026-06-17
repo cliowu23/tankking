@@ -108,22 +108,31 @@ function injectStyles() {
 }
 
 // ── Move joystick (left side) → synthetic WASD ─────────────────────────────
-// Tank semantics: W/S drive forward/back, A/D rotate (steer). The stick maps to
-// the SAME keys a desktop player presses, but with a forgiving "go-straight"
-// cone: small wobble off-vertical does NOT steer. Without it, A/D is a
-// full-speed rotation, so any tiny tilt while driving forward spun the tank
-// wildly — brutal for beginners. Only a deliberate sideways push now turns.
+// The stick stores a screen-space vector; the per-frame controller below turns
+// it into the SAME keys a desktop player presses. Two modes:
+//   • COMBAT TANK  → direction-based "point where you want to go": the tank auto-
+//     turns toward the stick's on-screen direction and drives there. (Hull-
+//     relative WASD was unintuitive — to drive "down-screen" you had to push UP.)
+//   • HANGAR/DESIGNER walk → simple cone mapping (up = forward) with a forgiving
+//     ±34° straight channel so wobble doesn't spin you.
 const DEAD = 0.22;            // magnitude deadzone (below this = neutral)
-const STEER_CONE = 34;        // half-angle (deg) of the straight channel — inside it the tank does NOT turn
-const FWD_CONE   = 70;        // within this of straight up/down = drive forward / reverse
+const STEER_CONE = 34;        // cone mode: half-angle (deg) of the no-turn straight channel
+const FWD_CONE   = 70;        // cone mode: within this of up/down = forward / reverse
+const TURN_DEAD  = 0.14;      // dir mode: heading error (rad, ~8°) within which we stop turning
+const DRIVE_ARC  = 1.92;      // dir mode: drive forward once facing within ~110° of target (else pivot first)
+const PHI_SIGN   = 1;         // dir mode: maps stick screen-X → world turn direction (verified by measurement)
 const STICK_R = 60;           // px radius (matches #mc-stick 120px)
 let _moveId = null;           // active pointerId driving the stick
 let _ox = 0, _oy = 0;         // stick origin (where the finger first landed)
+let _vx = 0, _vy = 0, _vmag = 0; // current stick vector (screen space, normalised)
+
+const wrapPi = (a) => { while (a >  Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 function moveStart(e) {
   if (_moveId !== null) return;
   _moveId = e.pointerId;
   _ox = e.clientX; _oy = e.clientY;
+  _vx = _vy = _vmag = 0;
   _stick.style.display = 'block';
   _stick.style.left = _ox + 'px';
   _stick.style.top  = _oy + 'px';
@@ -135,27 +144,47 @@ function moveMove(e) {
   let dx = e.clientX - _ox, dy = e.clientY - _oy;
   const len = Math.hypot(dx, dy) || 1;
   const cl = Math.min(len, STICK_R);
-  const kx = (dx / len) * cl, ky = (dy / len) * cl;
-  _stickKnob.style.transform = `translate(${kx}px,${ky}px)`;
-
-  const mag = cl / STICK_R;                     // 0..1 push magnitude
-  const want = new Set();
-  if (mag >= DEAD) {
-    // Angle from straight-up, clockwise positive: 0=up, ±180=down, +ve=right.
-    const ang = Math.atan2(dx, -dy) * 180 / Math.PI;
-    const a = Math.abs(ang);
-    if (a <= FWD_CONE)            want.add('KeyW');   // forward arc
-    else if (a >= 180 - FWD_CONE) want.add('KeyS');  // reverse arc
-    // Steer only OUTSIDE the straight cone (and its mirror near reverse).
-    if (a > STEER_CONE && a < 180 - STEER_CONE) want.add(ang < 0 ? 'KeyA' : 'KeyD');
-  }
-  setDir(want);
+  _stickKnob.style.transform = `translate(${(dx / len) * cl}px,${(dy / len) * cl}px)`;
+  _vx = dx / STICK_R; _vy = dy / STICK_R; _vmag = cl / STICK_R; // computed each frame by the loop
 }
 function moveEnd(e) {
   if (e.pointerId !== _moveId) return;
   _moveId = null;
+  _vx = _vy = _vmag = 0;
   _stick.style.display = 'none';
   releaseDir();
+}
+
+// COMBAT: turn the tank toward the stick's on-screen direction and drive there.
+// We express "screen direction" in world heading using the camera's facing, so
+// it works no matter which way the hull currently points or how the cam has
+// yawed. Pressing A/D nudges the hull's rotY (D:+, A:−, per Tank.js) toward the
+// target; W drives once roughly aligned (pivot-then-go for big turns).
+function combatDirKeys(arena) {
+  const want = new Set();
+  if (_vmag < DEAD || !arena || !arena.tank) return want;
+  const cam = arena.camera;
+  const f = cam.getForwardRay().direction;            // world dir that points "into"/up the screen
+  const screenUp = Math.atan2(f.x, f.z);              // same convention as tank.rotY (forward=(sinθ,cosθ))
+  const phi = Math.atan2(_vx, -_vy);                  // stick angle, CW from screen-up
+  const desired = screenUp + PHI_SIGN * phi;          // world heading the player is pointing at
+  const err = wrapPi(desired - arena.tank.rotY);
+  if (err >  TURN_DEAD) want.add('KeyD');             // rotY must increase → D
+  else if (err < -TURN_DEAD) want.add('KeyA');        // rotY must decrease → A
+  if (Math.abs(err) < DRIVE_ARC) want.add('KeyW');    // drive once facing close enough
+  return want;
+}
+
+// HANGAR / DESIGNER: simple camera-relative cone mapping (up = forward).
+function coneWalkKeys() {
+  const want = new Set();
+  if (_vmag < DEAD) return want;
+  const ang = Math.atan2(_vx, -_vy) * 180 / Math.PI;  // 0=up, ±180=down, +ve=right
+  const a = Math.abs(ang);
+  if (a <= FWD_CONE)            want.add('KeyW');
+  else if (a >= 180 - FWD_CONE) want.add('KeyS');
+  if (a > STEER_CONE && a < 180 - STEER_CONE) want.add(ang < 0 ? 'KeyA' : 'KeyD');
+  return want;
 }
 
 // ── Hold button (boost / shield): keydown on press, keyup on release ───────
@@ -254,8 +283,13 @@ function refresh() {
   const inInspect = st === 'INSPECTOR';
 
   // Move joystick: combat + hangar walking + designer orbit all read WASD.
-  show(_moveZone, inGame || inHangar || inInspect);
-  if (!(inGame || inHangar || inInspect) && _moveId !== null) { _moveId = null; _stick.style.display = 'none'; releaseDir(); }
+  const moveCtx = inGame || inHangar || inInspect;
+  show(_moveZone, moveCtx);
+  if (!moveCtx && _moveId !== null) { _moveId = null; _vmag = 0; _stick.style.display = 'none'; releaseDir(); }
+  // Per-frame movement: combat = point-to-go controller, hangar/designer = cone walk.
+  if (_moveId !== null && moveCtx) {
+    setDir(inGame ? combatDirKeys(arena) : coneWalkKeys());
+  }
 
   // Combat-only buttons.
   show(_btnBoost,  inGame);
