@@ -273,22 +273,25 @@ export default class ChaffEnemy extends AIEnemy {
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
-      this._moveBeep(dt);   // fast high beep-beep-beep while it advances
+      this._moveBeep(dt, playerPos);   // soft blip while advancing, only when near
       this._animateLegs(dt);
       this._updateEye(dt);
     }
   }
 
-  // Fast movement blip: only while actually moving (distance/sec over threshold).
-  _moveBeep(dt) {
-    const STEP_INTERVAL = 0.28, MOVE_THRESH = 0.6;
+  // Movement blip: fires only while actually moving AND within earshot of the
+  // player. Distance-gating keeps a whole aggro'd swarm from beeping at once —
+  // only the ones closing on you are heard. Slow cadence + slight per-bot jitter.
+  _moveBeep(dt, playerPos) {
+    const STEP_INTERVAL = 0.5, MOVE_THRESH = 0.6, BEEP_RANGE = 18;
     const { x, z } = this.root.position;
     const sp = (this._bpx !== undefined) ? Math.hypot(x - this._bpx, z - this._bpz) / Math.max(dt, 1e-3) : 0;
     this._bpx = x; this._bpz = z;
     this._stepT = (this._stepT ?? 0) - dt;
-    if (sp > MOVE_THRESH && this._stepT <= 0) {
+    const near = playerPos ? Math.hypot(x - playerPos.x, z - playerPos.z) <= BEEP_RANGE : true;
+    if (near && sp > MOVE_THRESH && this._stepT <= 0) {
       audio.play('enemy.chaff_step', { emitter: this.root });
-      this._stepT = STEP_INTERVAL;
+      this._stepT = STEP_INTERVAL + Math.random() * 0.12;   // jitter so a pack doesn't sync
     }
   }
 

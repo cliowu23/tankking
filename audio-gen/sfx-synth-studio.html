@@ -177,10 +177,10 @@ const SOUNDS = {
     build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.85,t0+p.dur);
       const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.004,.5,p.dur); o.start(t0);o.stop(t0+p.dur+.03); return p.dur+.05; } },
 
-  "enemy.chaff_step": { tag:"synth", intent:"chaff move beep — high quick blip, fast cadence",
-    params:{ freq:{min:600,max:1700,val:1050,step:10}, dur:{min:.03,max:.12,val:.06,step:.01} },
-    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="square"; o.frequency.setValueAtTime(p.freq,t0);
-      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.003,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.04; } },
+  "enemy.chaff_step": { tag:"synth", intent:"chaff move beep — soft mid 'boop', distance-gated + slow cadence in-game",
+    params:{ freq:{min:300,max:900,val:520,step:10}, dur:{min:.04,max:.16,val:.09,step:.01} },
+    build(ctx,t0,p){ const o=ctx.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(p.freq,t0); o.frequency.exponentialRampToValueAtTime(p.freq*0.9,t0+p.dur);
+      const g=ctx.createGain(); o.connect(g).connect(ctx.destination); env(ctx,g,t0,.005,.4,p.dur); o.start(t0);o.stop(t0+p.dur+.02); return p.dur+.04; } },
 };
 
 // ---- WAV encoder (mono, 16-bit) ----
