@@ -85,17 +85,21 @@ const _settingsBtn = document.createElement('button');
 _settingsBtn.id = 'settings-btn';
 _settingsBtn.title = 'Audio settings';
 // Chunky pixel-art cog (inline SVG, crisp edges) — toylike + retro, on-brand with
-// the Press Start 2P / Tron UI. 4-fold cog on a 12-unit grid with a 2×2 hub hole.
+// the Press Start 2P / Tron UI. An octagonal hub RING (2px walls, 4×4 hole) with
+// four protruding teeth (N/S/E/W) on a 16-unit grid — the visible hole is what
+// reads as a gear rather than a solid disc.
 _settingsBtn.innerHTML =
-  '<svg viewBox="0 0 12 12" width="22" height="22" shape-rendering="crispEdges" fill="#4fd6ff" aria-hidden="true">' +
-    '<rect x="4" y="0" width="4" height="2"/>' +
-    '<rect x="2" y="2" width="8" height="2"/>' +
-    '<rect x="0" y="4" width="12" height="1"/>' +
-    '<rect x="0" y="5" width="5" height="2"/>' +
-    '<rect x="7" y="5" width="5" height="2"/>' +
-    '<rect x="0" y="7" width="12" height="1"/>' +
-    '<rect x="2" y="8" width="8" height="2"/>' +
-    '<rect x="4" y="10" width="4" height="2"/>' +
+  '<svg viewBox="0 0 16 16" width="24" height="24" shape-rendering="crispEdges" fill="#4fd6ff" aria-hidden="true">' +
+    '<rect x="6" y="2" width="4" height="2"/>' +   // N tooth
+    '<rect x="6" y="12" width="4" height="2"/>' +  // S tooth
+    '<rect x="2" y="6" width="2" height="4"/>' +   // W tooth
+    '<rect x="12" y="6" width="2" height="4"/>' +  // E tooth
+    '<rect x="5" y="4" width="6" height="1"/>' +   // ring: top (beveled)
+    '<rect x="4" y="5" width="8" height="1"/>' +   // ring: top
+    '<rect x="4" y="6" width="2" height="4"/>' +   // ring: left wall
+    '<rect x="10" y="6" width="2" height="4"/>' +  // ring: right wall
+    '<rect x="4" y="10" width="8" height="1"/>' +  // ring: bottom
+    '<rect x="5" y="11" width="6" height="1"/>' +  // ring: bottom (beveled)
   '</svg>';
 _settingsBtn.style.cssText =
   'position:fixed;top:12px;right:12px;z-index:9999;width:38px;height:38px;border-radius:8px;' +
