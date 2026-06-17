@@ -136,6 +136,15 @@ class AudioManager {
     } catch (_) {}
   }
 
+  // Master volume for a whole category bus (e.g. the settings SFX slider). Updates
+  // the live bus and the BUSES baseline so the duck system restores to the new
+  // level. Safe before init — the baseline is read when buses are created.
+  setBusVolume(name, v) {
+    if (BUSES[name]) BUSES[name].volume = v;
+    const bus = this.buses[name];
+    if (bus) { try { bus.volume = v; } catch (_) {} }
+  }
+
   // Per-emitter looped sound: borrow a pooled spatial instance, attach it to the
   // emitter mesh, loop it, and return a handle. Each enemy gets its OWN positioned
   // loop (engine/whir/skitter). Returns null if not ready or pool exhausted —
