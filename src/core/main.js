@@ -67,24 +67,86 @@ function _menuMusicOnGesture() {
 window.addEventListener('pointerdown', _menuMusicOnGesture);
 window.addEventListener('keydown', _menuMusicOnGesture);
 
-// Persistent music mute toggle (top-right corner, all screens). Saves to localStorage.
-const _musicMuteBtn = document.createElement('button');
-_musicMuteBtn.id = 'music-mute';
-_musicMuteBtn.title = 'Toggle music (M)';
-_musicMuteBtn.style.cssText =
+// Persistent AUDIO SETTINGS (top-right corner, all screens). A gear opens a small
+// panel with Music + SFX volume sliders and a music-mute toggle; everything saves
+// to localStorage. M still toggles music mute directly (quick + convenient).
+const MUSIC_VOL_KEY = 'tk_music_vol', SFX_VOL_KEY = 'tk_sfx_vol', MUTE_KEY = 'tk_music_muted';
+
+// Apply persisted values on boot (defaults match the engine: music 0.55, sfx 0.90).
+const _mv = parseFloat(localStorage.getItem(MUSIC_VOL_KEY));
+const _sv = parseFloat(localStorage.getItem(SFX_VOL_KEY));
+const _musicVol0 = Number.isFinite(_mv) ? _mv : 0.55;
+const _sfxVol0   = Number.isFinite(_sv) ? _sv : 0.90;
+music.setMasterVolume(_musicVol0);
+audio.setBusVolume('sfx', _sfxVol0);
+if (localStorage.getItem(MUTE_KEY) === '1') music.setMuted(true);
+
+const _settingsBtn = document.createElement('button');
+_settingsBtn.id = 'settings-btn';
+_settingsBtn.title = 'Audio settings';
+_settingsBtn.textContent = '⚙';
+_settingsBtn.style.cssText =
   'position:fixed;top:12px;right:12px;z-index:9999;width:38px;height:38px;border-radius:8px;' +
-  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);color:#cdd6e2;font-size:17px;' +
+  'border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.6);color:#cdd6e2;font-size:19px;' +
   'cursor:pointer;backdrop-filter:blur(4px);line-height:1;padding:0;';
-if (localStorage.getItem('tk_music_muted') === '1') music.setMuted(true);
-const _renderMute = () => { _musicMuteBtn.textContent = music.muted ? '🔇' : '🎵'; _musicMuteBtn.style.opacity = music.muted ? '0.55' : '1'; };
+
+const _settingsPanel = document.createElement('div');
+_settingsPanel.id = 'settings-panel';
+_settingsPanel.style.cssText =
+  'position:fixed;top:58px;right:12px;z-index:9999;display:none;width:208px;padding:14px 16px;' +
+  'border-radius:10px;border:1px solid rgba(79,214,255,.4);background:rgba(10,13,18,.92);' +
+  'backdrop-filter:blur(6px);color:#cdd6e2;font-family:"Press Start 2P",monospace;box-shadow:0 6px 24px rgba(0,0,0,.5);';
+_settingsPanel.innerHTML =
+  '<div style="font-size:9px;letter-spacing:2px;color:#4fd6ff;margin-bottom:14px;">AUDIO</div>' +
+  '<label style="display:block;font-size:7px;letter-spacing:1px;margin-bottom:6px;">MUSIC</label>' +
+  '<input id="set-music-vol" type="range" min="0" max="100" step="1" style="width:100%;accent-color:#4fd6ff;margin-bottom:14px;">' +
+  '<label style="display:block;font-size:7px;letter-spacing:1px;margin-bottom:6px;">SFX</label>' +
+  '<input id="set-sfx-vol" type="range" min="0" max="100" step="1" style="width:100%;accent-color:#4fd6ff;margin-bottom:16px;">' +
+  '<button id="set-mute" style="width:100%;font-family:inherit;font-size:8px;letter-spacing:1px;padding:8px;border-radius:6px;cursor:pointer;border:1px solid rgba(79,214,255,.4);background:transparent;color:#cdd6e2;"></button>' +
+  '<div style="font-size:6px;color:#7f8da0;margin-top:8px;text-align:center;letter-spacing:1px;">M = QUICK MUTE</div>';
+
+document.body.appendChild(_settingsBtn);
+document.body.appendChild(_settingsPanel);
+
+const _musicSlider = _settingsPanel.querySelector('#set-music-vol');
+const _sfxSlider   = _settingsPanel.querySelector('#set-sfx-vol');
+const _muteBtn     = _settingsPanel.querySelector('#set-mute');
+_musicSlider.value = Math.round(_musicVol0 * 100);
+_sfxSlider.value   = Math.round(_sfxVol0 * 100);
+
+const _renderMute = () => {
+  _muteBtn.textContent = music.muted ? '🔇 MUSIC MUTED' : '🔊 MUSIC ON';
+  _muteBtn.style.opacity = music.muted ? '0.7' : '1';
+  _settingsBtn.style.opacity = music.muted ? '0.55' : '1'; // dim the gear when muted
+};
 function _toggleMusicMute() {
   const m = music.toggleMuted();
-  localStorage.setItem('tk_music_muted', m ? '1' : '0');
+  localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   _renderMute();
 }
-_musicMuteBtn.addEventListener('click', (e) => { e.stopPropagation(); _toggleMusicMute(); });
+
+_musicSlider.addEventListener('input', () => {
+  const v = _musicSlider.value / 100;
+  music.setMasterVolume(v);
+  localStorage.setItem(MUSIC_VOL_KEY, String(v));
+  if (music.muted && v > 0) _toggleMusicMute(); // raising music volume un-mutes
+});
+_sfxSlider.addEventListener('input', () => {
+  const v = _sfxSlider.value / 100;
+  audio.setBusVolume('sfx', v);
+  localStorage.setItem(SFX_VOL_KEY, String(v));
+});
+_muteBtn.addEventListener('click', (e) => { e.stopPropagation(); _toggleMusicMute(); });
+
+_settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  _settingsPanel.style.display = _settingsPanel.style.display === 'none' ? 'block' : 'none';
+});
+window.addEventListener('click', (e) => { // click-away closes the panel
+  if (_settingsPanel.style.display === 'block' && !_settingsPanel.contains(e.target) && e.target !== _settingsBtn)
+    _settingsPanel.style.display = 'none';
+});
 window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') _toggleMusicMute(); });
-document.body.appendChild(_musicMuteBtn);
 _renderMute();
 
 // Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
