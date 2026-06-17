@@ -22,6 +22,7 @@ import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
 import { bankSalvage } from '../core/runState.js';
 import { audio } from '../core/audio/AudioManager.js';
+import { music } from '../core/audio/MusicManager.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
 
@@ -866,10 +867,15 @@ export default class ArenaScene {
       this.tank.update(dt);
       this._clampCorridor();
 
+      let _aliveEnemies = 0;
       for (const enemy of this.enemies) {
         enemy.update(dt, this.tank.position);
         if (enemy.shells) for (const s of enemy.shells) s.update(dt);
+        if (enemy.alive) _aliveEnemies++;
       }
+      // Combat music intensity swells with the number of live threats (throttled).
+      this._musicT = (this._musicT ?? 0) - dt;
+      if (this._musicT <= 0) { music.setIntensity(Math.min(1, _aliveEnemies / 5)); this._musicT = 0.5; }
 
       // Barrel elevation disabled for flat-shot mode — re-enable with _elevationForHeight when arc shots return
       this.tank.barrelElevation = 0;

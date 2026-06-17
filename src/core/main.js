@@ -4,6 +4,7 @@ import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
 import { getBankedSalvage } from './runState.js';
 import { audio } from './audio/AudioManager.js';
+import { music } from './audio/MusicManager.js';
 import { WORLD1 } from '../world/zones/world1.js';
 import { generateRoadLeg } from '../world/zones/roadLeg.js';
 
@@ -55,6 +56,8 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // Boot the audio engine (Babylon Audio Engine v2). Loads sounds now; the browser
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
+// music: Tone graph is built lazily on first scene entry (music.start) so node
+// creation happens after the audio context is running — no autoplay-warning spam.
 
 // Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
 // or rebuilding the arena, so they don't bleed into the hangar/menu.
@@ -201,6 +204,7 @@ function startGame() {
         arenaScene._restart();
       }
       engine.runRenderLoop(() => arenaScene.scene.render());
+      music.playCombat();
       arenaScene._paused = true;
       window.__state = 'CONTROLS';
       document.getElementById('controls-screen').style.display = 'flex';
@@ -230,6 +234,7 @@ function startHangar() {
       if (hs) { hs.textContent = `BANKED SALVAGE: ${getBankedSalvage()}`; hs.style.display = 'block'; }
       engine.runRenderLoop(() => hangarScene.scene.render());
       audio.startLoop('amb.hangar'); // warm hangar room tone (2D)
+      music.playHangar();
     },
     'iris'
   );
@@ -297,6 +302,7 @@ function deployToArena(dev = false) {
         document.getElementById('hud').style.display = 'block';
         engine.runRenderLoop(() => arenaScene.scene.render());
         audio.play('ui.wave_start'); // dropped into combat
+        music.playCombat();
 
         // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
         if (!controlsSeen) {
@@ -346,6 +352,7 @@ function goToMenu() {
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
   silenceArena(); // after _restart (which restarts engine) so the menu is quiet
   audio.stopLoop('amb.hangar');
+  music.stop();
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
