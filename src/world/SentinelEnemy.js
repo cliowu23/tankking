@@ -270,6 +270,7 @@ export default class SentinelEnemy extends AIEnemy {
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
+      if (!this._whir) this._whir = audio.attachLoop('enemy.sentinel_whir', this.root); // lazy: retries until ready
       this._updateCharge(dt);
       this._updateEye(dt);
     }
@@ -336,6 +337,7 @@ export default class SentinelEnemy extends AIEnemy {
 
   _deathVisuals() {
     audio.play('enemy.sentinel_death', { emitter: this.root });
+    audio.detachLoop(this._whir); this._whir = null;
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.22, 0.22, 0.24, 1);
     else if (this.bodyMat) {   // primitive fallback
       this.bodyMat.diffuseColor.set(...DEATH_TINT);

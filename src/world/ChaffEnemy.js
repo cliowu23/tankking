@@ -273,6 +273,7 @@ export default class ChaffEnemy extends AIEnemy {
   update(dt, playerPos) {
     super.update(dt, playerPos);
     if (this.alive) {
+      if (!this._skitter) this._skitter = audio.attachLoop('enemy.chaff_skitter', this.root); // lazy: retries until ready
       this._animateLegs(dt);
       this._updateEye(dt);
     }
@@ -318,6 +319,7 @@ export default class ChaffEnemy extends AIEnemy {
 
   _deathVisuals() {
     audio.play('enemy.chaff_death', { emitter: this.root });
+    audio.detachLoop(this._skitter); this._skitter = null;
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
     else if (this.hullMat) {   // primitive fallback
       this.hullMat.diffuseColor.set(...DEATH_TINT);

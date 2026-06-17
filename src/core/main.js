@@ -56,6 +56,14 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
 
+// Stop all arena loops (engine, shield, pooled enemy whirs/skitters) when leaving
+// or rebuilding the arena, so they don't bleed into the hangar/menu.
+function silenceArena() {
+  audio.releaseAllPooled();
+  audio.stopLoop('tank.engine');
+  audio.stopLoop('tank.shield_loop');
+}
+
 let arenaScene    = null;
 let designerScene = null;
 let hangarScene   = null;
@@ -192,6 +200,7 @@ function startHangar() {
       document.getElementById('hangar-prompt').style.display = 'none';
       document.getElementById('hangar-panel').style.display  = 'none';
       engine.stopRenderLoop();
+      silenceArena();
       if (arenaScene) { arenaScene._paused = false; arenaScene = null; }
     },
     () => {
@@ -315,6 +324,7 @@ function goToMenu() {
   engine.stopRenderLoop();
   if (arenaScene) { arenaScene._paused = false; arenaScene._restart(); }
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
+  silenceArena(); // after _restart (which restarts engine) so the menu is quiet
   overlay.classList.add('playing');
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
@@ -514,6 +524,7 @@ document.getElementById('lounge-panel-close').addEventListener('click', () => {
 // ── Crew Quarters wardrobe panel — rows built from wardrobe.json ──────────────
 // (presets row + one row per wardrobe slot: hair / headwear / face / back)
 let _wardrobe = null;
+let _driverCfg = null;   // latest synced driver config — read by the Bedroll toggle
 async function buildCrewPanel() {
   if (_wardrobe) return;
   _wardrobe = await (await fetch('/assets/models/characters/wardrobe.json')).json();
@@ -594,9 +605,30 @@ async function buildCrewPanel() {
         if (hangarScene) syncCrewPanel(hangarScene.setDriverConfig({ [slot]: id }));
       });
     }
+    if (slot === 'back') {
+      // Bedroll is a satchel add-on, not a standalone piece — a toggle that only
+      // works while the Satchel is equipped (disabled + auto-dropped otherwise).
+      const b = document.createElement('button');
+      b.textContent = 'Bedroll';
+      b.dataset.bedroll = '1';
+      b.addEventListener('click', () => {
+        if (!hangarScene) return;
+        const on = (_driverCfg?.bedroll ?? 'none') !== 'none';
+        syncCrewPanel(hangarScene.setDriverConfig({ bedroll: on ? 'none' : 'back-bedroll' }));
+      });
+      btns.appendChild(b);
+    }
   }
 }
 function syncCrewPanel(cfg) {
+  _driverCfg = cfg;
+  const bedBtn = document.querySelector('#lounge-slots [data-bedroll]');
+  if (bedBtn) {
+    const hostOn = cfg.back === 'back-satchel';   // bedroll only rides the satchel
+    bedBtn.disabled = !hostOn;
+    bedBtn.style.opacity = hostOn ? '' : '0.4';
+    bedBtn.classList.toggle('on', hostOn && (cfg.bedroll ?? 'none') !== 'none');
+  }
   document.querySelectorAll('#lounge-slots [data-skin]').forEach(b =>
     b.classList.toggle('on', b.dataset.skin === cfg.skin));
   const wheel = document.getElementById('skin-wheel');

@@ -1084,6 +1084,7 @@ export default class ArenaScene {
       this.enemies[i].reset(x, z);
     }
     this.tank.reset();
+    audio.startLoop('tank.engine', { emitter: this.tank.root }); // engine was stopped on death
     this.lockedEnemy      = null;
     this._prevLockedEnemy = null;
     this.lockRing.isVisible  = false;

@@ -30,6 +30,7 @@ class AudioManager {
     this.engine = null;
     this.buses = {};         // name -> AudioBus
     this.sounds = {};        // id   -> { snd, def, _looping }
+    this.pools = {};         // id   -> { def, free:[Sound], used:Map<handle,Sound> } (per-emitter loops)
     this.ready = false;      // sounds loaded
     this.unlocked = false;   // browser granted playback (after a user gesture)
     this._initStarted = false;
@@ -49,8 +50,20 @@ class AudioManager {
         this.buses[name] = bus;
       }
 
-      // Preload + route every declared sound.
+      // Preload + route every declared sound. `poolSize` ids get a pool of
+      // independent spatial instances instead (one looped emitter per enemy).
       await Promise.all(Object.entries(SOUNDS).map(async ([id, def]) => {
+        if (def.poolSize) {
+          const free = [];
+          for (let k = 0; k < def.poolSize; k++) {
+            const s = await CreateSoundAsync(`${id}#${k}`, BASE + def.url, { spatialEnabled: true, maxInstances: 1 });
+            if (this.buses[def.bus]) s.outBus = this.buses[def.bus];
+            if (def.gain != null) s.volume = def.gain;
+            free.push(s);
+          }
+          this.pools[id] = { def, free, used: new Map() };
+          return;
+        }
         const snd = await CreateSoundAsync(id, BASE + def.url, {
           spatialEnabled: !!def.spatial,
           maxInstances: def.maxInstances ?? 1,
@@ -121,6 +134,40 @@ class AudioManager {
       if (typeof entry.snd.setVolume === 'function') entry.snd.setVolume(v, { duration: dur });
       else entry.snd.volume = v;
     } catch (_) {}
+  }
+
+  // Per-emitter looped sound: borrow a pooled spatial instance, attach it to the
+  // emitter mesh, loop it, and return a handle. Each enemy gets its OWN positioned
+  // loop (engine/whir/skitter). Returns null if not ready or pool exhausted —
+  // callers should retry next frame (lazy attach). detachLoop() on death.
+  attachLoop(id, emitter) {
+    const pool = this.pools[id];
+    if (!this.ready || !pool || pool.free.length === 0) return null;
+    const inst = pool.free.pop();
+    const handle = { id, inst };
+    try { if (emitter && inst.spatial && typeof inst.spatial.attach === 'function') inst.spatial.attach(emitter); } catch (_) {}
+    try { inst.play({ loop: true }); } catch (_) {}
+    pool.used.set(handle, inst);
+    return handle;
+  }
+
+  detachLoop(handle) {
+    if (!handle) return;
+    const pool = this.pools[handle.id];
+    if (!pool || !pool.used.has(handle)) return;
+    try { handle.inst.stop(); } catch (_) {}
+    pool.used.delete(handle);
+    pool.free.push(handle.inst);
+  }
+
+  // Stop + reclaim every pooled loop (call on arena teardown/restart so loops
+  // don't leak across runs).
+  releaseAllPooled() {
+    for (const id in this.pools) {
+      const p = this.pools[id];
+      for (const inst of p.used.values()) { try { inst.stop(); } catch (_) {} p.free.push(inst); }
+      p.used.clear();
+    }
   }
 
   // Briefly pull down music/ambience so an impactful SFX reads, then restore.
