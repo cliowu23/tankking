@@ -333,7 +333,8 @@ function deployToArena(dev = false) {
         document.getElementById('hud').style.display = 'block';
         engine.runRenderLoop(() => arenaScene.scene.render());
         audio.play('ui.wave_start'); // dropped into combat
-        music.playCombat();
+        if (dev) music.playArena();  // dev test arena gets its own "Test Chamber" track
+        else     music.playCombat(); // World 1 keeps the combat theme
 
         // HOW-TO-PLAY controls screen on the FIRST arena entry of the session only.
         if (!controlsSeen) {
@@ -483,6 +484,7 @@ function resumeGame() {
   if (window.__state !== 'PAUSED') return;
   document.getElementById('pause').style.display = 'none';
   if (arenaScene) arenaScene._paused = false;
+  music.resume(); // un-freeze the soundtrack from where it paused
   window.__state = 'GAME';
 }
 
@@ -496,6 +498,7 @@ document.getElementById('pause-restart').addEventListener('click', () => {
   document.getElementById('hud').style.display   = 'block';
   arenaScene._paused = false;
   arenaScene._restart();
+  music.restart(); // soundtrack restarts from the top with the run
   window.__state = 'GAME';
 });
 document.getElementById('death-hangar').addEventListener('click', startHangar);
@@ -506,7 +509,7 @@ document.getElementById('death-restart').addEventListener('click', () => {
   document.getElementById('hud').style.display   = 'block';
   arenaScene._paused = false;
   arenaScene._restart();
-  music.playCombat(); // resume combat music (stopped on death)
+  music.restart(); // replay whatever track was playing (combat or dev arena), from the top
   window.__state = 'GAME';
 });
 
@@ -514,6 +517,8 @@ function autoPause() {
   if (window.__state !== 'GAME') return;
   window.__state = 'PAUSED';
   if (arenaScene) arenaScene._paused = true;
+  music.pause();           // freeze the soundtrack with the game
+  music.playNeedleLift();  // record-needle-off transition
   document.getElementById('pause').style.display = 'flex';
 }
 

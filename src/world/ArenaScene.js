@@ -474,6 +474,8 @@ export default class ArenaScene {
       this._paused = !this._paused;
       window.__state = this._paused ? 'PAUSED' : 'GAME';
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
+      if (this._paused) { music.pause(); music.playNeedleLift(); } // freeze music + needle-off
+      else music.resume();                                         // un-freeze where it left off
     });
     document.getElementById('pause-restart').addEventListener('click', () => {
       this._restart();
@@ -486,7 +488,7 @@ export default class ArenaScene {
       this._restart();
       this._paused = false;
       window.__state = 'GAME';
-      music.playCombat(); // resume combat music (stopped on death)
+      // music restart is owned by the main.js death-restart handler (music.restart())
       document.getElementById('death').style.display = 'none';
     });
 
@@ -1172,6 +1174,7 @@ export default class ArenaScene {
     if (!c || c.looted) return;
     c.looted = true;
     this._runSalvage += c.value;
+    music.playPickup(); // salvage coin ding
     this._nearContainer = null;
     if (this._lootPrompt) this._lootPrompt.style.display = 'none';
   }
@@ -1192,6 +1195,7 @@ export default class ArenaScene {
       if (dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
         crate.collect();
         this._runSalvage += crate.value;
+        music.playPickup(); // salvage coin ding
       }
     }
 
