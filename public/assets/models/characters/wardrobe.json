@@ -450,10 +450,6 @@
       {
         "id": "back-satchel",
         "label": "Satchel"
-      },
-      {
-        "id": "back-bedroll",
-        "label": "Bedroll"
       }
     ]
   }
