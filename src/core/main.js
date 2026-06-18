@@ -202,7 +202,10 @@ function _unlockAudio() {
   _audioUnlocked = true;
   music.unlock();
   if (audio.unlock) audio.unlock();
-  if (window.__state && window.__state !== 'BOOT') _kickMusicForState();
+  // Actually START the theme inside this completed gesture — resuming an idle
+  // context isn't enough on iOS (it re-suspends before the deferred theme starts,
+  // which is why a 2nd tap was needed). During BOOT this kicks the menu theme.
+  _kickMusicForState();
   _UNLOCK_EVENTS.forEach(ev => window.removeEventListener(ev, _unlockAudio, true));
 }
 _UNLOCK_EVENTS.forEach(ev => window.addEventListener(ev, _unlockAudio, true));
