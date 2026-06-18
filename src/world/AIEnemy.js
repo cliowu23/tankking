@@ -40,6 +40,7 @@ export default class AIEnemy {
     this.state           = this._ambush ? 'AMBUSH' : 'IDLE';
     this.fireCooldown    = 1.5; // brief delay before first shot
     this._recoil         = 0;
+    this._stunTimer = 0;   // > 0 while frozen by a parry
 
     // Recoil baseline + muzzle length — primitive defaults; subclasses
     // (SentinelEnemy/ChaffEnemy) overwrite these to point at their own muzzle.
@@ -81,6 +82,17 @@ export default class AIEnemy {
     this.hpBarFill.position.set(0, 1.55, 0);
     this.hpBarFill.material = this.hpFillMat;
     this.hpBarFill.parent = this.root;
+
+    // --- Stun tell: an emissive ring that spins above a parried (frozen) unit ---
+    const stunMat = new StandardMaterial('aiStunMat', scene);
+    stunMat.diffuseColor  = new Color3(0.2, 0.9, 1.0);
+    stunMat.emissiveColor = new Color3(0.3, 0.85, 1.0);
+    this.stunRing = MeshBuilder.CreateTorus('aiStunRing', { diameter: 2.0, thickness: 0.18, tessellation: 16 }, scene);
+    this.stunRing.position.set(0, 2.2, 0);
+    this.stunRing.material   = stunMat;
+    this.stunRing.parent     = this.root;
+    this.stunRing.isVisible  = false;
+    this.stunRing.isPickable = false;
 
     // --- Own shell pool (separate from player's) ---
     this.shells = Array.from({ length: 4 }, () => new Shell(scene));
@@ -157,6 +169,18 @@ export default class AIEnemy {
     if (d <= radius) this.state = 'APPROACH';
   }
 
+  // Freeze this unit (parry result). Stacks by taking the longer remaining time.
+  stun(seconds) {
+    if (!this.alive) return;
+    this._stunTimer = Math.max(this._stunTimer, seconds);
+    this.speed = 0;
+    if (this.stunRing) this.stunRing.isVisible = true;
+  }
+
+  _hideStunTell() {
+    if (this.stunRing) this.stunRing.isVisible = false;
+  }
+
   addShadows(shadowGen) {
     if (!this.hull) return;   // composed visuals manage their own (blob) shadows
     shadowGen.addShadowCaster(this.hull);
@@ -183,6 +207,8 @@ export default class AIEnemy {
     this.state           = this._ambush ? 'AMBUSH' : 'IDLE';
     this.fireCooldown    = 1.5;
     this._recoil         = 0;
+    this._stunTimer = 0;
+    this._hideStunTell();
     this.barrelPivot.position.z = this._barrelBaseZ;
     this.staticFrictionThreshold = 1.0;
     this.root.position.set(x, 0, z);
@@ -213,6 +239,17 @@ export default class AIEnemy {
     if (!this.alive) {
       this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.vx * dt));
       this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.vz * dt));
+      return;
+    }
+
+    // --- Stunned: frozen (no AI/turret/fire), still shovable by knockback ---
+    if (this._stunTimer > 0) {
+      this._stunTimer -= dt;
+      if (this.stunRing) this.stunRing.rotation.y += dt * 5;
+      this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.vx * dt));
+      this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.vz * dt));
+      this.root.rotation.y = this.rotY;
+      if (this._stunTimer <= 0) this._hideStunTell();
       return;
     }
 
@@ -348,6 +385,8 @@ export default class AIEnemy {
   _die() {
     this.alive = false;
     this.speed = 0;
+    this._stunTimer = 0;
+    this._hideStunTell();
     this._deathVisuals();
     this.hpBarBg.isVisible   = false;
     this.hpBarFill.isVisible = false;
