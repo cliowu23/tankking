@@ -9,6 +9,7 @@ export const SHIELD_DURATION   = 0.8;   // seconds the bubble lasts per pop
 export const SHIELD_FUEL_COST  = 25;    // fuel per pop (~4 pops on a full 100 tank)
 export const SHIELD_MITIGATION = 0.15;  // damage multiplier while active (85% reduction)
 export const SHIELD_MOVE_MULT  = 0.50;  // move-speed multiplier while active
+export const SHIELD_STUN_DURATION = 1.5;  // seconds an enemy is frozen when its attack is parried (blocked by the active bubble)
 
 export function makeShieldState() {
   return { active: false, timeLeft: 0 };

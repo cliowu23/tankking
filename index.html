@@ -639,6 +639,39 @@
       66%  { opacity: 0.7; transform: scaleY(0.018); filter: brightness(1);   }
       100% { opacity: 0;   transform: scaleY(0.018);                          }
     }
+
+    /* ─── COLD BOOT — arcade attract screen (also captures the first gesture that unlocks audio) ─── */
+    #cold-boot {
+      position: fixed; inset: 0; z-index: 200;
+      background: #000;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; cursor: pointer;
+    }
+    #cold-boot::before {   /* faint arcade-CRT scanlines */
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image: repeating-linear-gradient(
+        0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(255,255,255,0.035) 3px, rgba(255,255,255,0.035) 4px);
+    }
+    #cold-boot::after {    /* subtle vignette */
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(0,0,0,0.6) 100%);
+    }
+    #cold-boot-inner { position: relative; z-index: 1; text-align: center; }
+    #cb-title {
+      font-family: 'Press Start 2P', monospace; color: #fff;
+      font-size: 42px; letter-spacing: 2px; line-height: 1.2;
+      margin-bottom: 46px; text-shadow: 0 4px 0 rgba(255,255,255,0.12);
+    }
+    #cb-prompt {
+      font-family: 'Press Start 2P', monospace; color: #fff;
+      font-size: 15px; letter-spacing: 1px;
+      animation: cbBlink 1.06s steps(1) infinite;
+    }
+    @keyframes cbBlink { 0%,55% { opacity: 1; } 55.01%,100% { opacity: 0; } }   /* arcade blink */
+    /* white flash-cut: screen flashes white, cuts to the menu underneath, flash fades */
+    #boot-flash { position: fixed; inset: 0; z-index: 210; background: #fff; opacity: 0; pointer-events: none; }
+    #boot-flash.flash-in  { transition: opacity 80ms ease-out; opacity: 1; }
+    #boot-flash.flash-out { transition: opacity 280ms ease-in;  opacity: 0; }
     #hangar-prompt {
       position: fixed;
       bottom: 120px;
@@ -965,6 +998,14 @@
   </div>
 
   <div id="crt-off"></div>
+
+  <div id="cold-boot">
+    <div id="cold-boot-inner">
+      <h1 id="cb-title">TanKING</h1>
+      <p id="cb-prompt">PRESS ENTER TO START</p>
+    </div>
+  </div>
+  <div id="boot-flash"></div>
   <canvas id="transition-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99;display:none"></canvas>
 
   <script>

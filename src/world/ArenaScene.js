@@ -25,6 +25,7 @@ import { audio } from '../core/audio/AudioManager.js';
 import { music } from '../core/audio/MusicManager.js';
 import { buildWorld1 } from './zones/World1Builder.js';
 import { buildRoadLeg } from './zones/RoadBuilder.js';
+import { SHIELD_STUN_DURATION } from '../tank/shield.js';
 
 // Hull-follow camera (Long Road): the view yaws to keep the hull's forward up-screen, so
 // off-angle/branching roads read as "straight ahead". Reversing keeps facing up-the-road
@@ -1438,12 +1439,14 @@ export default class ArenaScene {
 
   _updateHUD() {
     const fuelRatio = this.tank.fuel / this.tank.maxFuel;
+    const redline   = this.tank.energy?.redline;
     const fill = document.getElementById('hud-fill');
     if (fill) {
-      fill.style.width = `${Math.max(1, fuelRatio * 100)}%`;
+      // No min floor — the bar must read truly empty on a full drain.
+      fill.style.width = `${Math.max(0, fuelRatio * 100)}%`;
       // backgroundColor (not the `background` shorthand) so the CSS segmentation
       // gradient (repeating-linear-gradient on #hud-fill) survives the recolor.
-      fill.style.backgroundColor = fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
+      fill.style.backgroundColor = redline ? '#aa2a2a' : fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
     }
 
     const hpRatio = this.tank.hp / this.tank.maxHp;
@@ -1530,7 +1533,10 @@ export default class ArenaScene {
         const dz = shell.position.z - this.tank.position.z;
         if (Math.abs(dx) < 0.25 + this.tank.halfW && Math.abs(dz) < 0.25 + this.tank.halfD) {
           shell.deactivate();
-          this.tank.takeDamage(enemy.shellDamage ?? 34);
+          // Parry: any attack absorbed by the active bubble stuns its source.
+          // Works for Shell / EyeBeam / LaserBolt alike — all share enemy.shells.
+          if (this.tank.shield?.active) enemy.stun?.(SHIELD_STUN_DURATION);
+          this.tank.takeDamage(enemy.shellDamage ?? 34);   // mitigation auto-applied while shielded
           this._triggerShake(0.18, 0.55);
           if (!this.tank.alive) this._showDeath();
           break outer;
