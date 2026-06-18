@@ -10,7 +10,7 @@ import { PostProcess, Effect } from '@babylonjs/core';
 // (brightness/contrast/saturation = 1) — earlier grade read as over-saturated.
 export const CRT_PARAMS = {
   scanline: 0.27, density: 440, curvature: 0.04, vignette: 0.21, aberration: 0.001,
-  glow: 0.24, grain: 0.04, brightness: 1.02, contrast: 1.15, saturation: 1.06,
+  glow: 0.24, grain: 0.04, brightness: 1.02, contrast: 1.05, saturation: 1.06,
 };
 
 // Global live state (so the Settings toggle flips it without recreating the pass).
