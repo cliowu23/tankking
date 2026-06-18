@@ -96,7 +96,7 @@ export default class MenuScene {
     const portrait = eng.getRenderHeight() > eng.getRenderWidth();
     const mobile = !!(window.__mobile && window.__mobile.active);
     let tx = -1.4, ty = 1.1, radius = 7.6, fov = 0.72;
-    if (mobile && portrait) { tx = 0.2; ty = 0.8; radius = 9.0; fov = 0.84; }  // tank left-of-center, lifted, smaller
+    if (mobile && portrait) { tx = -0.9; ty = 0.8; radius = 8.6; fov = 0.84; }  // tank occupies the RIGHT, clipping a touch off the right edge
     else if (mobile)        { tx = -1.1; ty = 1.1; radius = 8.0; fov = 0.74; } // landscape phone
     this.camera.setTarget(new Vector3(tx, ty, 0));
     this.camera.radius = radius;

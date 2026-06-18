@@ -68,6 +68,7 @@ let _booted = false;
 function powerOn() {
   if (_booted) return;
   _booted = true;
+  music.unlock();   // resume the Tone context IN this gesture (iOS unlocks audio only synchronously); theme still starts after the flash
   const boot  = document.getElementById('cold-boot');
   const flash = document.getElementById('boot-flash');
   const reveal = () => {
