@@ -80,6 +80,29 @@ class MusicManager {
   pause()  { if (this._started) { const T = Tone.getTransport(); if (T.state === 'started') T.pause(); } }
   resume() { if (this._started) { const T = Tone.getTransport(); if (T.state === 'paused')  T.start(); } }
 
+  // Fade-then-freeze for the game PAUSE: ramp the music down, then halt the
+  // transport once it's silent (so it still resumes from the same bar). Paired
+  // with fadeResume(). Replaces the abrupt needle-lift as the pause transition.
+  fadePause(ms = 400) {
+    if (!this._started) return;
+    const T = Tone.getTransport();
+    if (this.master) this.master.gain.rampTo(0, ms / 1000);
+    // Tempo winds DOWN with the SFX tape-stop (synth music can't pitch-bend, but
+    // the rhythm grinding to a halt sells the same "everything stopping" feel).
+    if (this._bpmSaved == null) this._bpmSaved = T.bpm.value;
+    try { T.bpm.rampTo(this._bpmSaved * 0.3, ms / 1000); } catch (_) {}
+    clearTimeout(this._pauseT);
+    this._pauseT = setTimeout(() => { if (T.state === 'started') T.pause(); }, ms + 20);
+  }
+  fadeResume(ms = 400) {
+    if (!this._started) return;
+    clearTimeout(this._pauseT);             // cancel a still-pending freeze if we resume fast
+    const T = Tone.getTransport();
+    if (this._bpmSaved != null) { try { T.bpm.value = this._bpmSaved; } catch (_) {} this._bpmSaved = null; } // restore tempo before unpausing
+    if (T.state === 'paused') T.start();
+    if (this.master) this.master.gain.rampTo(this._activeVol(), ms / 1000);
+  }
+
   // ---- one-shot stingers + transition SFX (fire-and-forget, survive theme stop) ----
   // These are game FEEDBACK, not music: they ride their own output (_fxOut) so a
   // theme crossfade/stop can't cut them off, and they ignore the music mute.
@@ -141,6 +164,7 @@ class MusicManager {
       const T = Tone.getTransport();
       T.stop();
       T.bpm.value = CFG[id].bpm;
+      this._bpmSaved = null;   // fresh theme = known tempo; don't let a stale pause-save restore the wrong bpm
       T.swing = CFG[id].swing; T.swingSubdivision = '8n';
       T.position = 0;
       this._theme = this[`_build_${id}`]();

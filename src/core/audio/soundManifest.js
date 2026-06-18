@@ -38,7 +38,7 @@ export const SOUNDS = {
   'tank.shield_loop':   { url: 'sfx/tank/shield_loop.ogg',   bus: 'sfx', loop: true, gain: 0.45 },
   'tank.shield_break':  { url: 'sfx/tank/shield_break.ogg',  bus: 'sfx', gain: 0.80 },
   'tank.destroyed':     { url: 'sfx/tank/destroyed.ogg',     bus: 'sfx', duck: true, gain: 1.00 },
-  'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: false, loop: true, gain: 0.10 },
+  'tank.engine':        { url: 'sfx/tank/engine.ogg',        bus: 'sfx', spatial: false, loop: true, gain: 0.07 },
   'tank.reload':        { url: 'sfx/tank/reload.ogg',        bus: 'sfx', spatial: false, pitchVar: 0.05, gain: 0.55 },
   'tank.low_fuel':      { url: 'sfx/tank/low_fuel.ogg',      bus: 'ui',  gain: 0.50 },
 

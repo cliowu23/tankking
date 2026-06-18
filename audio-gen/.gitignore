@@ -1,5 +1,8 @@
 cc0/_packs/
+cc0/freesound/
 candidates/raw/
 candidates/raw_sa/
 *.wav
 preview.html
+freesound-audition.html
+.env

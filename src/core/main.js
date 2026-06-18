@@ -505,6 +505,7 @@ function goToMenu() {
   if (hangarScene) { hangarScene.dispose(); hangarScene = null; }
   silenceArena(); // after _restart (which restarts engine) so the menu is quiet
   audio.stopLoop('amb.hangar');
+  audio.resumeAll(0); // undo any pause fade so menu audio isn't left muted
   music.playMenu();
   music.playCrtOff();        // power-down whine + thunk, synced to the CRT-off visual
   overlay.classList.add('playing');
@@ -601,7 +602,8 @@ function resumeGame() {
   if (window.__state !== 'PAUSED') return;
   document.getElementById('pause').style.display = 'none';
   if (arenaScene) arenaScene._paused = false;
-  music.resume(); // un-freeze the soundtrack from where it paused
+  music.fadeResume(); // un-freeze + ramp the soundtrack back up
+  audio.resumeAll();  // fade engine + ambience + sfx back to their levels
   window.__state = 'GAME';
 }
 
@@ -613,6 +615,7 @@ document.getElementById('pause-restart').addEventListener('click', () => {
   if (!arenaScene) return;
   document.getElementById('pause').style.display = 'none';
   document.getElementById('hud').style.display   = 'block';
+  audio.resumeAll(0);  // undo the pause fade so the restarted run isn't muted
   arenaScene._paused = false;
   arenaScene._restart();
   music.restart(); // soundtrack restarts from the top with the run
@@ -634,8 +637,8 @@ function autoPause() {
   if (window.__state !== 'GAME') return;
   window.__state = 'PAUSED';
   if (arenaScene) arenaScene._paused = true;
-  music.pause();           // freeze the soundtrack with the game
-  music.playNeedleLift();  // record-needle-off transition
+  music.fadePause();   // ramp soundtrack down, then freeze it (resumes from the same bar)
+  audio.pauseAll();    // fade engine + ambience + all sfx loops to silence
   document.getElementById('pause').style.display = 'flex';
 }
 

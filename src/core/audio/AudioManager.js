@@ -151,6 +151,67 @@ class AudioManager {
     } catch (_) {}
   }
 
+  // Live pitch change on a playing sound (e.g. engine RPM with throttle). A loop's
+  // playbackRate maps to the source's AudioParam, so it's safe to set every frame;
+  // the caller smooths the value so there's no zipper noise.
+  setPlaybackRate(id, rate) {
+    const entry = this.sounds[id];
+    if (!entry) return;
+    try { entry.snd.playbackRate = rate; } catch (_) {}
+  }
+
+  // TAPE-STOP pause: every live loop bends DOWN in pitch (playbackRate → near-0)
+  // while its bus fades to silence — the classic "wind down to a halt." Volume
+  // rides a native bus ramp (works even if rAF is throttled on a hidden tab);
+  // pitch rides a rAF ramp. The _paused flag stops an in-flight duck from fighting.
+  pauseAll(ms = 400) {
+    if (!this.ready) return;
+    this._paused = true;
+    this._stopRamp();
+    const dur = ms / 1000;
+    for (const name in this.buses) this._setBusVolume(name, 0, dur);
+    const srcs = this._activeSources().map(snd => ({ snd, from: (snd.playbackRate ?? 1) || 1 }));
+    // ease-in (p²) so it lingers near speed then drops away fast → from → from*0.06
+    this._rampPitch(srcs, ms, (from, p) => from * (1 - 0.94 * (p * p)));
+  }
+
+  // TAPE-START resume: pitch spins back up to normal as the buses fade back in.
+  // (Tank.update re-owns the engine's playbackRate within a frame; the volume
+  // fade-in masks the hand-off.)
+  resumeAll(ms = 400) {
+    this._paused = false;
+    this._stopRamp();
+    const dur = ms / 1000;
+    for (const name in this.buses) this._setBusVolume(name, BUSES[name].volume, dur);
+    const srcs = this._activeSources().map(snd => ({ snd, from: (snd.playbackRate ?? 0.06) || 0.06 }));
+    // ease-out so it picks up quickly then settles at 1.0
+    this._rampPitch(srcs, ms, (from, p) => from + (1 - from) * (p * (2 - p)));
+  }
+
+  // Every currently-audible looping source: declared loops + pooled spatial loops.
+  _activeSources() {
+    const out = [];
+    for (const id in this.sounds) if (this.sounds[id]._looping) out.push(this.sounds[id].snd);
+    for (const id in this.pools) for (const inst of this.pools[id].used.values()) out.push(inst);
+    return out;
+  }
+
+  // Drive playbackRate over `ms` via rAF. fn(from, p)->rate, p in [0,1].
+  _rampPitch(srcs, ms, fn) {
+    if (!srcs.length) return;
+    const apply = (p) => { for (const s of srcs) { try { s.snd.playbackRate = Math.max(0.0625, fn(s.from, p)); } catch (_) {} } };
+    if (ms <= 0) { apply(1); return; }
+    const t0 = performance.now();
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      apply(p);
+      this._rampRAF = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    this._rampRAF = requestAnimationFrame(step);
+  }
+
+  _stopRamp() { if (this._rampRAF) { cancelAnimationFrame(this._rampRAF); this._rampRAF = null; } }
+
   // Master volume for a whole category bus (e.g. the settings SFX slider). Updates
   // the live bus and the BUSES baseline so the duck system restores to the new
   // level. Safe before init — the baseline is read when buses are created.
@@ -199,6 +260,7 @@ class AudioManager {
     clearTimeout(this._duckTimer);
     for (const name of DUCK.buses) this._setBusVolume(name, BUSES[name].volume * DUCK.amount, DUCK.attack);
     this._duckTimer = setTimeout(() => {
+      if (this._paused) return; // a pause fade owns the buses now; don't fight it
       for (const name of DUCK.buses) this._setBusVolume(name, BUSES[name].volume, DUCK.release);
     }, (DUCK.attack + 0.05) * 1000);
   }
