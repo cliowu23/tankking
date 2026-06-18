@@ -14,6 +14,7 @@ import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
 import { audio } from '../core/audio/AudioManager.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
+import { attachCrt } from '../core/crtFilter.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { buildPrimitiveTank } from '../tank/primitiveTank.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
@@ -685,6 +686,7 @@ export default class HangarScene {
     // Phone/portrait pulls the hangar camera back too (its north-offset is
     // radius * _camNorthRatio, so it stays framed). Desktop = ×1 (unchanged).
     if (window.__camZoom) this.driver.camera.radius *= window.__camZoom();
+    attachCrt(this.driver.camera);   // arcade/CRT post-process (toggled live via Settings)
     this._driverConfig = this._loadDriverConfig();
     // Apply the saved look once the default model finishes loading; adopt back the
     // APPLIED config (the driver clears slots whose pieces failed to load).
