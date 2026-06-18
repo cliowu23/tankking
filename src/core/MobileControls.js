@@ -108,6 +108,21 @@ function injectStyles() {
   /* Health/Energy HUD is desktop-sized; scale it down on phones (anchored to its
      bottom-left corner so it stays put). */
   body.mc-touch #hud{ transform:scale(0.7); transform-origin:bottom left; }
+
+  /* ── New title screen (live-tank menu) on a phone: shrink the wordmark + the
+     PRESS TO PLAY / TANK SELECTOR prompts into the left corner so they fit a
+     tall, narrow screen. On touch there's no hover, so make the secondary
+     (TANK SELECTOR) legible on its own. The tank itself is pulled left + zoomed
+     out by MenuScene._applyFraming(). */
+  body.mc-touch #menu-wordmark{ font-size:30px; top:34px; left:24px; letter-spacing:1px; }
+  body.mc-touch #menu-wordmark::after{ width:86px; bottom:-11px; }
+  body.mc-touch #menu-nav{ left:24px; bottom:58px; gap:16px; }
+  body.mc-touch .menu-item{ font-size:14px; }
+  body.mc-touch .menu-item.secondary{ font-size:12px; }
+  body.mc-touch #menu-nav .menu-item .ch{ color:var(--white); text-shadow:0 0 5px rgba(0,238,221,0.22); }
+  body.mc-touch #menu-nav .menu-item.secondary .ch{ color:#9fc4cf; text-shadow:none; }
+  body.mc-touch #menu-ver{ left:24px; bottom:36px; font-size:8px; }
+  body.mc-touch #menu-scrim{ background:linear-gradient(90deg, rgba(5,13,26,0.94) 0%, rgba(5,13,26,0.8) 34%, rgba(5,13,26,0) 66%); }
   `;
   const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
 }
@@ -339,9 +354,10 @@ function refresh() {
   // BACK/PAUSE — in combat (pause) and inspector (exit). Designer confirm is E.
   show(_btnBack, inGame || inInspect);
 
-  // START — menu + controls "press enter" screens.
-  show(_btnStart, inMenu);
-  if (_btnStart) _btnStart.textContent = st === 'CONTROLS' ? 'TAP TO START' : 'TAP TO PLAY';
+  // START — only the CONTROLS (how-to-play) screen needs the big button; on the
+  // title MENU the corner "PRESS TO PLAY" item is the play affordance.
+  show(_btnStart, st === 'CONTROLS');
+  if (_btnStart && st === 'CONTROLS') _btnStart.textContent = 'TAP TO START';
 
   // Inspector confirm reuses the INTERACT button (E = confirm selection).
   if (inInspect) { _btnInteract.innerHTML = '✓<br>CONFIRM'; show(_btnInteract, true); }

@@ -25,7 +25,9 @@ export default class MenuScene {
     // (at origin) frames to the RIGHT, leaving the left third clear for the menu.
     this.camera = new ArcRotateCamera('menuCam', -Math.PI / 2.4, 1.28, 7.6,
       new Vector3(-1.4, 1.1, 0), this.scene);
-    this.camera.fov = 0.72;
+    this._applyFraming();     // desktop frames RIGHT; portrait phone pulls left + zooms out
+    this._onResize = () => this._applyFraming();
+    engine.onResizeObservable.add(this._onResize);
     attachCrt(this.camera);   // arcade/CRT post-process (toggled live via Settings)
 
     // Lighting — warm key + teal rim + low cool ambient.
@@ -85,10 +87,27 @@ export default class MenuScene {
     this.scene.registerBeforeRender(this._spin);
   }
 
+  // Framing adapts to the viewport. Desktop frames the tank to the RIGHT (clear
+  // left third for the menu). A portrait phone pulls the tank toward center-left
+  // (target moves right of the tank) and zooms out so it fits the tall, narrow
+  // screen alongside the scaled-down corner UI.
+  _applyFraming() {
+    const eng = this._engine;
+    const portrait = eng.getRenderHeight() > eng.getRenderWidth();
+    const mobile = !!(window.__mobile && window.__mobile.active);
+    let tx = -1.4, ty = 1.1, radius = 7.6, fov = 0.72;
+    if (mobile && portrait) { tx = 0.2; ty = 0.8; radius = 9.0; fov = 0.84; }  // tank left-of-center, lifted, smaller
+    else if (mobile)        { tx = -1.1; ty = 1.1; radius = 8.0; fov = 0.74; } // landscape phone
+    this.camera.setTarget(new Vector3(tx, ty, 0));
+    this.camera.radius = radius;
+    this.camera.fov = fov;
+  }
+
   render() { this.scene.render(); }
 
   dispose() {
     try { this.scene.unregisterBeforeRender(this._spin); } catch (_) {}
+    try { if (this._onResize) this._engine.onResizeObservable.removeCallback(this._onResize); } catch (_) {}
     this.scene.dispose();
   }
 }
