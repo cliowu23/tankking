@@ -10,6 +10,7 @@ import {
 } from '@babylonjs/core';
 import { buildPrimitiveTank } from '../tank/primitiveTank.js';
 import { shortAngle } from '../utils/mathUtils.js';
+import { attachCrt } from '../core/crtFilter.js';
 
 const ROTATE_SPEED = 0.18; // rad/s — slow continuous turntable; tune to taste
 const TURRET_SPEED = 1.8;  // rad/s — sweep rate when the turret acquires a new heading
@@ -25,6 +26,7 @@ export default class MenuScene {
     this.camera = new ArcRotateCamera('menuCam', -Math.PI / 2.4, 1.28, 7.6,
       new Vector3(-1.4, 1.1, 0), this.scene);
     this.camera.fov = 0.72;
+    attachCrt(this.camera);   // arcade/CRT post-process (toggled live via Settings)
 
     // Lighting — warm key + teal rim + low cool ambient.
     const amb = new HemisphericLight('menuAmb', new Vector3(0, 1, 0), this.scene);

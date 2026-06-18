@@ -6,6 +6,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
+import { attachCrt } from '../core/crtFilter.js';
 import { hpColor, yRotForFacing } from '../utils/mathUtils.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
@@ -106,6 +107,7 @@ export default class ArenaScene {
     const camRadius = CAM_RADIUS * (window.__camZoom ? window.__camZoom() : 1);
     this.camera = new ArcRotateCamera('cam', -Math.PI / 2 - this._camHeading, CAM_BETA, camRadius,
       new Vector3(this._camX, 0, this._camZ), this.scene);
+    this._crt = attachCrt(this.camera);   // arcade/CRT post-process (toggled live via Settings)
   }
 
   _setupLighting() {

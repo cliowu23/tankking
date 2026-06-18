@@ -11,6 +11,7 @@ import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
 import { audio } from '../core/audio/AudioManager.js';
+import { attachCrt } from '../core/crtFilter.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import SentinelEnemy from '../world/SentinelEnemy.js';
 import ChaffEnemy from '../world/ChaffEnemy.js';
@@ -89,6 +90,7 @@ export default class TankDesignerScene {
     // (otherwise navigating also pans/tilts the view). Mouse drag + wheel still work.
     this.camera.keysUp = []; this.camera.keysDown = [];
     this.camera.keysLeft = []; this.camera.keysRight = [];
+    attachCrt(this.camera);   // arcade/CRT post-process (toggled live via Settings)
   }
 
   _setupLighting() {
