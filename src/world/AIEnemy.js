@@ -83,16 +83,12 @@ export default class AIEnemy {
     this.hpBarFill.material = this.hpFillMat;
     this.hpBarFill.parent = this.root;
 
-    // --- Stun tell: an emissive ring that spins above a parried (frozen) unit ---
-    const stunMat = new StandardMaterial('aiStunMat', scene);
-    stunMat.diffuseColor  = new Color3(0.2, 0.9, 1.0);
-    stunMat.emissiveColor = new Color3(0.3, 0.85, 1.0);
-    this.stunRing = MeshBuilder.CreateTorus('aiStunRing', { diameter: 2.0, thickness: 0.18, tessellation: 16 }, scene);
-    this.stunRing.position.set(0, 2.2, 0);
-    this.stunRing.material   = stunMat;
-    this.stunRing.parent     = this.root;
-    this.stunRing.isVisible  = false;
-    this.stunRing.isPickable = false;
+    // Stun tell = a fast white blink over the whole unit (built lazily on first
+    // stun via renderOverlay, which is per-mesh so it is safe even when units
+    // share painted materials, and works for primitive + composed GLB alike).
+    this._blinkMeshes = null;
+    this._blinkT      = 0;
+    this._blinkOn     = false;
 
     // --- Own shell pool (separate from player's) ---
     this.shells = Array.from({ length: 4 }, () => new Shell(scene));
@@ -174,11 +170,33 @@ export default class AIEnemy {
     if (!this.alive) return;
     this._stunTimer = Math.max(this._stunTimer, seconds);
     this.speed = 0;
-    if (this.stunRing) this.stunRing.isVisible = true;
+    // Gather the unit's visible meshes (skip the HP bar) for the white blink.
+    this._blinkMeshes = this.root.getChildMeshes().filter(m => !/HpBar/i.test(m.name));
+    this._blinkT  = 0;
+    this._blinkOn = false;
+    this._setStunOverlay(true);
+  }
+
+  // Advance the white-blink flicker while stunned (fast on/off cadence).
+  _blinkStun(dt) {
+    this._blinkT -= dt;
+    if (this._blinkT <= 0) {
+      this._blinkOn = !this._blinkOn;
+      this._blinkT  = 0.08;
+      this._setStunOverlay(this._blinkOn);
+    }
+  }
+
+  _setStunOverlay(on) {
+    if (!this._blinkMeshes) return;
+    for (const m of this._blinkMeshes) {
+      m.renderOverlay = on;
+      if (on) { m.overlayColor = new Color3(1, 1, 1); m.overlayAlpha = 0.85; }
+    }
   }
 
   _hideStunTell() {
-    if (this.stunRing) this.stunRing.isVisible = false;
+    this._setStunOverlay(false);
   }
 
   addShadows(shadowGen) {
@@ -245,7 +263,7 @@ export default class AIEnemy {
     // --- Stunned: frozen (no AI/turret/fire), still shovable by knockback ---
     if (this._stunTimer > 0) {
       this._stunTimer -= dt;
-      if (this.stunRing) this.stunRing.rotation.y += dt * 5;
+      this._blinkStun(dt);
       this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + this.vx * dt));
       this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + this.vz * dt));
       this.root.rotation.y = this.rotY;

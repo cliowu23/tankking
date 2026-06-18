@@ -1439,12 +1439,14 @@ export default class ArenaScene {
 
   _updateHUD() {
     const fuelRatio = this.tank.fuel / this.tank.maxFuel;
+    const redline   = this.tank.energy?.redline;
     const fill = document.getElementById('hud-fill');
     if (fill) {
-      fill.style.width = `${Math.max(1, fuelRatio * 100)}%`;
+      // No min floor — the bar must read truly empty on a full drain.
+      fill.style.width = `${Math.max(0, fuelRatio * 100)}%`;
       // backgroundColor (not the `background` shorthand) so the CSS segmentation
       // gradient (repeating-linear-gradient on #hud-fill) survives the recolor.
-      fill.style.backgroundColor = fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
+      fill.style.backgroundColor = redline ? '#aa2a2a' : fuelRatio < 0.3 ? '#ff4444' : '#44aaff';
     }
 
     const hpRatio = this.tank.hp / this.tank.maxHp;

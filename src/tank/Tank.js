@@ -3,6 +3,7 @@ import { shortAngle } from '../utils/mathUtils.js';
 import { hullFootprint } from '../utils/meshBounds.js';
 import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
 import { stepThrottle, turnRateAt } from './movement.js';
+import { makeEnergyState, stepEnergy, canSpend } from './energy.js';
 import { audio } from '../core/audio/AudioManager.js';
 
 // --- Engine audio: throttle-driven RPM → pitch (revving). Tune live. ---
@@ -28,14 +29,20 @@ export default class Tank {
     this._halfW           = 1.2;  // collision half-extents — refit to the model via fitCollisionToModel()
     this._halfD           = 1.6;
     this.rotY             = 0; // start facing north (+Z, away from camera)
-    this.acceleration     = 4.5;   // slow spool-up (~3.5s to top) = heavy machine
+    this.acceleration     = 4.5;   // peak thrust off the line (diminishes toward top via accelCurve)
+    this.accelCurve       = 2;     // diminishing-accel exponent: brisk low-end, slow final push to top speed
     this.maxSpeed         = 16;    // real top speed (just under old boost)
     this.drag             = 20;   // units/s² — high so tank stops fast when gas released (not slidey)
     this.brakeDecel       = 28;   // units/s² — active braking when input opposes motion (> drag)
     this.rotateSpeed      = 2.1;    // rad/s
+    this.turnScrub        = 10;   // units/s² of speed bled while steering, scaled by speed — hard turns at top speed cost momentum (no free circle-dodging)
     this.maxFuel          = 100;
-    this.fuel             = 100;
-    this.fuelRecharge     = 18;
+    this.energy           = makeEnergyState(this.maxFuel);  // owns fuel + redline/recharge timers
+    // --- Energy stats (AC-inspired; tune live) ---
+    this.rechargeDelay    = 0.5;   // s of no-spend before partial-use regen begins
+    this.rechargeRate     = 35;    // units/s normal regen
+    this.redlineRecovery  = 1.2;   // s lockout after a FULL drain (boost+shield disabled)
+    this.redlineRefillRate = 200;  // units/s fast sweep-up to full after the lockout
     this.tapCost          = 18;
     this.tapDashDist      = 3.0;
     this.tapDashExit      = 18;
@@ -45,6 +52,7 @@ export default class Tank {
     this.boostDecay       = 15;   // units/s² bleed from boostMaxSpeed back to maxSpeed
     this.momentumDuration = 0.175;  // seconds to coast at boost speed after releasing
     this.turretSpeed      = 72 * Math.PI / 180; // rad/s — 72°/s traverse rate
+    this.turretHullAssist = 0.7;  // fraction of hull rotation carried into world aim (WT coupling; <1 = smoother swing)
     this.dispersion       = 0;   // radians — set by fire control system module
 
     this.maxHp            = 340;
@@ -69,6 +77,7 @@ export default class Tank {
 
     // Turret world-space aim angle (traverses at turretSpeed toward cursor)
     this.turretAimAngle   = 0;
+    this._turretHullPrev  = 0;   // hull yaw last turret-update; hull rotation carries the gun (WT coupling)
 
     // Barrel elevation in radians (0 = flat, positive = muzzle up)
     this.barrelElevation  = 0;
@@ -285,8 +294,9 @@ export default class Tank {
     this.knockZ = 0;
     this.rotY  = 0;
     this.turretAimAngle  = 0;
+    this._turretHullPrev = 0;
     this.barrelElevation = 0;
-    this.fuel  = this.maxFuel;
+    this.energy = makeEnergyState(this.maxFuel);
     this.shield.active = false;
     this.shield.timeLeft = 0;
     this._qPressed = false;
@@ -297,6 +307,9 @@ export default class Tank {
     this.hullMat.emissiveColor = new Color3(0, 0, 0);
   }
 
+  // Fuel lives in the energy state machine; expose it read-only for HUD/low-fuel/shield.
+  get fuel() { return this.energy.fuel; }
+
   addShadows(shadowGen) {
     for (const m of this._shadowMeshes) shadowGen.addShadowCaster(m);
   }
@@ -304,10 +317,12 @@ export default class Tank {
   update(dt) {
     if (!this.alive) return;
 
+    let energySpent = 0;   // fuel burned this frame (shield + boost); applied via stepEnergy below
+
     // --- Shield step (before movement so the slow applies this frame) ---
     const prevShieldActive = this.shield.active;
-    const { fuelSpent } = stepShield(this.shield, dt, this._qPressed, this.fuel);
-    this.fuel = Math.max(0, this.fuel - fuelSpent);
+    const { fuelSpent } = stepShield(this.shield, dt, this._qPressed, this.energy.fuel);
+    energySpent += fuelSpent;
     this._qPressed = false;
     this.shieldBubble.isVisible = this.shield.active;
     // Shield audio: edge-triggered activate/break + a hold loop while up.
@@ -361,10 +376,20 @@ export default class Tank {
       return;
     }
 
-    // --- Rotation (tight at crawl, wide at full tilt) ---
-    const turn = turnRateAt(this.speed, this.maxSpeed, this.rotateSpeed);
+    // --- Rotation (tight at crawl, wide at full tilt — boost restores full agility) ---
+    // Agile-boost = your nimble dodge window: full turn rate + no momentum scrub.
+    const agileBoost = this.keys.shift && !this.energy.redline && this.energy.fuel > 0;
+    const turn = agileBoost ? this.rotateSpeed : turnRateAt(this.speed, this.maxSpeed, this.rotateSpeed);
     if (this.keys.a) this.rotY -= turn * dt;
     if (this.keys.d) this.rotY += turn * dt;
+    // Hard turns scrub momentum, scaled by speed: free to pivot at a crawl,
+    // costly to swing the hull at full tilt. Skipped while boosting so the dodge
+    // burst stays agile; otherwise stops you circle-dodging at top speed.
+    if (!agileBoost && (this.keys.a || this.keys.d)) {
+      const scrub = this.turnScrub * (Math.abs(this.speed) / this.maxSpeed) * dt;
+      if (this.speed > 0)      this.speed = Math.max(0, this.speed - scrub);
+      else if (this.speed < 0) this.speed = Math.min(0, this.speed + scrub);
+    }
 
     const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
 
@@ -377,7 +402,7 @@ export default class Tank {
     const boostTapped = this._justPressedShift;
     const boostHeld   = this.keys.shift;
 
-    if (boostTapped && this.fuel >= this.tapCost) {
+    if (boostTapped && canSpend(this.energy, this.tapCost)) {
         const reversing    = this.keys.s;
         const dist         = reversing ? -(this.tapDashDist * 0.8) : this.tapDashDist;
         const exitSpd      = reversing ? -(this.tapDashExit  * 0.8) : this.tapDashExit;
@@ -387,17 +412,18 @@ export default class Tank {
         this.dashTimeLeft  = DURATION;
         this.dashExitSpeed = exitSpd;
         this.isDashing     = true;
-        this.fuel         -= this.tapCost;
+        energySpent       += this.tapCost;
         this.scene._onCameraShake?.(0.07, 0.3);
       }
 
-      if (boostHeld && this.fuel > 0) {
+      // Hold-boost is blocked during redline; draining to 0 here triggers the lockout.
+      if (boostHeld && !this.energy.redline && this.energy.fuel > 0) {
         const reversing = this.keys.s;
         const accel = reversing ? -(this.holdBoostAccel * 0.8) : this.holdBoostAccel;
         const cap   = reversing ? -(this.boostMaxSpeed  * 0.8) : this.boostMaxSpeed;
         this.speed  += accel * dt;
         this.speed   = reversing ? Math.max(this.speed, cap) : Math.min(this.speed, cap);
-        this.fuel    = Math.max(0, this.fuel - this.holdFuelDrain * dt);
+        energySpent += this.holdFuelDrain * dt;
         this._momentumTimer = this.momentumDuration; // keep resetting while held
       }
 
@@ -420,9 +446,8 @@ export default class Tank {
       }
     }
 
-    if (!boostHeld && this.fuel < this.maxFuel) {
-      this.fuel = Math.min(this.maxFuel, this.fuel + this.fuelRecharge * dt);
-    }
+    // --- Energy: apply this frame's spend, run regen / redline recovery ---
+    stepEnergy(this.energy, dt, energySpent, this);
 
     // --- Apply velocity (shield slows you while held up) ---
     const vx = forward.x * this.speed * shieldMove;
@@ -463,6 +488,13 @@ export default class Tank {
     const sinY  = Math.sin(this.rotY);
     const pivotX = this.root.position.x + (tp.x * cosY + tp.z * sinY) * scale;
     const pivotZ = this.root.position.z + (-tp.x * sinY + tp.z * cosY) * scale;
+
+    // War-Thunder coupling: the turret is bolted to the hull, so hull rotation
+    // carries the gun in world space — steering toward a target stacks on top of
+    // the turret's own traverse below (and steering away fights it).
+    const hullDelta = shortAngle(this._turretHullPrev, this.rotY);
+    this.turretAimAngle += hullDelta * this.turretHullAssist;
+    this._turretHullPrev = this.rotY;
 
     if (this.lockTarget) {
       // Lock-on: traverse at limited rate toward locked enemy
