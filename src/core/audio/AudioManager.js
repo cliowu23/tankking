@@ -44,6 +44,17 @@ class AudioManager {
     this._duckTimer = null;
   }
 
+  // Resume the SFX engine within a user gesture (idempotent). Babylon auto-unlocks
+  // via resumeOnInteraction, but re-kicking on the first completed gesture is cheap
+  // insurance for iOS, which only un-suspends on pointerup/touchend/click/keydown.
+  unlock() {
+    try { this.engine && this.engine.unlockAsync && this.engine.unlockAsync(); } catch (e) { /* no-op */ }
+    try {
+      const c = this.engine && (this.engine.audioContext || this.engine._audioContext);
+      if (c && c.state === 'suspended' && c.resume) c.resume();
+    } catch (e) { /* no-op */ }
+  }
+
   async init() {
     if (this._initStarted) return;
     this._initStarted = true;

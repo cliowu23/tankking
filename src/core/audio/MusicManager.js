@@ -87,12 +87,19 @@ class MusicManager {
   }
   get hangarTrack() { return this._forcedHangar || null; }
 
-  // Resume the Tone audio context synchronously inside a user gesture. iOS Safari
-  // only unlocks Web Audio when resume() is called DURING the gesture — the cold
-  // boot defers the actual theme to a timer (after the white flash), which is too
-  // late on iOS. Calling this in the power-on gesture kicks the context so the
-  // later playMenu() starts the theme on an already-running context.
-  unlock() { try { Tone.start(); } catch (e) { /* no-op */ } }
+  // Resume the Tone audio context. iOS only unlocks Web Audio on a COMPLETED user
+  // gesture (pointerup/touchend/click/keydown — NOT pointerdown), so this is called
+  // from a first-gesture unlock hook in main.js. Tone.start() can be a no-op once
+  // Tone thinks it's started, so we ALSO resume the raw AudioContext directly —
+  // that's what actually un-suspends an already-built (but silent) theme.
+  unlock() {
+    try {
+      Tone.start();
+      const ctx = Tone.getContext && Tone.getContext();
+      const raw = ctx && (ctx.rawContext || ctx._context);
+      if (raw && raw.state === 'suspended' && raw.resume) raw.resume();
+    } catch (e) { /* no-op */ }
+  }
 
   // Replay the current theme from bar 0 — used by the in-run RESTART so the
   // music restarts with the run. Falls back to the last theme if the theme was

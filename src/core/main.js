@@ -176,6 +176,7 @@ const _renderMute = () => {
 // (Mobile-session fix, preserved across the merge with the settings panel.)
 function _kickMusicForState() {
   try {
+    music.unlock();   // un-suspend the context first (unmuting a suspended ctx is otherwise silent)
     const s = window.__state;
     if (s === 'HANGAR' || s === 'INSPECTOR') music.playHangar();
     else if (s === 'GAME' || s === 'PAUSED') music.playCombat();
@@ -188,6 +189,23 @@ function _toggleMusicMute() {
   _renderMute();
   if (!m) _kickMusicForState();   // just unmuted → start/keep the right theme audible
 }
+
+// ── Bulletproof audio unlock (esp. iOS) ─────────────────────────────────────
+// iOS grants Web-Audio activation only on a COMPLETED gesture (pointerup /
+// touchend / click / keydown) — NEVER pointerdown, which is what the cold boot
+// powers on from. That's why audio needed a SECOND tap. Resume both contexts on
+// the first completed gesture and (re)kick the current theme. Self-removes.
+let _audioUnlocked = false;
+const _UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'];
+function _unlockAudio() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  music.unlock();
+  if (audio.unlock) audio.unlock();
+  if (window.__state && window.__state !== 'BOOT') _kickMusicForState();
+  _UNLOCK_EVENTS.forEach(ev => window.removeEventListener(ev, _unlockAudio, true));
+}
+_UNLOCK_EVENTS.forEach(ev => window.addEventListener(ev, _unlockAudio, true));
 
 // CRT/arcade filter toggle (live via window.__crt.enabled, read each frame by the post-process).
 const _crtBtn = _settingsPanel.querySelector('#set-crt');
