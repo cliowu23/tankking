@@ -45,6 +45,14 @@ export default class HangarScene {
     this._setupDriver();
     this._setupGameLoop();
     this._setupInteractables();   // clickable poster (room decor) + desk radio (music jukebox)
+
+    // Resolves once the async loads (driver GLBs + the displayed tank) settle — the
+    // entry iris holds the cover until then, so the hangar reveals fully built (no
+    // pop-in). allSettled so a single failed load can't hang the reveal.
+    this.ready = Promise.allSettled([
+      this.driver && this.driver.ready,
+      this._tankReady,
+    ].filter(Boolean)).then(() => {});
   }
 
   _buildRoom() {
@@ -322,7 +330,7 @@ export default class HangarScene {
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
     this._buildBayProps(propMats);
-    this._loadTankDisplay();
+    this._tankReady = this._loadTankDisplay();   // async GLB — tracked for the ready gate
     this._buildExitDoor();
     this._buildExitFloorMark();
   }

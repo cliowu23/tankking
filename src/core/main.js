@@ -352,7 +352,7 @@ _resizeTC();
 function _easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
 
 // Iris wipe: circle closes → swap screens while fully covered → circle opens
-function _iris(hideFn, showFn) {
+function _iris(hideFn, showFn, readyFn) {
   const HALF = 420;
   const W = _tc.width, H = _tc.height;
   const cx = W / 2, cy = H / 2;
@@ -372,10 +372,9 @@ function _iris(hideFn, showFn) {
     _tctx.fill();
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'close') {
-      // Screen fully covered — swap now so the open reveals the live scene
+      // Screen fully covered — swap now, then HOLD covered until the scene is ready
       try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
-      phase = 'open'; start = null;
-      requestAnimationFrame(tick);
+      _revealWhenReady(readyFn, () => { phase = 'open'; start = null; requestAnimationFrame(tick); });
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
@@ -387,7 +386,7 @@ function _iris(hideFn, showFn) {
 }
 
 // Checkerboard dissolve: tiles fill in randomly → swap → tiles clear randomly
-function _checker(hideFn, showFn) {
+function _checker(hideFn, showFn, readyFn) {
   const HALF = 420;
   const W = _tc.width, H = _tc.height;
   const SZ = 28;
@@ -416,11 +415,10 @@ function _checker(hideFn, showFn) {
     }
     if (p < 1) { requestAnimationFrame(tick); return; }
     if (phase === 'in') {
-      // Screen fully covered — swap now so the reveal shows the live scene
+      // Screen fully covered — swap now, then HOLD covered until the scene is ready
       try { hideFn(); showFn(); } catch (e) { console.error('[transition] swap failed:', e); }
-      phase = 'out'; start = null;
       order.sort(() => Math.random() - 0.5); // re-shuffle for reveal
-      requestAnimationFrame(tick);
+      _revealWhenReady(readyFn, () => { phase = 'out'; start = null; requestAnimationFrame(tick); });
     } else {
       _tctx.clearRect(0, 0, W, H);
       _tc.style.display = 'none';
@@ -431,14 +429,30 @@ function _checker(hideFn, showFn) {
   requestAnimationFrame(tick);
 }
 
-function transition(hideFn, showFn, type = 'checker') {
+// Hold the fully-covered screen until the incoming scene reports ready — ADAPTIVE:
+// only as long as the load actually takes (no fixed delay). Let it paint one frame,
+// then run `proceed` (the reveal). No readyFn ⇒ reveal immediately. The transition
+// watchdog is the hard ceiling if `ready` never resolves.
+function _revealWhenReady(readyFn, proceed) {
+  if (!readyFn) { proceed(); return; }
+  let fired = false;
+  const go = () => { if (fired) return; fired = true; requestAnimationFrame(() => requestAnimationFrame(proceed)); };
+  try { Promise.resolve(readyFn()).then(go, go); } catch (_) { go(); }
+}
+
+// readyFn (optional): a function returning a Promise that resolves when the scene
+// built in showFn has finished loading. When given, the wipe stays fully covered
+// until then, so we never reveal a half-loaded scene.
+function transition(hideFn, showFn, type = 'checker', readyFn = null) {
   if (_tBusy) return;
   _tBusy = true;
   clearTimeout(_tWatchdog);
-  _tWatchdog = setTimeout(_clearTransition, 2000); // never lock the UI permanently
+  // Longer ceiling while we hold for an async scene load (a slow phone can take
+  // a few seconds); the snappy wipes still get the tight 2s ceiling.
+  _tWatchdog = setTimeout(_clearTransition, readyFn ? 8000 : 2000);
   _resizeTC();
-  if (type === 'iris') _iris(hideFn, showFn);
-  else                 _checker(hideFn, showFn);
+  if (type === 'iris') _iris(hideFn, showFn, readyFn);
+  else                 _checker(hideFn, showFn, readyFn);
 }
 
 function startGame() {
@@ -492,7 +506,8 @@ function startHangar() {
       audio.startLoop('amb.hangar'); // warm hangar room tone (2D)
       music.playHangar();
     },
-    'iris'
+    'iris',
+    () => hangarScene && hangarScene.ready,   // hold the iris closed until the driver + props finish loading
   );
 }
 
