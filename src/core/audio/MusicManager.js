@@ -5,7 +5,10 @@
 // a switch for a quick crossfade.
 //
 //   menu    — "Signal Home": hummable bell hook over a warm pad bed + soft breath
-//   hangar  — cozy lo-fi groove: soft swung beat, warm sine bass, mellow keys
+//   hangar  — cozy bunker music: ONE OF FOUR grooves picked at random each entry
+//             (no immediate repeat) for variety — each sets its own tempo/swing:
+//               a  cozy lo-fi  ·  c  Tinker's shuffle  ·  f  Night Watch synthwave
+//               e3 Lounge-Lift bossa.  Auditioned via audio-gen/hangar-variants-audition.html
 //   combat  — driving darksynth, VERTICAL-LAYERED by intensity (live enemy count):
 //             base (bass+kick) always · mid (hats+snare) · high (lead arp)
 //   arena   — "Test Chamber": sparse bitcrushed lab tone — the DEV ARENA · TEST sandbox
@@ -212,8 +215,21 @@ class MusicManager {
     return { nodes };
   }
 
-  _build_hangar() { // cozy lo-fi
+  // Hangar = a random pick among four cozy bunker grooves, re-rolled each entry
+  // (no immediate repeat). Each variant sets its own tempo/swing before the
+  // transport starts (overriding CFG.hangar), so they can differ freely.
+  _build_hangar() {
+    const variants = ['a', 'c', 'f', 'e3'];
+    let pick;
+    do { pick = variants[Math.floor(Math.random() * variants.length)]; }
+    while (pick === this._lastHangarVariant);
+    this._lastHangarVariant = pick;
+    return this[`_build_hangar_${pick}`]();
+  }
+
+  _build_hangar_a() { // A — cozy lo-fi: soft swung beat, warm sine bass, mellow keys
     const m = this.master, nodes = [];
+    const T = Tone.getTransport(); T.bpm.value = 78; T.swing = 0.35; T.swingSubdivision = '8n';
     const keys = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.02, decay: 0.5, sustain: 0.4, release: 1.2 }, volume: -15 }).connect(m); nodes.push(keys);
     const bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.3 }, volume: -10 }).connect(m); nodes.push(bass);
     const kick = new Tone.MembraneSynth({ volume: -8 }).connect(m); nodes.push(kick);
@@ -224,6 +240,75 @@ class MusicManager {
     nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '2n').start(0));
     nodes.push(new Tone.Loop(t => snare.triggerAttackRelease('8n', t), '2n').start('4n'));
     nodes.push(new Tone.Loop(t => hat.triggerAttackRelease('16n', t), '8n').start('8n'));
+    return { nodes };
+  }
+
+  _build_hangar_c() { // C — Tinker's Shuffle: shuffly brushed lo-fi, plucky bass, soft bell motif
+    const m = this.master, nodes = [];
+    const T = Tone.getTransport(); T.bpm.value = 82; T.swing = 0.5; T.swingSubdivision = '8n';
+    const verb = new Tone.Freeverb(0.5, 3200).connect(m); nodes.push(verb);
+    const keys = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0.15, release: 0.5 }, volume: -17 }).connect(verb); nodes.push(keys);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.22, sustain: 0.25, release: 0.2 }, filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.2, baseFrequency: 180, octaves: 2 }, volume: -11 }).connect(m); nodes.push(bass);
+    const kick = new Tone.MembraneSynth({ volume: -8 }).connect(m); nodes.push(kick);
+    const snare = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 }, volume: -23 }).connect(m); nodes.push(snare);
+    const ride = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.12, release: 0.05 }, harmonicity: 6, resonance: 3000, volume: -40 }).connect(verb); nodes.push(ride);
+    const bell = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.4 }, volume: -18 }).connect(verb); nodes.push(bell);
+    const WALK = ['A1', 'A1', 'E2', 'A1', 'F1', 'F1', 'C2', 'F1', 'C2', 'C2', 'G2', 'C2', 'G1', 'G1', 'D2', 'G1'];
+    const MEL = ['E5', null, null, 'C5', null, 'A4', null, null, 'F4', null, 'A4', null, 'G4', null, null, null,
+                 'C5', null, 'B4', null, null, 'G4', null, null, 'D5', null, 'E5', null, null, null, null, null];
+    nodes.push(new Tone.Sequence((t, c) => keys.triggerAttackRelease(c, '4n', t), LOFI_CH, '2n').start('8n'));
+    nodes.push(new Tone.Sequence((t, n) => bass.triggerAttackRelease(n, '8n', t), WALK, '8n').start(0));
+    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '2n').start(0));
+    nodes.push(new Tone.Loop(t => snare.triggerAttackRelease('8n', t), '2n').start('4n'));
+    nodes.push(new Tone.Loop(t => ride.triggerAttackRelease('16n', t), '4n').start('8n'));
+    nodes.push(new Tone.Sequence((t, n) => { if (n) bell.triggerAttackRelease(n, '8n', t); }, MEL, '8n').start('1m'));
+    return { nodes };
+  }
+
+  _build_hangar_f() { // F — Night Watch: chill synthwave, warm saw chords, gentle arp, soft 4-on-floor
+    const m = this.master, nodes = [];
+    const T = Tone.getTransport(); T.bpm.value = 100; T.swing = 0;
+    const verb = new Tone.Freeverb(0.5, 3000).connect(m); nodes.push(verb);
+    const chord = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.06, decay: 0.4, sustain: 0.55, release: 0.6 }, volume: -23 }).connect(verb); nodes.push(chord);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.1 }, filterEnvelope: { attack: 0.01, decay: 0.12, sustain: 0.3, baseFrequency: 140, octaves: 2.2 }, volume: -14 }).connect(m); nodes.push(bass);
+    const kick = new Tone.MembraneSynth({ volume: -8 }).connect(m); nodes.push(kick);
+    const hat = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.025, sustain: 0 }, volume: -28 }).connect(m); nodes.push(hat);
+    const dly = new Tone.FeedbackDelay('8n', 0.3); dly.wet.value = 0.32; dly.connect(verb); nodes.push(dly);
+    const arp = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0.1, release: 0.3 }, volume: -17 }).connect(dly); nodes.push(arp);
+    const BASS = []; ROOTS.forEach(r => { for (let i = 0; i < 8; i++) BASS.push(r); });
+    const ARP = []; LOFI_CH.forEach(c => { ARP.push(c[0], c[2], c[3], c[2], c[1], c[2], c[3], c[2]); });
+    nodes.push(new Tone.Sequence((t, c) => chord.triggerAttackRelease(c, '2n', t), LOFI_CH, '1m').start(0));
+    nodes.push(new Tone.Sequence((t, n) => bass.triggerAttackRelease(n, '8n', t), BASS, '8n').start(0));
+    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '4n').start(0));
+    nodes.push(new Tone.Loop(t => hat.triggerAttackRelease('16n', t), '8n').start('8n'));
+    nodes.push(new Tone.Sequence((t, n) => { if (n) arp.triggerAttackRelease(Tone.Frequency(n).transpose(12), '8n', t); }, ARP, '8n').start(0));
+    return { nodes };
+  }
+
+  _build_hangar_e3() { // E3 — Lounge Lift: warm bossa, fat-triangle comp, brush+ride, vibraphone melody
+    const m = this.master, nodes = [];
+    const T = Tone.getTransport(); T.bpm.value = 98; T.swing = 0;
+    const t5 = (r) => Tone.Frequency(r).transpose(7);
+    const verb = new Tone.Freeverb(0.45, 3400).connect(m); nodes.push(verb);
+    const gLP = new Tone.Filter({ type: 'lowpass', frequency: 2800 }).connect(verb); nodes.push(gLP);
+    const gtr = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fattriangle', spread: 20, count: 3 }, envelope: { attack: 0.005, decay: 0.4, sustain: 0.05, release: 0.5 }, volume: -17 }).connect(gLP); nodes.push(gtr);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.3, sustain: 0.5, release: 0.3 }, volume: -9 }).connect(m); nodes.push(bass);
+    const kick = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 4, volume: -13 }).connect(m); nodes.push(kick);
+    const brF = new Tone.Filter({ type: 'bandpass', frequency: 3200, Q: 0.7 }).connect(m); nodes.push(brF);
+    const br = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.004, decay: 0.12, sustain: 0 }, volume: -25 }).connect(brF); nodes.push(br);
+    const ride = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.1, release: 0.04 }, harmonicity: 6, resonance: 3500, volume: -42 }).connect(verb); nodes.push(ride);
+    const vib = new Tone.Vibrato({ frequency: 5, depth: 0.12 }).connect(verb); nodes.push(vib);
+    const mallet = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.003, decay: 0.5, sustain: 0, release: 0.6 }, volume: -16 }).connect(vib); nodes.push(mallet);
+    const HITS = [1, 0, 0, 1, 0, 0, 1, 0]; const COMP = []; LOFI_CH.forEach(c => HITS.forEach(h => COMP.push(h ? c : null)));
+    const BASS = []; ROOTS.forEach(r => { const f = t5(r), sx = Tone.Frequency(r).transpose(10); for (let i = 0; i < 8; i++) BASS.push(i === 0 ? r : (i === 4 ? f : (i === 6 ? sx : null))); });
+    const MEL = ['E5', null, 'C5', null, 'A4', null, null, null, 'A4', null, 'C5', null, 'F5', null, null, null,
+                 'G5', null, 'E5', null, 'C5', null, null, null, 'B4', null, 'D5', null, 'G5', null, null, null];
+    nodes.push(new Tone.Sequence((t, c) => { if (c) gtr.triggerAttackRelease(c, '8n', t); }, COMP, '8n').start(0));
+    nodes.push(new Tone.Sequence((t, n) => { if (n) bass.triggerAttackRelease(n, '4n', t); }, BASS, '8n').start(0));
+    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '2n').start(0));
+    nodes.push(new Tone.Loop(t => br.triggerAttackRelease('8n', t), '2n').start('4n'));
+    nodes.push(new Tone.Loop(t => ride.triggerAttackRelease('16n', t), '4n').start('8n'));
+    nodes.push(new Tone.Sequence((t, n) => { if (n) mallet.triggerAttackRelease(n, '4n', t); }, MEL, '8n').start('2m'));
     return { nodes };
   }
 

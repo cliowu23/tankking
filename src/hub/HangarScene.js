@@ -292,9 +292,20 @@ export default class HangarScene {
     // HangarRadio.js. Carries the swappable north-wall poster (this._radio.setPoster).
     this._radio = buildRadio(s, propMats);
     this._stationMeshes.push({ mesh: this._radio.collider, data: this._stationDefs.radio });
-    try { const saved = localStorage.getItem('radioPoster'), savedImg = localStorage.getItem('radioPosterImg');
-      if (saved === 'photo' && savedImg) { const im = new Image(); im.onload = () => this._radio.setCustomPhoto(im); im.src = savedImg; }
-      else if (saved && POSTER_DESIGNS.includes(saved)) this._radio.setPoster(saved); } catch (e) { /* ignore */ }
+    // Poster: if the player deliberately pinned one via the 5-click chooser, honor
+    // it; otherwise show a fresh random design each hangar visit.
+    try {
+      const pinned   = localStorage.getItem('radioPosterPinned') === '1';
+      const saved    = localStorage.getItem('radioPoster');
+      const savedImg = localStorage.getItem('radioPosterImg');
+      if (pinned && saved === 'photo' && savedImg) {
+        const im = new Image(); im.onload = () => this._radio.setCustomPhoto(im); im.src = savedImg;
+      } else if (pinned && saved && POSTER_DESIGNS.includes(saved)) {
+        this._radio.setPoster(saved);
+      } else {
+        this._applyRandomPoster();
+      }
+    } catch (e) { /* ignore */ }
 
     // SW-corner lounge — furniture is fixed/hand-tuned (baked into
     // HangarLounge.js, no longer customizable). Pressing E opens the character
@@ -917,6 +928,20 @@ export default class HangarScene {
     this._mountTimer = setTimeout(() => this.onDeploy(), 500);
   }
 
+  // Pick a random poster design for this visit (NOT persisted — re-rolls on each
+  // hangar entry). 'photo' only joins the pool if the player uploaded a custom image.
+  _applyRandomPoster() {
+    let savedImg = null;
+    try { savedImg = localStorage.getItem('radioPosterImg'); } catch (e) { /* ignore */ }
+    const pool = POSTER_DESIGNS.filter(d => d !== 'photo' || savedImg);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick === 'photo' && savedImg) {
+      const im = new Image(); im.onload = () => this._radio.setCustomPhoto(im); im.src = savedImg;
+    } else {
+      this._radio.setPoster(pick);
+    }
+  }
+
   // ── Poster easter-egg: hover swaps the reticle to a "click" indicator; 5 clicks
   //    open a small chooser menu (4 painted designs + upload-your-own). ──────────
   _setupPosterEgg() {
@@ -936,7 +961,8 @@ export default class HangarScene {
 
     let hovering = false, clicks = 0, menuOpen = false;
     const setHover = (on) => { if (on === hovering) return; hovering = on; if (reticle) reticle.innerHTML = on ? CLICK_RETICLE : ORIG_RETICLE; };
-    const persist  = (design, img) => { try { localStorage.setItem('radioPoster', design); if (img !== null) localStorage.setItem('radioPosterImg', img); } catch (e) { /* quota */ } };
+    // Picking a design pins it (overrides the per-visit random until RANDOM is chosen).
+    const persist  = (design, img) => { try { localStorage.setItem('radioPoster', design); localStorage.setItem('radioPosterPinned', '1'); if (img !== null) localStorage.setItem('radioPosterImg', img); } catch (e) { /* quota */ } };
 
     // chooser menu (self-contained DOM, Tron-styled — no main.js/index.html changes)
     const menu = document.createElement('div'); menu.id = 'poster-menu';
@@ -947,6 +973,7 @@ export default class HangarScene {
         '<div style="color:#00e5ff;font-size:10px;letter-spacing:2px;">POSTER</div>'
       + '<div style="color:#2f6470;font-size:7px;letter-spacing:1px;margin-bottom:6px;">PICK A DESIGN · OR UPLOAD YOUR OWN</div>'
       + '<div id="pm-row" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+      + '<button id="pm-random">RANDOM EACH VISIT</button>'
       + '<button id="pm-upload">UPLOAD YOUR OWN</button>'
       + '<button id="pm-close">CLOSE</button>'
       + '<input id="pm-file" type="file" accept="image/*" style="display:none">';
@@ -961,8 +988,14 @@ export default class HangarScene {
       b.onclick = () => { this._radio.setPoster(d); persist(d, null); closeMenu(); }; row.appendChild(b);
     });
     const fileIn = menu.querySelector('#pm-file');
+    menu.querySelector('#pm-random').style.cssText = btnCss;
     menu.querySelector('#pm-upload').style.cssText = btnCss;
     menu.querySelector('#pm-close').style.cssText  = btnCss;
+    // RANDOM clears the pin so the poster re-rolls each hangar visit; show one now.
+    menu.querySelector('#pm-random').onclick = () => {
+      try { localStorage.removeItem('radioPosterPinned'); } catch (e) { /* ignore */ }
+      this._applyRandomPoster(); closeMenu();
+    };
     menu.querySelector('#pm-upload').onclick = () => fileIn.click();
     menu.querySelector('#pm-close').onclick  = () => closeMenu();
     fileIn.onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return;
