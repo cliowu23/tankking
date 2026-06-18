@@ -67,19 +67,25 @@ let _booted = false;
 function powerOn() {
   if (_booted) return;
   _booted = true;
-  const boot = document.getElementById('cold-boot');
-  if (boot) {
-    boot.classList.add('powering');
-    setTimeout(() => {
-      boot.style.display = 'none';
-      window.__state = 'MENU';
-      const sb = document.getElementById('settings-btn');
-      if (sb) sb.style.display = 'flex';   // reveal the cog now the rig is on
-      music.playMenu();   // audio starts once the boot has cleared (the gesture already resumed the context)
-    }, 520);
-  } else {
+  const boot  = document.getElementById('cold-boot');
+  const flash = document.getElementById('boot-flash');
+  const reveal = () => {
+    if (boot) boot.style.display = 'none';   // cut the boot screen out under the white flash
     window.__state = 'MENU';
-    music.playMenu();
+    const sb = document.getElementById('settings-btn');
+    if (sb) sb.style.display = 'flex';        // reveal the cog now the rig is on
+    music.playMenu();                          // audio starts once the boot has cleared
+  };
+  if (flash) {
+    flash.classList.add('flash-in');           // screen flashes white (~80ms)
+    setTimeout(() => {
+      reveal();                                 // at the peak: hard cut to the menu underneath
+      flash.classList.remove('flash-in');
+      flash.classList.add('flash-out');         // white fades out → menu revealed (~280ms)
+      setTimeout(() => flash.classList.remove('flash-out'), 300);
+    }, 100);
+  } else {
+    reveal();
   }
 }
 window.addEventListener('pointerdown', () => { if (window.__state === 'BOOT') powerOn(); });
