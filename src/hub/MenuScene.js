@@ -54,7 +54,7 @@ export default class MenuScene {
     // WITH the hull and periodically swings to a new heading, as if acquiring a target.
     this._turretLocal = -0.45;   // turret angle relative to the hull
     this._turretAim   = -0.45;
-    this._dwell       = 5 + Math.random() * 3;   // long FIRST pause — the move should surprise, not look eager
+    this._dwell       = 4.5;   // FIXED first pause → guaranteed first sweep ~6s after the menu appears (armed ~1.5s in)
     this.turretActive = true;    // frozen during the cold-boot power-on; released once lit
 
     this._spin = () => {
@@ -73,7 +73,7 @@ export default class MenuScene {
               let a;
               do { a = (Math.random() * 2 - 1) * Math.PI; } while (Math.abs(shortAngle(this._turretLocal, a)) < 0.6);
               this._turretAim = a;
-              this._dwell = 4 + Math.random() * 4;   // relaxed: 4–8s between sweeps (occasional, not eager)
+              this._dwell = 3 + Math.random() * 3;   // 3–6s between sweeps (a touch more frequent — more movement)
             }
           }
         }
