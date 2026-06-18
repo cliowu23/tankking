@@ -124,9 +124,9 @@ function injectStyles() {
   body.mc-touch #menu-ver{ left:24px; bottom:36px; font-size:8px; }
   body.mc-touch #menu-scrim{ background:linear-gradient(90deg, rgba(5,13,26,0.94) 0%, rgba(5,13,26,0.8) 34%, rgba(5,13,26,0) 66%); }
 
-  /* BANKED SALVAGE (hangar) sits too high on a phone (under the notch / top edge);
-     drop it down and shrink the text a touch. */
-  body.mc-touch #hangar-salvage{ top:60px !important; left:16px !important; font-size:12px !important; letter-spacing:1px !important; }
+  /* BANKED SALVAGE (hangar) — hidden on phones; too cluttery on a small screen.
+     (Loot total will be surfaced elsewhere in the mobile UI later.) */
+  body.mc-touch #hangar-salvage{ display:none !important; }
   `;
   const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
 }
