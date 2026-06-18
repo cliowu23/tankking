@@ -162,6 +162,9 @@ export function buildMapTable(s, M) {
   cyl(radio, 'radio-dial2', 0.05, 0.03, -2.49, 1.16, -0.61, M.metal, 10).rotation.z = Math.PI / 2;
   cyl(radio, 'radio-ind', 0.035, 0.03, -2.49, 0.97, -0.79, M.redInd, 8).rotation.z = Math.PI / 2;
   cyl(radio, 'radio-ant', 0.02, 0.5, -2.55, 1.35, -0.85, M.metal, 6).rotation.z = -0.3;
+  // The radio is a clickable interactable (room-music jukebox) — make its parts
+  // pickable so HangarScene can hook clicks (the rest of the desk stays un-pickable).
+  radio.getChildMeshes().forEach(m => { m.isPickable = true; });
 
   // ── desk clutter (papers, clipboard, books, mug, pencils, notebook) ─────────
   const clutter = grp('clutter');
@@ -186,5 +189,5 @@ export function buildMapTable(s, M) {
   const collider = makeCollider('station-map',
     { width: 3.6, height: 1.6, depth: 3.6 }, new Vector3(cx, 0.8, cz), s);
 
-  return { collider, root, center: new Vector3(cx, 0.5, cz) };
+  return { collider, root, center: new Vector3(cx, 0.5, cz), radio };
 }

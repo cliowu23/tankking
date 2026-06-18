@@ -5,10 +5,11 @@
 // a switch for a quick crossfade.
 //
 //   menu    — "Signal Home": hummable bell hook over a warm pad bed + soft breath
-//   hangar  — cozy bunker music: ONE OF FOUR grooves picked at random each entry
+//   hangar  — cozy bunker music: ONE OF FIVE grooves picked at random each entry
 //             (no immediate repeat) for variety — each sets its own tempo/swing:
-//               a  cozy lo-fi  ·  c  Tinker's shuffle  ·  f  Night Watch synthwave
-//               e3 Lounge-Lift bossa.  Auditioned via audio-gen/hangar-variants-audition.html
+//               a  cozy lo-fi  ·  c  Tinker's shuffle  ·  e3 Lounge-Lift bossa
+//               g  Dust Motes (chillhop)  ·  h  Low Power (calmest, near-ambient)
+//             Auditioned via audio-gen/hangar-variants-audition.html
 //   combat  — driving darksynth, VERTICAL-LAYERED by intensity (live enemy count):
 //             base (bass+kick) always · mid (hats+snare) · high (lead arp)
 //   arena   — "Test Chamber": sparse bitcrushed lab tone — the DEV ARENA · TEST sandbox
@@ -31,6 +32,10 @@ const CBASS = [];
 ROOTS.forEach(r => { for (let i = 0; i < 8; i++) CBASS.push(r); });
 const CLEAD = [];
 [['A5','C6'], ['F5','A5'], ['E5','G5'], ['D5','G5']].forEach(([a, b]) => CLEAD.push(a, null, b, null, a, b, null, null));
+
+// Hangar groove ids, in chooser order — the desk-radio jukebox picks among these
+// (random per visit unless one is pinned).
+const HANGAR_TRACKS = ['a', 'c', 'e3', 'g', 'h'];
 
 const CFG = {
   menu:   { bpm: 84,  swing: 0 },
@@ -62,9 +67,25 @@ class MusicManager {
 
   // ---- public ----
   playMenu()   { this._setMode('menu'); }
-  playHangar() { this._setMode('hangar'); }
+  playHangar() {
+    // Honor a jukebox pick saved by the desk radio; else random per entry.
+    try { const t = localStorage.getItem('hangarTrack'); this._forcedHangar = HANGAR_TRACKS.includes(t) ? t : null; }
+    catch (e) { this._forcedHangar = null; }
+    this._setMode('hangar');
+  }
   playCombat() { this._setMode('combat'); }
   playArena()  { this._setMode('arena'); }   // dev test arena soundtrack
+
+  // Jukebox (desk radio): pin a specific hangar groove (a/c/e3/g/h), or null/
+  // 'shuffle' to randomize each entry. Persists, and re-picks immediately if the
+  // hangar theme is already playing.
+  setHangarTrack(id) {
+    this._forcedHangar = HANGAR_TRACKS.includes(id) ? id : null;
+    try { if (this._forcedHangar) localStorage.setItem('hangarTrack', this._forcedHangar); else localStorage.removeItem('hangarTrack'); }
+    catch (e) { /* quota */ }
+    if (this._started && this._mode === 'hangar') { this._mode = null; this._switch('hangar', true); }
+  }
+  get hangarTrack() { return this._forcedHangar || null; }
 
   // Replay the current theme from bar 0 — used by the in-run RESTART so the
   // music restarts with the run. Falls back to the last theme if the theme was
@@ -215,14 +236,17 @@ class MusicManager {
     return { nodes };
   }
 
-  // Hangar = a random pick among four cozy bunker grooves, re-rolled each entry
-  // (no immediate repeat). Each variant sets its own tempo/swing before the
-  // transport starts (overriding CFG.hangar), so they can differ freely.
+  // Hangar = one of five cozy grooves. Random per entry (no immediate repeat)
+  // unless the desk-radio jukebox has pinned one (_forcedHangar). Each variant
+  // sets its own tempo/swing before the transport starts (overriding CFG.hangar).
   _build_hangar() {
-    const variants = ['a', 'c', 'f', 'e3'];
     let pick;
-    do { pick = variants[Math.floor(Math.random() * variants.length)]; }
-    while (pick === this._lastHangarVariant);
+    if (HANGAR_TRACKS.includes(this._forcedHangar)) {
+      pick = this._forcedHangar;                       // jukebox pin
+    } else {
+      do { pick = HANGAR_TRACKS[Math.floor(Math.random() * HANGAR_TRACKS.length)]; }
+      while (pick === this._lastHangarVariant);
+    }
     this._lastHangarVariant = pick;
     return this[`_build_hangar_${pick}`]();
   }
@@ -265,23 +289,55 @@ class MusicManager {
     return { nodes };
   }
 
-  _build_hangar_f() { // F — Night Watch: chill synthwave, warm saw chords, gentle arp, soft 4-on-floor
+  _build_hangar_g() { // G — Dust Motes: chillhop, warm Rhodes 7ths, laid-back swung beat, soft hat, vinyl crackle
     const m = this.master, nodes = [];
-    const T = Tone.getTransport(); T.bpm.value = 100; T.swing = 0;
-    const verb = new Tone.Freeverb(0.5, 3000).connect(m); nodes.push(verb);
-    const chord = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.06, decay: 0.4, sustain: 0.55, release: 0.6 }, volume: -23 }).connect(verb); nodes.push(chord);
-    const bass = new Tone.MonoSynth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.1 }, filterEnvelope: { attack: 0.01, decay: 0.12, sustain: 0.3, baseFrequency: 140, octaves: 2.2 }, volume: -14 }).connect(m); nodes.push(bass);
-    const kick = new Tone.MembraneSynth({ volume: -8 }).connect(m); nodes.push(kick);
-    const hat = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.025, sustain: 0 }, volume: -28 }).connect(m); nodes.push(hat);
-    const dly = new Tone.FeedbackDelay('8n', 0.3); dly.wet.value = 0.32; dly.connect(verb); nodes.push(dly);
-    const arp = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0.1, release: 0.3 }, volume: -17 }).connect(dly); nodes.push(arp);
-    const BASS = []; ROOTS.forEach(r => { for (let i = 0; i < 8; i++) BASS.push(r); });
-    const ARP = []; LOFI_CH.forEach(c => { ARP.push(c[0], c[2], c[3], c[2], c[1], c[2], c[3], c[2]); });
-    nodes.push(new Tone.Sequence((t, c) => chord.triggerAttackRelease(c, '2n', t), LOFI_CH, '1m').start(0));
-    nodes.push(new Tone.Sequence((t, n) => bass.triggerAttackRelease(n, '8n', t), BASS, '8n').start(0));
-    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '4n').start(0));
+    const T = Tone.getTransport(); T.bpm.value = 72; T.swing = 0.3; T.swingSubdivision = '8n';
+    const verbG = new Tone.Gain(0.9).connect(m); nodes.push(verbG);
+    const verb = new Tone.Freeverb(0.6, 3000).connect(verbG); nodes.push(verb);
+    const lp = new Tone.Filter({ type: 'lowpass', frequency: 3200, Q: 0.3 }).connect(verb); nodes.push(lp);   // lo-fi roll-off
+    const ep = new Tone.PolySynth(Tone.FMSynth, { harmonicity: 3, modulationIndex: 6, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.8, sustain: 0.25, release: 1.0 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.4, sustain: 0, release: 0.3 }, volume: -18 }).connect(lp); nodes.push(ep);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.03, decay: 0.4, sustain: 0.6, release: 0.4 }, volume: -10 }).connect(m); nodes.push(bass);
+    const kick = new Tone.MembraneSynth({ pitchDecay: 0.04, octaves: 4, volume: -9 }).connect(m); nodes.push(kick);
+    const snare = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.13, sustain: 0 }, volume: -22 }).connect(lp); nodes.push(snare);
+    const hatG = new Tone.Gain(0.7).connect(m); nodes.push(hatG);
+    const hatF = new Tone.Filter({ type: 'highpass', frequency: 8000 }).connect(hatG); nodes.push(hatF);
+    const hat = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.02, sustain: 0 }, volume: -32 }).connect(hatF); nodes.push(hat);
+    const crkOut = new Tone.Gain(0.5).connect(m); nodes.push(crkOut);
+    const crkF = new Tone.Filter({ type: 'highpass', frequency: 1200 }).connect(crkOut); nodes.push(crkF);
+    const crkG = new Tone.Gain(0.05).connect(crkF); nodes.push(crkG);
+    const crk = new Tone.Noise('pink').connect(crkG); crk.start(); nodes.push(crk);   // vinyl crackle bed
+    nodes.push(new Tone.Sequence((t, c) => ep.triggerAttackRelease(c, '2n.', t), LOFI_CH, '1m').start(0));
+    nodes.push(new Tone.Sequence((t, r) => bass.triggerAttackRelease(r, '2n', t), ROOTS, '1m').start(0));
+    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '2n').start(0));
+    nodes.push(new Tone.Loop(t => snare.triggerAttackRelease('8n', t), '2n').start('4n'));
     nodes.push(new Tone.Loop(t => hat.triggerAttackRelease('16n', t), '8n').start('8n'));
-    nodes.push(new Tone.Sequence((t, n) => { if (n) arp.triggerAttackRelease(Tone.Frequency(n).transpose(12), '8n', t); }, ARP, '8n').start(0));
+    return { nodes };
+  }
+
+  _build_hangar_h() { // H — Low Power: calmest, near-ambient — soft pad bed + light beat, tape-wobble keys, lots of space
+    const m = this.master, nodes = [];
+    const T = Tone.getTransport(); T.bpm.value = 64; T.swing = 0.2; T.swingSubdivision = '8n';
+    const verbG = new Tone.Gain(0.9).connect(m); nodes.push(verbG);
+    const verb = new Tone.Freeverb(0.8, 2600).connect(verbG); nodes.push(verb);
+    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fattriangle', spread: 18, count: 2 }, envelope: { attack: 1.2, decay: 0.6, sustain: 0.7, release: 2.4 }, volume: -25 }).connect(verb); nodes.push(pad);
+    const wob = new Tone.Vibrato({ frequency: 3.2, depth: 0.06 }).connect(verb); nodes.push(wob);
+    const lp = new Tone.Filter({ type: 'lowpass', frequency: 2800 }).connect(wob); nodes.push(lp);
+    const keys = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.02, decay: 0.6, sustain: 0.2, release: 1.2 }, volume: -19 }).connect(lp); nodes.push(keys);
+    const bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.7, release: 0.5 }, volume: -11 }).connect(m); nodes.push(bass);
+    const kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4, volume: -11 }).connect(m); nodes.push(kick);
+    const rimG = new Tone.Gain(0.6).connect(m); nodes.push(rimG);
+    const rimF = new Tone.Filter({ type: 'highpass', frequency: 3000 }).connect(rimG); nodes.push(rimF);
+    const rim = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }, volume: -28 }).connect(rimF); nodes.push(rim);
+    const crkOut = new Tone.Gain(0.4).connect(m); nodes.push(crkOut);
+    const crkF = new Tone.Filter({ type: 'highpass', frequency: 1000 }).connect(crkOut); nodes.push(crkF);
+    const crkG = new Tone.Gain(0.04).connect(crkF); nodes.push(crkG);
+    const crk = new Tone.Noise('brown').connect(crkG); crk.start(); nodes.push(crk);
+    const HITS = [1, 0, 0, 0, 0, 1, 0, 0]; const COMP = []; LOFI_CH.forEach(c => HITS.forEach(h => COMP.push(h ? c : null)));   // sparse stabs, lots of space
+    nodes.push(new Tone.Sequence((t, c) => pad.triggerAttackRelease(c, '1m', t), LOFI_CH, '1m').start(0));
+    nodes.push(new Tone.Sequence((t, c) => { if (c) keys.triggerAttackRelease(c, '4n', t); }, COMP, '8n').start(0));
+    nodes.push(new Tone.Sequence((t, r) => bass.triggerAttackRelease(r, '1m', t), ROOTS, '1m').start(0));
+    nodes.push(new Tone.Loop(t => kick.triggerAttackRelease('C1', '8n', t), '2n').start(0));
+    nodes.push(new Tone.Loop(t => rim.triggerAttackRelease('16n', t), '2n').start('4n'));
     return { nodes };
   }
 

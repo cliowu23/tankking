@@ -379,7 +379,11 @@ export default class TankDesignerScene {
             hb.classList.add('active');
             this._activeHullBtn = hb;
             this._equippedHull  = hull.id;
-            // Adopt the equipped turret's natural gun so the cannon matches the turret.
+            // Show this hull's full DEFAULT tank — its native turret + that turret's
+            // gun — rather than transplanting the previously-equipped turret. The
+            // player can then swap the turret out from the default (turret dropdown,
+            // which re-syncs its highlight to _equippedTurret on open).
+            this._equippedTurret = hull.nativeTurret || this._equippedTurret;
             const turret = PARTS_BY_ID[this._equippedTurret];
             if (turret?.defaultCannon) this._equippedCannon = turret.defaultCannon;
             this._rebuildComposed();
