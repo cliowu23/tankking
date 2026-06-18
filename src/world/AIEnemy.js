@@ -3,6 +3,10 @@ import Shell from '../combat/Shell.js';
 import { shortAngle, hpColor } from '../utils/mathUtils.js';
 
 const HSPEED = 35;
+// Per-instance tint multiplier used for the stun blink. Instanced meshes can't take
+// a per-instance material/emissive, but their tint channel (a MULTIPLY) can be driven
+// above 1 to push diffuse colors up toward white. ~7× whites out gunmetal/dark parts.
+const STUN_FLASH_GAIN = 7;
 
 export default class AIEnemy {
   // opts tune the unit (zone band tuning) and select behavior:
@@ -83,9 +87,9 @@ export default class AIEnemy {
     this.hpBarFill.material = this.hpFillMat;
     this.hpBarFill.parent = this.root;
 
-    // Stun tell = a fast white blink over the whole unit (built lazily on first
-    // stun via renderOverlay, which is per-mesh so it is safe even when units
-    // share painted materials, and works for primitive + composed GLB alike).
+    // Stun tell = a fast bright blink over the whole unit. Instanced enemies drive
+    // their per-instance tint above 1 (whites out diffuse); primitives fall back to
+    // a white emissive flash. See _setStunFlash.
     this._blinkMeshes = null;
     this._blinkT      = 0;
     this._blinkOn     = false;
@@ -170,11 +174,11 @@ export default class AIEnemy {
     if (!this.alive) return;
     this._stunTimer = Math.max(this._stunTimer, seconds);
     this.speed = 0;
-    // Gather the unit's visible meshes (skip the HP bar) for the white blink.
+    // Gather the unit's visible meshes (skip the HP bar) for the primitive fallback.
     this._blinkMeshes = this.root.getChildMeshes().filter(m => !/HpBar/i.test(m.name));
     this._blinkT  = 0;
     this._blinkOn = false;
-    this._setStunOverlay(true);
+    this._setStunFlash(true);
   }
 
   // Advance the white-blink flicker while stunned (fast on/off cadence).
@@ -183,20 +187,39 @@ export default class AIEnemy {
     if (this._blinkT <= 0) {
       this._blinkOn = !this._blinkOn;
       this._blinkT  = 0.08;
-      this._setStunOverlay(this._blinkOn);
+      this._setStunFlash(this._blinkOn);
     }
   }
 
-  _setStunOverlay(on) {
+  // Blink the model bright toward white. Enemies are GPU-instanced, so we can't
+  // swap a material/emissive per-instance — but the per-instance tint channel
+  // (instancedBuffers.color, a MULTIPLY, also used for death-darkening) can be
+  // driven ABOVE 1 to push diffuse colors up to white. Primitive (non-instanced)
+  // enemies fall back to a white emissive flash on their own materials.
+  _setStunFlash(on) {
+    if (this._tint && this._tint.length) {
+      const v = on ? STUN_FLASH_GAIN : 1;
+      for (const n of this._tint) {
+        if (n.instancedBuffers && n.instancedBuffers.color) n.instancedBuffers.color.set(v, v, v, 1);
+      }
+      return;
+    }
     if (!this._blinkMeshes) return;
     for (const m of this._blinkMeshes) {
-      m.renderOverlay = on;
-      if (on) { m.overlayColor = new Color3(1, 1, 1); m.overlayAlpha = 0.85; }
+      const mat = m.material;
+      if (!mat || !mat.emissiveColor) continue;
+      if (on) {
+        if (mat._stunEmissive === undefined) mat._stunEmissive = mat.emissiveColor.clone();
+        mat.emissiveColor.set(1, 1, 1);
+      } else if (mat._stunEmissive !== undefined) {
+        mat.emissiveColor.copyFrom(mat._stunEmissive);
+        mat._stunEmissive = undefined;
+      }
     }
   }
 
   _hideStunTell() {
-    this._setStunOverlay(false);
+    this._setStunFlash(false);
   }
 
   addShadows(shadowGen) {
