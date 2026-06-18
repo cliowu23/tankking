@@ -670,12 +670,11 @@
     }
     @keyframes cbBlink   { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0.12; } }
     @keyframes cbFlicker { 0%,96%,100% { opacity: 1; } 97% { opacity: 0.85; } 98.5% { opacity: 0.97; } }
-    #cold-boot.powering { animation: crtOn 0.6s ease-out forwards; pointer-events: none; }
-    @keyframes crtOn {
-      0%   { opacity: 1;   filter: brightness(1);   transform: scaleY(1);    }
-      12%  { opacity: 1;   filter: brightness(2.8); transform: scaleY(1);    }
-      55%  { opacity: 0.6; filter: brightness(1);   transform: scaleY(0.04); }
-      100% { opacity: 0;   filter: brightness(1);   transform: scaleY(0.04); }
+    #cold-boot.powering { animation: crtOn 0.45s ease-out forwards; pointer-events: none; }
+    @keyframes crtOn {   /* brief power-surge flash, then clean fade out (no fold) */
+      0%   { opacity: 1; filter: brightness(1);   }
+      20%  { opacity: 1; filter: brightness(1.9); }
+      100% { opacity: 0; filter: brightness(1);   }
     }
     #hangar-prompt {
       position: fixed;

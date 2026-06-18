@@ -67,7 +67,6 @@ let _booted = false;
 function powerOn() {
   if (_booted) return;
   _booted = true;
-  music.playMenu();   // gesture has resumed the audio context; start the menu theme
   const boot = document.getElementById('cold-boot');
   if (boot) {
     boot.classList.add('powering');
@@ -76,9 +75,11 @@ function powerOn() {
       window.__state = 'MENU';
       const sb = document.getElementById('settings-btn');
       if (sb) sb.style.display = 'flex';   // reveal the cog now the rig is on
-    }, 620);
+      music.playMenu();   // audio starts once the boot has cleared (the gesture already resumed the context)
+    }, 450);
   } else {
     window.__state = 'MENU';
+    music.playMenu();
   }
 }
 window.addEventListener('pointerdown', () => { if (window.__state === 'BOOT') powerOn(); });
