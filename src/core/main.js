@@ -58,16 +58,30 @@ if (maxVertexUniformBlocks && maxVertexUniformBlocks < WORST_CASE_UNIFORM_BLOCKS
 // grants playback on the first user gesture (the START / deploy click).
 audio.init();
 window.__audio = audio; window.__music = music; // debug hooks (mirror __arena/__hangar)
-// music: Tone graph is built lazily (music.start) after the audio context is
-// running — no autoplay-warning spam. Kick off the MENU theme on the very first
-// user gesture (so the title screen has music before the player presses start).
-function _menuMusicOnGesture() {
-  if (window.__state === 'MENU') music.playMenu();
-  window.removeEventListener('pointerdown', _menuMusicOnGesture);
-  window.removeEventListener('keydown', _menuMusicOnGesture);
+// COLD BOOT: the title opens on a retro CRT boot screen. The first gesture
+// (ENTER / click) "powers on" the rig — this is also the user gesture the browser
+// requires to unlock audio (autoplay policy: a fresh load can never auto-play).
+// Power-on resumes the context, swells the menu theme, runs the CRT flourish,
+// then reveals the menu. A second ENTER on the menu deploys (see keydown handler).
+let _booted = false;
+function powerOn() {
+  if (_booted) return;
+  _booted = true;
+  music.playMenu();   // gesture has resumed the audio context; start the menu theme
+  const boot = document.getElementById('cold-boot');
+  if (boot) {
+    boot.classList.add('powering');
+    setTimeout(() => {
+      boot.style.display = 'none';
+      window.__state = 'MENU';
+      const sb = document.getElementById('settings-btn');
+      if (sb) sb.style.display = 'flex';   // reveal the cog now the rig is on
+    }, 620);
+  } else {
+    window.__state = 'MENU';
+  }
 }
-window.addEventListener('pointerdown', _menuMusicOnGesture);
-window.addEventListener('keydown', _menuMusicOnGesture);
+window.addEventListener('pointerdown', () => { if (window.__state === 'BOOT') powerOn(); });
 
 // Persistent AUDIO SETTINGS (top-right corner, all screens). A gear opens a small
 // panel with Music + SFX volume sliders and a music-mute toggle; everything saves
@@ -131,6 +145,7 @@ _settingsPanel.innerHTML =
 
 document.body.appendChild(_settingsBtn);
 document.body.appendChild(_settingsPanel);
+_settingsBtn.style.display = 'none';   // hidden during cold boot; revealed on power-on
 
 const _musicSlider = _settingsPanel.querySelector('#set-music-vol');
 const _sfxSlider   = _settingsPanel.querySelector('#set-sfx-vol');
@@ -215,7 +230,7 @@ let designerScene = null;
 let hangarScene   = null;
 let controlsSeen  = false;   // HOW-TO-PLAY shows on the first arena entry per session only
 
-window.__state = 'MENU'; // 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
+window.__state = 'BOOT'; // 'BOOT' | 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
 
 // Additive touch layer for phone playtesting. No-op on non-touch devices; never
 // modifies a keyboard handler (it dispatches the game's own key events). See
@@ -559,6 +574,11 @@ function exitDesigner() {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // Cold boot: ENTER / SPACE powers on the rig (and unlocks audio) → menu.
+  if (window.__state === 'BOOT') {
+    if (e.code === 'Enter' || e.code === 'Space') powerOn();
+    return;
+  }
   // Long Road: E-loot a POI container (chest) when in range.
   if (window.__state === 'GAME' && e.code === 'KeyE' && arenaScene && arenaScene._nearContainer) {
     arenaScene.lootNearbyContainer();
