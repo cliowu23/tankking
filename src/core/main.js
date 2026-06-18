@@ -76,7 +76,7 @@ function powerOn() {
       const sb = document.getElementById('settings-btn');
       if (sb) sb.style.display = 'flex';   // reveal the cog now the rig is on
       music.playMenu();   // audio starts once the boot has cleared (the gesture already resumed the context)
-    }, 450);
+    }, 520);
   } else {
     window.__state = 'MENU';
     music.playMenu();
