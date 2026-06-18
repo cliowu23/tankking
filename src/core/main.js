@@ -709,7 +709,11 @@ function resumeGame() {
 }
 
 document.getElementById('controls-start').addEventListener('click', dismissControls);
+const MOBILE_MENU_LABELS = { play: 'PRESS TO PLAY', tank: 'TANK SELECTOR' };
+const onMobileMenu = !!(window.__mobile && window.__mobile.active);
 document.querySelectorAll('#menu-nav .menu-item').forEach((el, n) => {
+  // On a phone there's no keyboard/hover, so relabel to tap-friendly prompts.
+  if (onMobileMenu && MOBILE_MENU_LABELS[el.dataset.action]) el.textContent = MOBILE_MENU_LABELS[el.dataset.action];
   // wrap each character in a .ch span (with its index) for the staggered light-up
   const label = el.textContent;
   el.textContent = '';
