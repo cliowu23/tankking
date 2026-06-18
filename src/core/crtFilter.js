@@ -17,7 +17,8 @@ export const CRT_PARAMS = {
 // `enabled` persists across reloads; `params` always re-syncs from source so edits
 // here take effect on reload/HMR.
 if (typeof window !== 'undefined') {
-  window.__crt = window.__crt || { enabled: localStorage.getItem('tk_crt') !== '0' };
+  // Default OFF — opt-in via Settings (persisted as 'tk_crt'='1'). Evaluating during dev.
+  window.__crt = window.__crt || { enabled: localStorage.getItem('tk_crt') === '1' };
   window.__crt.params = CRT_PARAMS;
 }
 
@@ -61,6 +62,9 @@ void main(){
 // Attach a CRT pass to a camera. Always created; the shader passes through raw when
 // window.__crt.enabled is false, so the Settings toggle is instant + camera-agnostic.
 export function attachCrt(camera) {
+  // Skip on mobile entirely — full-screen pass is too costly for the mobile-heavy
+  // portals, and it's off by default anyway. Desktop keeps the live Settings toggle.
+  if (typeof window !== 'undefined' && window.__mobile && window.__mobile.active) return null;
   const pp = new PostProcess('crt', 'crt',
     ['enabled', 'time', 'resolution', 'scanline', 'density', 'curvature', 'vignette',
      'aberration', 'glow', 'grain', 'brightness', 'contrast', 'saturation'],
