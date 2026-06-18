@@ -10,6 +10,7 @@ import { buildPrimitiveTank } from '../tank/primitiveTank.js';
 import { worldBounds } from '../utils/meshBounds.js';
 import { PARTS, PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.js';
 import { assembleTank } from '../tank/parts/assembleTank.js';
+import { audio } from '../core/audio/AudioManager.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import SentinelEnemy from '../world/SentinelEnemy.js';
 import ChaffEnemy from '../world/ChaffEnemy.js';
@@ -84,6 +85,10 @@ export default class TankDesignerScene {
     this.camera.upperBetaLimit        = Math.PI / 2.05;
     this.camera.wheelDeltaPercentage  = 0.01; // smooth scroll zoom
     this.camera.attachControl(canvas, true);
+    // Arrow keys are reserved for tank-list navigation — unbind them from the camera
+    // (otherwise navigating also pans/tilts the view). Mouse drag + wheel still work.
+    this.camera.keysUp = []; this.camera.keysDown = [];
+    this.camera.keysLeft = []; this.camera.keysRight = [];
   }
 
   _setupLighting() {
@@ -280,8 +285,31 @@ export default class TankDesignerScene {
     if (hint) hint.textContent = '[ E ] CONFIRM SELECTION   |   [ ESC ] BACK';
   }
 
+  // Arrow-key navigation: step to the previous/next sidebar entry and load it
+  // (reuses each button's own click handler). dir = +1 (down) / -1 (up).
+  cycleSelection(dir) {
+    const sidebar = document.getElementById('designer-sidebar');
+    if (!sidebar) return;
+    const btns = [...sidebar.querySelectorAll('.shape-btn')];
+    if (!btns.length) return;
+    // Drive purely off a tracked index — button types set different "active" vars
+    // (_activeBtn vs _activeHullBtn), so reading _activeBtn would stick/skip. Seed
+    // from whatever's currently highlighted on the first press.
+    if (this._navIndex == null) {
+      const cur = sidebar.querySelector('.shape-btn.active, .shape-btn.selected');
+      this._navIndex = Math.max(0, btns.indexOf(cur));
+    }
+    const idx = (this._navIndex + dir + btns.length) % btns.length;
+    this._navIndex = idx;
+    const next = btns[idx];
+    next.click();
+    next.scrollIntoView({ block: 'nearest' });
+    audio.play('ui.hover');   // soft tick as you move through the list
+  }
+
   confirmSelection() {
     if (!this._previewFilename) return;
+    audio.play('ui.select');   // confirm blip on E-select
     localStorage.setItem('selectedTank', this._previewFilename);
     this._selectedFilename = this._previewFilename;
     // Composed mode ('composed') needs the actual parts saved so the arena/hangar can rebuild it.
@@ -602,7 +630,7 @@ export default class TankDesignerScene {
     // Not a selectable player tank.
     this._previewFilename = null;
     const hint = document.getElementById('designer-bottom-hint');
-    if (hint) hint.textContent = '👁 VIEW ONLY — enemy model  ·  [ A / D ] rotate turret  ·  [ ESC ] back to menu';
+    if (hint) hint.textContent = 'VIEW ONLY — enemy model  ·  [ A / D ] rotate turret  ·  [ ESC ] back to menu';
   }
 
   _clearCurrentModel() {

@@ -2,6 +2,7 @@ import { Engine } from '@babylonjs/core';
 import ArenaScene        from '../world/ArenaScene.js';
 import TankDesignerScene from '../hub/TankDesignerScene.js';
 import HangarScene       from '../hub/HangarScene.js';
+import MenuScene         from '../hub/MenuScene.js';
 import { getBankedSalvage } from './runState.js';
 import { audio } from './audio/AudioManager.js';
 import { music } from './audio/MusicManager.js';
@@ -71,6 +72,8 @@ function powerOn() {
   const flash = document.getElementById('boot-flash');
   const reveal = () => {
     if (boot) boot.style.display = 'none';   // cut the boot screen out under the white flash
+    enterMenuScene();                          // live rotating-tank backdrop behind the menu
+    bootInMenu();                              // cold-boot only: title/KING/PLAY power on
     window.__state = 'MENU';
     const sb = document.getElementById('settings-btn');
     if (sb) sb.style.display = 'flex';        // reveal the cog now the rig is on
@@ -235,6 +238,50 @@ document.addEventListener('click', (e) => {
 let arenaScene    = null;
 let designerScene = null;
 let hangarScene   = null;
+let menuScene     = null;
+
+// Live main-menu backdrop (rotating tank). Created on entering MENU, disposed on leave.
+const MENU_ITEMS = [
+  { action: 'play', run: () => startHangar()   },
+  { action: 'tank', run: () => startDesigner() },
+];
+let menuIndex = 0;
+
+function enterMenuScene() {
+  canvas.style.display = 'block';
+  if (!menuScene) {
+    menuScene = new MenuScene(engine);
+    window.__menu = menuScene; // debug hook (mirrors __arena / __hangar)
+    engine.runRenderLoop(() => menuScene && menuScene.render());
+  }
+  setMenuSelection(0);
+}
+function leaveMenuScene() {
+  if (!menuScene) return;
+  engine.stopRenderLoop();
+  menuScene.dispose();
+  menuScene = null;
+}
+function setMenuSelection(i) {
+  const items = [...document.querySelectorAll('#menu-nav .menu-item')];
+  if (!items.length) return;
+  menuIndex = (i + items.length) % items.length;
+  items.forEach((el, n) => el.classList.toggle('sel', n === menuIndex));
+}
+function activateMenuItem() { MENU_ITEMS[menuIndex]?.run(); }
+
+// Cold-boot "coming alive" beat (~1s, cold-boot reveal ONLY): menu starts dark,
+// the title fades in + KING flickers like a neon sign, then PLAY's letters light
+// up one-by-one. Returning from the hangar/selector skips this (just appears).
+function bootInMenu() {
+  const menu = document.getElementById('menu');
+  if (!menu) return;
+  document.querySelectorAll('#menu-nav .menu-item').forEach(el => el.classList.remove('sel')); // start dark (sync, no flash)
+  if (menuScene) menuScene.turretActive = false;       // hold the turret still through the power-on
+  menu.classList.add('boot');                          // Tan lights up, then KING flickers (CSS, after flash clears)
+  setTimeout(() => { setMenuSelection(0); if (menuScene) menuScene.turretActive = true; }, 1500); // PLAY lit + turret armed (long first pause keeps it a surprise)
+  setTimeout(() => menu.classList.remove('boot'), 2150);
+}
 let controlsSeen  = false;   // HOW-TO-PLAY shows on the first arena entry per session only
 
 window.__state = 'BOOT'; // 'BOOT' | 'MENU' | 'HANGAR' | 'GAME' | 'PAUSED' | 'DEAD' | 'CONTROLS' | 'INSPECTOR'
@@ -390,6 +437,7 @@ function startHangar() {
       document.getElementById('hud').style.display           = 'none';
       document.getElementById('hangar-prompt').style.display = 'none';
       document.getElementById('hangar-panel').style.display  = 'none';
+      leaveMenuScene();   // tear down the live menu tank backdrop
       engine.stopRenderLoop();
       silenceArena();
       if (arenaScene) { arenaScene._paused = false; arenaScene = null; }
@@ -534,6 +582,7 @@ function goToMenu() {
   overlay.addEventListener('animationend', () => {
     overlay.classList.remove('playing');
     document.getElementById('menu').style.display = 'flex';
+    enterMenuScene();   // bring the live tank backdrop back (goToMenu hid the canvas)
     window.__state = 'MENU';
   }, { once: true });
 }
@@ -544,6 +593,7 @@ function startDesigner() {
     () => {
       document.getElementById('menu').style.display = 'none';
       document.getElementById('hud').style.display  = 'none';
+      leaveMenuScene();   // tear down the live menu tank backdrop
       engine.stopRenderLoop();
     },
     () => {
@@ -553,6 +603,7 @@ function startDesigner() {
       document.getElementById('designer-sidebar').style.display     = 'flex';
       document.getElementById('designer-bottom-hint').style.display = 'block';
       window.__state = 'INSPECTOR';
+      _settingsBtn.style.top = '54px';   // sit below the selector top bar (avoid overlap)
       if (!designerScene) designerScene = new TankDesignerScene(engine, exitDesigner);
       window.__designer = designerScene; // debug hook (mirrors __arena / __hangar)
       engine.runRenderLoop(() => designerScene.scene.render());
@@ -561,7 +612,7 @@ function startDesigner() {
 }
 
 function exitDesigner() {
-  music.playRetro();         // 8-bit blip cascade under the checker/pixelated wipe
+  music.playRetroDown();     // descending mirror of the entry jingle — going back down
   transition(
     () => {
       document.getElementById('designer-ui').style.display          = 'none';
@@ -574,6 +625,8 @@ function exitDesigner() {
     },
     () => {
       document.getElementById('menu').style.display = 'flex';
+      _settingsBtn.style.top = '12px';   // restore default cog position
+      enterMenuScene();   // bring the live tank backdrop back (hideFn hid the canvas)
       window.__state = 'MENU';
     }
   );
@@ -616,12 +669,16 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (window.__state === 'MENU') {
-    if (e.code === 'Enter') startHangar();
-    if (e.code === 'KeyT')  startDesigner();
+    if (e.code === 'ArrowUp'   || e.code === 'KeyW') setMenuSelection(menuIndex - 1);
+    else if (e.code === 'ArrowDown' || e.code === 'KeyS') setMenuSelection(menuIndex + 1);
+    else if (e.code === 'Enter' || e.code === 'Space') activateMenuItem();
+    else if (e.code === 'KeyT') startDesigner();   // back-compat shortcut to SELECT TANK
   }
   if (window.__state === 'INSPECTOR') {
     if (e.code === 'Escape') exitDesigner();
     if (e.code === 'KeyE' && designerScene) designerScene.confirmSelection();
+    if (e.code === 'ArrowDown' && designerScene) designerScene.cycleSelection(1);
+    if (e.code === 'ArrowUp'   && designerScene) designerScene.cycleSelection(-1);
   }
 });
 
@@ -635,7 +692,18 @@ function resumeGame() {
 }
 
 document.getElementById('controls-start').addEventListener('click', dismissControls);
-document.getElementById('menu-designer').addEventListener('click', startDesigner);
+document.querySelectorAll('#menu-nav .menu-item').forEach((el, n) => {
+  // wrap each character in a .ch span (with its index) for the staggered light-up
+  const label = el.textContent;
+  el.textContent = '';
+  [...label].forEach((c, i) => {
+    const s = document.createElement('span');
+    s.className = 'ch'; s.textContent = c; s.style.setProperty('--i', i);
+    el.appendChild(s);
+  });
+  el.addEventListener('click', () => { setMenuSelection(n); activateMenuItem(); });
+});
+// Hover is pure CSS (only SELECT TANK lights up) — keyboard ↑/↓ drives the .sel selection.
 document.getElementById('pause-resume').addEventListener('click', resumeGame);
 document.getElementById('pause-menu').addEventListener('click', goToMenu);
 document.getElementById('pause-restart').addEventListener('click', () => {

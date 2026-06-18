@@ -53,78 +53,56 @@
     }
 
     /* ─── MENU ─────────────────────────────────────────── */
-    #menu {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      z-index: 10;
+    /* Main menu — left list over the live 3D tank scene (transparent so the canvas shows). */
+    #menu { position: fixed; inset: 0; z-index: 10; background: transparent; }
+    #menu-scrim { position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(90deg, rgba(5,13,26,0.92) 0%, rgba(5,13,26,0.72) 22%, rgba(5,13,26,0) 47%); }
+    #menu-scan { position: absolute; inset: 0; pointer-events: none; opacity: 0.4;
+      background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.12) 3px, rgba(0,0,0,0) 4px); }
+
+    #menu-wordmark {
+      position: absolute; top: 56px; left: 64px;
+      color: var(--white); font-size: 44px; letter-spacing: 2px; line-height: 1.1;
+      text-shadow: 0 3px 0 rgba(0,0,0,0.5);
+    }
+    #menu-wordmark .king { color: var(--gold); text-shadow: 0 0 20px rgba(255,204,0,0.45); }
+    /* thin teal accent rule under the wordmark */
+    #menu-wordmark::after { content: ''; position: absolute; left: 2px; bottom: -16px;
+      width: 132px; height: 2px; background: var(--accent); box-shadow: 0 0 8px var(--accent); opacity: 0.7; }
+
+    /* cold-boot "coming alive": both words sit DARK/unlit (still visible), then Tan lights up,
+       THEN KING flashes/flickers on like a neon sign warming up — color animates, not opacity. */
+    /* delays start each beat AFTER the white flash-cut clears (~0.3s), so the dark→lit is visible */
+    #menu.boot #menu-wordmark .tan   { animation: tanPowerOn 0.35s ease-out 0.32s both; }
+    #menu.boot #menu-wordmark .king  { animation: kingPowerOn 0.55s steps(1, end) 0.74s both; }
+    #menu.boot #menu-wordmark::after { animation: rulePowerOn 0.30s ease-out 1.15s both; }
+    @keyframes tanPowerOn {
+      0%   { color: #14303a; text-shadow: none; }
+      100% { color: var(--white); text-shadow: 0 3px 0 rgba(0,0,0,0.5); }
+    }
+    @keyframes kingPowerOn {  /* dark → flicker → settled gold */
+      0%{color:#332600} 14%{color:var(--gold)} 22%{color:#332600} 34%{color:var(--gold)}
+      46%{color:#5a4400} 58%{color:var(--gold)} 70%{color:#7a5a00} 84%{color:var(--gold)} 100%{color:var(--gold)}
+    }
+    @keyframes rulePowerOn { from { opacity: 0; } to { opacity: 0.7; } }
+
+    #menu-nav { position: absolute; left: 64px; bottom: 92px; display: flex; flex-direction: column; gap: 24px; }
+    /* Dim by default; on hover/select the letters light up one-by-one, left to right. */
+    .menu-item { font-size: 18px; letter-spacing: 1px; cursor: none; width: max-content; white-space: pre; }
+    .menu-item.secondary { font-size: 15px; }
+    .menu-item .ch { color: var(--dim); transition: color 0.05s linear, text-shadow 0.05s linear; }
+    /* resting selection — calm off-white, faint glow (not blazing) */
+    .menu-item.sel .ch {
+      color: var(--white); text-shadow: 0 0 5px rgba(0,238,221,0.22);
+      transition-delay: calc(var(--i) * 0.03s);   /* per-letter stagger */
+    }
+    /* hover light-up wave — SELECT TANK only (PLAY is the calm persistent primary) */
+    .menu-item.secondary:hover .ch {
+      color: #fff; text-shadow: 0 0 8px rgba(255,255,255,0.55), 0 0 18px rgba(0,238,221,0.45);
+      transition-delay: calc(var(--i) * 0.03s);
     }
 
-    #menu-panel {
-      background: var(--panel);
-      border-top:    3px solid rgba(255,255,255,0.1);
-      border-left:   3px solid rgba(255,255,255,0.1);
-      border-bottom: 3px solid rgba(0,0,0,0.45);
-      border-right:  3px solid rgba(0,0,0,0.45);
-      outline: 2px solid var(--accent);
-      box-shadow:
-        0 0 0 4px var(--bg),
-        0 0 0 6px var(--accent);
-      padding: 52px 88px 46px;
-      display: flex; flex-direction: column;
-      align-items: center;
-      position: relative;
-      min-width: 460px;
-    }
-
-    /* Diamond corners */
-    #menu-panel::before {
-      content: '◆';
-      position: absolute; top: -16px; left: -16px;
-      color: var(--gold); font: bold 13px monospace;
-    }
-    #menu-panel::after {
-      content: '◆';
-      position: absolute; bottom: -16px; right: -16px;
-      color: var(--gold); font: bold 13px monospace;
-    }
-    .menu-corner { position: absolute; color: var(--gold); font: bold 13px monospace; pointer-events: none; }
-    .menu-corner.tr { top: -16px; right: -16px; }
-    .menu-corner.bl { bottom: -16px; left: -16px; }
-
-    #menu h1 {
-      color: var(--white);
-      font-size: 38px;
-      letter-spacing: 5px;
-      text-shadow: 4px 4px 0 #000;
-      line-height: 1.2;
-    }
-    #menu h1 .king {
-      color: var(--gold);
-      text-shadow: 3px 3px 0 rgba(90,50,0,0.8);
-    }
-
-    #menu-start {
-      color: var(--white);
-      font-size: 12px;
-      margin-top: 38px;
-      letter-spacing: 2px;
-      animation: blink 1.0s step-end infinite;
-      text-shadow: 2px 2px 0 #000;
-      line-height: 1.8;
-    }
-    #menu-start::before { content: '▶  '; color: var(--accent); }
-
-    #menu-designer {
-      color: var(--dim);
-      font-size: 9px;
-      margin-top: 20px;
-      cursor: none;
-      letter-spacing: 1px;
-      line-height: 1.8;
-      transition: color 0.1s;
-    }
-    #menu-designer:hover { color: var(--white); }
+    #menu-ver { position: absolute; left: 64px; bottom: 42px; color: var(--dim); font-size: 9px; letter-spacing: 1px; }
 
     @keyframes blink { 50% { opacity: 0; } }
 
@@ -836,13 +814,14 @@
   <canvas id="renderCanvas"></canvas>
 
   <div id="menu">
-    <div id="menu-panel">
-      <span class="menu-corner tr">◆</span>
-      <span class="menu-corner bl">◆</span>
-      <h1>Tan<span class="king">KING</span></h1>
-      <p id="menu-start">PRESS ENTER TO START</p>
-      <p id="menu-designer">[ T ] SELECT TANK</p>
-    </div>
+    <div id="menu-scrim"></div>
+    <div id="menu-scan"></div>
+    <div id="menu-wordmark"><span class="tan">Tan</span><span class="king">KING</span></div>
+    <nav id="menu-nav">
+      <div class="menu-item sel" data-action="play">PLAY</div>
+      <div class="menu-item secondary" data-action="tank">SELECT TANK</div>
+    </nav>
+    <div id="menu-ver">v0.62</div>
   </div>
 
   <div id="pause">

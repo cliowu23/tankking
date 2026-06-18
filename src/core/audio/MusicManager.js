@@ -114,7 +114,8 @@ class MusicManager {
   playExtract() { this._fire(this._sting_extract); }
   playDefeat()  { this._fire(this._sting_defeat); }
   playShutter() { this._fire(this._fx_shutter); }
-  playRetro()   { this._fire(this._fx_retro); }
+  playRetro()     { this._fire(this._fx_retro); }
+  playRetroDown() { this._fire(this._fx_retroDown); }
   playCrtOff()  { this._fire(this._fx_crtOff); }
   playHitmark() { this._fire(this._fx_hitmark); }  // shell connects with an enemy
   playHitCrit() { this._fire(this._fx_hitcrit); }  // dead-center critical hit
@@ -333,6 +334,14 @@ class MusicManager {
     const blip = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.03 }, volume: -16 }).connect(out);
     const t = Tone.now() + 0.01;
     ['A4', 'C5', 'E5', 'A5', 'C6', 'E6'].forEach((n, i) => blip.triggerAttackRelease(n, '32n', t + i * 0.05));
+    this._disposeLater([blip], 700);
+  }
+
+  _fx_retroDown() { // back to menu — the retro cascade reversed (descending)
+    const out = this._fxDest();
+    const blip = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.03 }, volume: -16 }).connect(out);
+    const t = Tone.now() + 0.01;
+    ['E6', 'C6', 'A5', 'E5', 'C5', 'A4'].forEach((n, i) => blip.triggerAttackRelease(n, '32n', t + i * 0.05));
     this._disposeLater([blip], 700);
   }
 
