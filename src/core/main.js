@@ -151,7 +151,9 @@ _settingsPanel.innerHTML =
   '<label style="display:block;font-size:7px;letter-spacing:1px;margin-bottom:6px;">SFX</label>' +
   '<input id="set-sfx-vol" type="range" min="0" max="100" step="1" style="width:100%;accent-color:#4fd6ff;margin-bottom:16px;">' +
   '<button id="set-mute" style="width:100%;font-family:inherit;font-size:8px;letter-spacing:1px;padding:8px;border-radius:6px;cursor:pointer;border:1px solid rgba(79,214,255,.4);background:transparent;color:#cdd6e2;"></button>' +
-  '<div style="font-size:6px;color:#7f8da0;margin-top:8px;text-align:center;letter-spacing:1px;">M = QUICK MUTE</div>';
+  '<div style="font-size:6px;color:#7f8da0;margin-top:8px;text-align:center;letter-spacing:1px;">M = QUICK MUTE</div>' +
+  '<div style="font-size:9px;letter-spacing:2px;color:#4fd6ff;margin:18px 0 12px;">DISPLAY</div>' +
+  '<button id="set-crt" style="width:100%;font-family:inherit;font-size:8px;letter-spacing:1px;padding:8px;border-radius:6px;cursor:pointer;border:1px solid rgba(79,214,255,.4);background:transparent;color:#cdd6e2;"></button>';
 
 document.body.appendChild(_settingsBtn);
 document.body.appendChild(_settingsPanel);
@@ -185,6 +187,21 @@ function _toggleMusicMute() {
   _renderMute();
   if (!m) _kickMusicForState();   // just unmuted → start/keep the right theme audible
 }
+
+// CRT/arcade filter toggle (live via window.__crt.enabled, read each frame by the post-process).
+const _crtBtn = _settingsPanel.querySelector('#set-crt');
+const _renderCrt = () => {
+  const on = !!(window.__crt && window.__crt.enabled);
+  _crtBtn.textContent = on ? 'CRT FILTER: ON' : 'CRT FILTER: OFF';
+  _crtBtn.style.opacity = on ? '1' : '0.7';
+};
+_crtBtn.addEventListener('click', () => {
+  if (!window.__crt) return;
+  window.__crt.enabled = !window.__crt.enabled;
+  localStorage.setItem('tk_crt', window.__crt.enabled ? '1' : '0');
+  _renderCrt();
+});
+_renderCrt();
 
 _musicSlider.addEventListener('input', () => {
   const v = _musicSlider.value / 100;
