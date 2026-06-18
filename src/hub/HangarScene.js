@@ -13,6 +13,7 @@ import { buildMapTable } from './HangarMapTable.js';
 import { buildRadio } from './HangarRadio.js';
 import { POSTER_DESIGNS } from './posterArt.js';
 import { audio } from '../core/audio/AudioManager.js';
+import { music } from '../core/audio/MusicManager.js';
 import { applyModelPaint, makePaintMaterial } from '../utils/modelPaint.js';
 import { attachCrt } from '../core/crtFilter.js';
 import { worldBounds } from '../utils/meshBounds.js';
@@ -43,7 +44,7 @@ export default class HangarScene {
 
     this._setupDriver();
     this._setupGameLoop();
-    this._setupPosterEgg();
+    this._setupInteractables();   // clickable poster (room decor) + desk radio (music jukebox)
   }
 
   _buildRoom() {
@@ -942,12 +943,16 @@ export default class HangarScene {
     }
   }
 
-  // ── Poster easter-egg: hover swaps the reticle to a "click" indicator; 5 clicks
-  //    open a small chooser menu (4 painted designs + upload-your-own). ──────────
-  _setupPosterEgg() {
+  // ── Clickable hangar interactables (single shared pointer observer + reticle):
+  //    • the radio-station POSTER (NE wall) → room-decor chooser
+  //    • the planning-desk RADIO (NW) → room-music jukebox
+  //    Hovering either swaps the reticle to a "click" indicator; one click opens
+  //    its menu. One observer avoids the two fighting over the cursor reticle. ──
+  _setupInteractables() {
     const reticle = document.getElementById('reticle');
     const poster  = this._radio && this._radio.posterMesh;
-    if (!poster) return;
+    const radioGrp = this._map && this._map.radio;
+    if (!poster && !radioGrp) return;
 
     const ORIG_RETICLE = reticle ? reticle.innerHTML : '';
     const CLICK_RETICLE =
@@ -959,63 +964,104 @@ export default class HangarScene {
       + '<line x1="3" y1="20" x2="9" y2="20" stroke="#00eedd" stroke-width="2"/>'
       + '<line x1="31" y1="20" x2="37" y2="20" stroke="#00eedd" stroke-width="2"/></svg>';
 
-    let hovering = false, clicks = 0, menuOpen = false;
+    let hovering = false;
     const setHover = (on) => { if (on === hovering) return; hovering = on; if (reticle) reticle.innerHTML = on ? CLICK_RETICLE : ORIG_RETICLE; };
-    // Picking a design pins it (overrides the per-visit random until RANDOM is chosen).
-    const persist  = (design, img) => { try { localStorage.setItem('radioPoster', design); localStorage.setItem('radioPosterPinned', '1'); if (img !== null) localStorage.setItem('radioPosterImg', img); } catch (e) { /* quota */ } };
-
-    // chooser menu (self-contained DOM, Tron-styled — no main.js/index.html changes)
-    const menu = document.createElement('div'); menu.id = 'poster-menu';
-    menu.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;'
-      + 'flex-direction:column;gap:8px;padding:14px 16px;width:300px;background:rgba(0,8,20,0.95);'
-      + "border:1px solid #00e5ff;box-shadow:0 0 24px rgba(0,229,255,0.25);font-family:'Press Start 2P',monospace;";
-    menu.innerHTML =
-        '<div style="color:#00e5ff;font-size:10px;letter-spacing:2px;">POSTER</div>'
-      + '<div style="color:#2f6470;font-size:7px;letter-spacing:1px;margin-bottom:6px;">PICK A DESIGN · OR UPLOAD YOUR OWN</div>'
-      + '<div id="pm-row" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
-      + '<button id="pm-random">RANDOM EACH VISIT</button>'
-      + '<button id="pm-upload">UPLOAD YOUR OWN</button>'
-      + '<button id="pm-close">CLOSE</button>'
-      + '<input id="pm-file" type="file" accept="image/*" style="display:none">';
-    document.body.appendChild(menu);
-    this._posterMenu = menu;
+    this._restoreReticle = () => { if (reticle) reticle.innerHTML = ORIG_RETICLE; };
 
     const btnCss = 'background:#0a1824;color:#7fc8d4;border:1px solid #1b4250;padding:8px 9px;'
       + 'font-family:inherit;font-size:8px;letter-spacing:1px;cursor:none;margin-top:4px;';
-    const row = menu.querySelector('#pm-row');
-    [['wanted', 'WANTED'], ['fields', 'FIELDS'], ['morale', 'MORALE'], ['photo', 'PHOTO']].forEach(([d, label]) => {
-      const b = document.createElement('button'); b.textContent = label; b.style.cssText = btnCss + 'flex:1 1 44%;text-align:center;';
-      b.onclick = () => { this._radio.setPoster(d); persist(d, null); closeMenu(); }; row.appendChild(b);
-    });
-    const fileIn = menu.querySelector('#pm-file');
-    menu.querySelector('#pm-random').style.cssText = btnCss;
-    menu.querySelector('#pm-upload').style.cssText = btnCss;
-    menu.querySelector('#pm-close').style.cssText  = btnCss;
-    // RANDOM clears the pin so the poster re-rolls each hangar visit; show one now.
-    menu.querySelector('#pm-random').onclick = () => {
-      try { localStorage.removeItem('radioPosterPinned'); } catch (e) { /* ignore */ }
-      this._applyRandomPoster(); closeMenu();
+    const panelCss = (id) => 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;'
+      + 'flex-direction:column;gap:8px;padding:14px 16px;width:300px;background:rgba(0,8,20,0.95);'
+      + "border:1px solid #00e5ff;box-shadow:0 0 24px rgba(0,229,255,0.25);font-family:'Press Start 2P',monospace;";
+
+    // shared open-state: only one menu up at a time; observer dormant while open
+    let openMenuId = null;   // 'poster' | 'radio' | null
+    const closeAll = () => {
+      if (this._posterMenu) this._posterMenu.style.display = 'none';
+      if (this._radioMenu)  this._radioMenu.style.display  = 'none';
+      openMenuId = null;
     };
-    menu.querySelector('#pm-upload').onclick = () => fileIn.click();
-    menu.querySelector('#pm-close').onclick  = () => closeMenu();
-    fileIn.onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return;
-      const rd = new FileReader(); rd.onload = () => { const im = new Image();
-        im.onload = () => { this._radio.setCustomPhoto(im); persist('photo', rd.result); closeMenu(); }; im.src = rd.result; };
-      rd.readAsDataURL(f); };
 
-    const openMenu  = () => { menu.style.display = 'flex'; menuOpen = true; setHover(false); };
-    const closeMenu = () => { menu.style.display = 'none'; menuOpen = false; clicks = 0; };
-    this._closePosterMenu = closeMenu;
-    this._restoreReticle  = () => { if (reticle) reticle.innerHTML = ORIG_RETICLE; };
+    // ── POSTER chooser (room decor) ──────────────────────────────────────────
+    if (poster) {
+      const persist = (design, img) => { try { localStorage.setItem('radioPoster', design); localStorage.setItem('radioPosterPinned', '1'); if (img !== null) localStorage.setItem('radioPosterImg', img); } catch (e) { /* quota */ } };
+      const menu = document.createElement('div'); menu.id = 'poster-menu'; menu.style.cssText = panelCss('poster');
+      menu.innerHTML =
+          '<div style="color:#00e5ff;font-size:10px;letter-spacing:2px;">POSTER</div>'
+        + '<div style="color:#2f6470;font-size:7px;letter-spacing:1px;margin-bottom:6px;">PICK A DESIGN · OR UPLOAD YOUR OWN</div>'
+        + '<div id="pm-row" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+        + '<button id="pm-random">RANDOM EACH VISIT</button>'
+        + '<button id="pm-upload">UPLOAD YOUR OWN</button>'
+        + '<button id="pm-close">CLOSE</button>'
+        + '<input id="pm-file" type="file" accept="image/*" style="display:none">';
+      document.body.appendChild(menu);
+      this._posterMenu = menu;
+      const row = menu.querySelector('#pm-row');
+      [['wanted', 'WANTED'], ['fields', 'FIELDS'], ['morale', 'MORALE'], ['photo', 'PHOTO']].forEach(([d, label]) => {
+        const b = document.createElement('button'); b.textContent = label; b.style.cssText = btnCss + 'flex:1 1 44%;text-align:center;';
+        b.onclick = () => { this._radio.setPoster(d); persist(d, null); closeAll(); }; row.appendChild(b);
+      });
+      const fileIn = menu.querySelector('#pm-file');
+      menu.querySelector('#pm-random').style.cssText = btnCss;
+      menu.querySelector('#pm-upload').style.cssText = btnCss;
+      menu.querySelector('#pm-close').style.cssText  = btnCss;
+      menu.querySelector('#pm-random').onclick = () => { try { localStorage.removeItem('radioPosterPinned'); } catch (e) { /* ignore */ } this._applyRandomPoster(); closeAll(); };
+      menu.querySelector('#pm-upload').onclick = () => fileIn.click();
+      menu.querySelector('#pm-close').onclick  = () => closeAll();
+      fileIn.onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return;
+        const rd = new FileReader(); rd.onload = () => { const im = new Image();
+          im.onload = () => { this._radio.setCustomPhoto(im); persist('photo', rd.result); closeAll(); }; im.src = rd.result; };
+        rd.readAsDataURL(f); };
+    }
 
-    this._posterObserver = this.scene.onPointerObservable.add((pi) => {
-      if (this._panelOpen || menuOpen) { setHover(false); return; }   // dormant while a panel/menu is up
+    // ── RADIO jukebox (room music) ───────────────────────────────────────────
+    if (radioGrp) {
+      const TRACKS = [['shuffle', 'SHUFFLE (RANDOM)'], ['a', 'COZY LO-FI'], ['c', "TINKER'S SHUFFLE"], ['e3', 'LOUNGE LIFT'], ['g', 'DUST MOTES'], ['h', 'LOW POWER']];
+      const menu = document.createElement('div'); menu.id = 'radio-menu'; menu.style.cssText = panelCss('radio');
+      menu.innerHTML =
+          '<div style="color:#00e5ff;font-size:10px;letter-spacing:2px;">ROOM MUSIC</div>'
+        + '<div style="color:#2f6470;font-size:7px;letter-spacing:1px;margin-bottom:6px;">PICK A TRACK FOR THE HANGAR</div>'
+        + '<div id="rm-row" style="display:flex;flex-direction:column;gap:4px;"></div>'
+        + '<button id="rm-close">CLOSE</button>';
+      document.body.appendChild(menu);
+      this._radioMenu = menu;
+      const row = menu.querySelector('#rm-row');
+      const refresh = () => {   // highlight the active track (or SHUFFLE when none pinned)
+        const active = music.hangarTrack || 'shuffle';
+        row.querySelectorAll('button').forEach(b => {
+          const on = b.dataset.id === active;
+          b.style.cssText = btnCss + 'text-align:left;' + (on ? 'border-color:#00eedd;color:#00eedd;background:#06222a;' : '');
+        });
+      };
+      TRACKS.forEach(([id, label]) => {
+        const b = document.createElement('button'); b.dataset.id = id; b.textContent = label; b.style.cssText = btnCss + 'text-align:left;';
+        b.onclick = () => { music.setHangarTrack(id === 'shuffle' ? null : id); audio.play('ui.select'); refresh(); };  // play live, stay open to sample
+        row.appendChild(b);
+      });
+      menu.querySelector('#rm-close').style.cssText = btnCss;
+      menu.querySelector('#rm-close').onclick = () => closeAll();
+      this._refreshRadioMenu = refresh;
+    }
+
+    const openPoster = () => { if (!this._posterMenu) return; closeAll(); this._posterMenu.style.display = 'flex'; openMenuId = 'poster'; setHover(false); };
+    const openRadio  = () => { if (!this._radioMenu) return; closeAll(); if (this._refreshRadioMenu) this._refreshRadioMenu(); this._radioMenu.style.display = 'flex'; openMenuId = 'radio'; setHover(false); };
+
+    const hitTest = (mesh) => {
+      if (!mesh) return null;
+      if (poster && mesh === poster) return 'poster';
+      if (radioGrp && mesh.isDescendantOf(radioGrp)) return 'radio';
+      return null;
+    };
+
+    this._interObserver = this.scene.onPointerObservable.add((pi) => {
+      if (this._panelOpen || openMenuId) { setHover(false); return; }   // dormant while a panel/menu is up
       if (pi.type === PointerEventTypes.POINTERMOVE) {
         const p = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-        setHover(!!(p && p.hit && p.pickedMesh === poster));
+        setHover(!!(p && p.hit && hitTest(p.pickedMesh)));
       } else if (pi.type === PointerEventTypes.POINTERPICK) {
-        if (pi.pickInfo && pi.pickInfo.pickedMesh === poster) { clicks += 1; if (clicks >= 5) openMenu(); }
-        else clicks = 0;   // a click elsewhere resets the streak
+        const which = pi.pickInfo && pi.pickInfo.hit ? hitTest(pi.pickInfo.pickedMesh) : null;
+        if (which === 'poster') openPoster();
+        else if (which === 'radio') openRadio();
       }
     });
   }
@@ -1023,9 +1069,10 @@ export default class HangarScene {
   dispose() {
     clearTimeout(this._mountTimer);
     if (this._loopObserver) this.scene.onBeforeRenderObservable.remove(this._loopObserver);
-    if (this._posterObserver) this.scene.onPointerObservable.remove(this._posterObserver);
+    if (this._interObserver) this.scene.onPointerObservable.remove(this._interObserver);
     if (this._restoreReticle) this._restoreReticle();
     if (this._posterMenu) this._posterMenu.remove();
+    if (this._radioMenu) this._radioMenu.remove();
     if (this.driver) this.driver.dispose();
     this.scene.dispose();
   }
