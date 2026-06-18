@@ -6,14 +6,19 @@
 import { PostProcess, Effect } from '@babylonjs/core';
 
 // Values dialed in the studio (2026-06-18). Tune freely; one place.
+// "Pure CRT texture": scanlines + faint glow/vignette/aberration, NO colour grade
+// (brightness/contrast/saturation = 1) — earlier grade read as over-saturated.
 export const CRT_PARAMS = {
-  scanline: 0.23, density: 460, curvature: 0.05, vignette: 0.12, aberration: 0.0016,
-  glow: 0.28, grain: 0.05, brightness: 1.02, contrast: 1.18, saturation: 1.05,
+  scanline: 0.12, density: 620, curvature: 0.04, vignette: 0.12, aberration: 0.0008,
+  glow: 0.16, grain: 0.04, brightness: 1, contrast: 1, saturation: 1,
 };
 
 // Global live state (so the Settings toggle flips it without recreating the pass).
-if (typeof window !== 'undefined' && !window.__crt) {
-  window.__crt = { enabled: localStorage.getItem('tk_crt') !== '0', params: CRT_PARAMS };
+// `enabled` persists across reloads; `params` always re-syncs from source so edits
+// here take effect on reload/HMR.
+if (typeof window !== 'undefined') {
+  window.__crt = window.__crt || { enabled: localStorage.getItem('tk_crt') !== '0' };
+  window.__crt.params = CRT_PARAMS;
 }
 
 Effect.ShadersStore['crtFragmentShader'] = `
