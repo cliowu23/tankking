@@ -476,8 +476,8 @@ export default class ArenaScene {
       this._paused = !this._paused;
       window.__state = this._paused ? 'PAUSED' : 'GAME';
       document.getElementById('pause').style.display = this._paused ? 'flex' : 'none';
-      if (this._paused) { music.pause(); music.playNeedleLift(); } // freeze music + needle-off
-      else music.resume();                                         // un-freeze where it left off
+      if (this._paused) { music.fadePause(); audio.pauseAll(); } // fade music + all sfx to silence
+      else { music.fadeResume(); audio.resumeAll(); }            // fade everything back up
     });
     // NOTE: the #pause-restart and #death-restart buttons are owned solely by
     // main.js (it restarts the scene, restores the HUD, and restarts the music).

@@ -1,0 +1,11 @@
+{
+  "_note": "User's curated Freesound CC0 picks, baked 2026-06-18. '__keep__' = kept the existing baked sound (no Freesound swap). Each value is the staged file under cc0/freesound/<slot>/; provenance (author/license/id) is in freesound_sources.json. Baked to public/assets/audio/<manifest .ogg -> .m4a>.",
+  "picks": {
+    "tank.engine": "tank.engine__v3__fs453989.ogg",
+    "tank.hit_heavy": "tank.hit_heavy__v11__fs381608.ogg",
+    "tank.hit_light": "tank.hit_light__v1__fs30932.ogg",
+    "tank.destroyed": "tank.destroyed__v9__fs435416.ogg",
+    "tank.cannon_fire": "__keep__",
+    "tank.reload": "tank.reload__v5__fs94121.ogg"
+  }
+}

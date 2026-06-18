@@ -1,0 +1,622 @@
+{
+  "tank.destroyed__v1__fs483289.ogg": {
+    "freesound_id": 483289,
+    "name": "R29-33-Large Explosion with Metal and Glass Debris.wav",
+    "author": "craigsmith",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/craigsmith/sounds/483289/",
+    "duration": 26.0105,
+    "query": "large explosion debris metal",
+    "slot": "tank.destroyed"
+  },
+  "tank.cannon_fire__v1__fs587887.ogg": {
+    "freesound_id": 587887,
+    "name": "Explosion in a can",
+    "author": "SamsterBirdies",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/SamsterBirdies/sounds/587887/",
+    "duration": 3.35576,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v2__fs161343.ogg": {
+    "freesound_id": 161343,
+    "name": "Howitzer Artillery Gun Shot Sound Effect 01",
+    "author": "qubodup",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/qubodup/sounds/161343/",
+    "duration": 0.8,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v3__fs161342.ogg": {
+    "freesound_id": 161342,
+    "name": "Howitzer Artillery Gun Shot Sound Effect 02",
+    "author": "qubodup",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/qubodup/sounds/161342/",
+    "duration": 1.0,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v4__fs161341.ogg": {
+    "freesound_id": 161341,
+    "name": "Howitzer Artillery Gun Shot Sound Effect 03",
+    "author": "qubodup",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/qubodup/sounds/161341/",
+    "duration": 1.5,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v5__fs853281.ogg": {
+    "freesound_id": 853281,
+    "name": "Deep Boom Heavy Cannon Fire - Game SFX (2 of 2)",
+    "author": "el_boss",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/el_boss/sounds/853281/",
+    "duration": 2.43594,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v6__fs853280.ogg": {
+    "freesound_id": 853280,
+    "name": "Deep Boom Heavy Cannon Fire - Game SFX (1 of 2)",
+    "author": "el_boss",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/el_boss/sounds/853280/",
+    "duration": 4.5,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v7__fs467883.ogg": {
+    "freesound_id": 467883,
+    "name": "Cannon shot",
+    "author": "SamsterBirdies",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/SamsterBirdies/sounds/467883/",
+    "duration": 1.62179,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.cannon_fire__v8__fs702245.ogg": {
+    "freesound_id": 702245,
+    "name": "GUNArtl_69thFieldArtilleryGun01_InMotionAudio_FREESampleSunday.wav",
+    "author": "InMotionAudio",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/InMotionAudio/sounds/702245/",
+    "duration": 2.13333,
+    "query": "cannon fire boom artillery",
+    "slot": "tank.cannon_fire"
+  },
+  "tank.engine__v1__fs637515.ogg": {
+    "freesound_id": 637515,
+    "name": "engine idle van diesel exhaust CBC microwave truck back1.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/637515/",
+    "duration": 56.1746,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v2__fs453992.ogg": {
+    "freesound_id": 453992,
+    "name": "engine idle van diesel CBC microwave truck4 winter with heater noise close.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453992/",
+    "duration": 44.5779,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v3__fs453989.ogg": {
+    "freesound_id": 453989,
+    "name": "engine idle van diesel CBC microwave truck1 winter with heater noise +rev start.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453989/",
+    "duration": 78.3116,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v4__fs637516.ogg": {
+    "freesound_id": 637516,
+    "name": "engine idle van diesel exhaust CBC microwave truck back2 close.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/637516/",
+    "duration": 51.3513,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v5__fs453991.ogg": {
+    "freesound_id": 453991,
+    "name": "engine idle van diesel CBC microwave truck3 winter with heater noise close.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453991/",
+    "duration": 46.5799,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v6__fs637517.ogg": {
+    "freesound_id": 637517,
+    "name": "engine idle van diesel exhaust CBC microwave truck back3 nearby.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/637517/",
+    "duration": 57.9579,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v7__fs453995.ogg": {
+    "freesound_id": 453995,
+    "name": "engine idle van diesel exhaust CBC microwave truck side4 nearby.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453995/",
+    "duration": 41.5415,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v8__fs453994.ogg": {
+    "freesound_id": 453994,
+    "name": "engine idle van diesel exhaust CBC microwave truck side1.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453994/",
+    "duration": 57.1905,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v9__fs705386.ogg": {
+    "freesound_id": 705386,
+    "name": "Diesel engine idling",
+    "author": "chungus43A",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/chungus43A/sounds/705386/",
+    "duration": 11.4758,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v10__fs824190.ogg": {
+    "freesound_id": 824190,
+    "name": "EMD 567 engine idle/notch 1 (synth recreation)",
+    "author": "chungus43A",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/chungus43A/sounds/824190/",
+    "duration": 5.45454,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v11__fs453990.ogg": {
+    "freesound_id": 453990,
+    "name": "engine idle van diesel CBC microwave truck2 winter nearby.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453990/",
+    "duration": 54.7881,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.engine__v12__fs453993.ogg": {
+    "freesound_id": 453993,
+    "name": "engine idle van diesel CBC microwave truck5 winter with heater noise close.flac",
+    "author": "kyles",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/kyles/sounds/453993/",
+    "duration": 44.9115,
+    "query": "diesel engine idle",
+    "slot": "tank.engine"
+  },
+  "tank.hit_heavy__v1__fs381585.ogg": {
+    "freesound_id": 381585,
+    "name": "snd_ImpactHeavyMetal01.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381585/",
+    "duration": 0.77644,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v2__fs492020.ogg": {
+    "freesound_id": 492020,
+    "name": "Light Metal Impacts",
+    "author": "adgawrhbshbffsfgvsrf",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/adgawrhbshbffsfgvsrf/sounds/492020/",
+    "duration": 14.8724,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v3__fs381624.ogg": {
+    "freesound_id": 381624,
+    "name": "snd_ImpactSmallMetal08.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381624/",
+    "duration": 0.933537,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v4__fs381622.ogg": {
+    "freesound_id": 381622,
+    "name": "snd_ImpactSmallMetal06.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381622/",
+    "duration": 0.552834,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v5__fs381621.ogg": {
+    "freesound_id": 381621,
+    "name": "snd_ImpactSmallMetal07.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381621/",
+    "duration": 0.840726,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v6__fs381620.ogg": {
+    "freesound_id": 381620,
+    "name": "snd_ImpactSmallMetal04.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381620/",
+    "duration": 0.420363,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v7__fs381619.ogg": {
+    "freesound_id": 381619,
+    "name": "snd_ImpactSmallMetal05.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381619/",
+    "duration": 0.46068,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v8__fs381614.ogg": {
+    "freesound_id": 381614,
+    "name": "snd_ImpactMediumMetal03.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381614/",
+    "duration": 0.650703,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v9__fs381613.ogg": {
+    "freesound_id": 381613,
+    "name": "snd_ImpactMediumMetal04.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381613/",
+    "duration": 0.625737,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v10__fs381612.ogg": {
+    "freesound_id": 381612,
+    "name": "snd_ImpactMediumMetal05.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381612/",
+    "duration": 0.408866,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v11__fs381608.ogg": {
+    "freesound_id": 381608,
+    "name": "snd_ImpactMediumMetal01.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381608/",
+    "duration": 0.892562,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_heavy__v12__fs381607.ogg": {
+    "freesound_id": 381607,
+    "name": "snd_ImpactMediumMetal02.wav",
+    "author": "dorian.mastin",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/dorian.mastin/sounds/381607/",
+    "duration": 0.835261,
+    "query": "metal impact",
+    "slot": "tank.hit_heavy"
+  },
+  "tank.hit_light__v1__fs30932.ogg": {
+    "freesound_id": 30932,
+    "name": "bullet ricochet.wav",
+    "author": "aust_paul",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/aust_paul/sounds/30932/",
+    "duration": 2.35907,
+    "query": "metal ricochet",
+    "slot": "tank.hit_light"
+  },
+  "tank.hit_light__v2__fs94031.ogg": {
+    "freesound_id": 94031,
+    "name": "Dice Roll.mp3",
+    "author": "LoafDV",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/LoafDV/sounds/94031/",
+    "duration": 2.99209,
+    "query": "metal ricochet",
+    "slot": "tank.hit_light"
+  },
+  "tank.hit_light__v3__fs845857.ogg": {
+    "freesound_id": 845857,
+    "name": "collection of random foley sounds",
+    "author": "ImATaco",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/ImATaco/sounds/845857/",
+    "duration": 18.5455,
+    "query": "metal ricochet",
+    "slot": "tank.hit_light"
+  },
+  "tank.hit_light__v4__fs855248.ogg": {
+    "freesound_id": 855248,
+    "name": "Real Bullet Flyby Sound",
+    "author": "qubodup",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/qubodup/sounds/855248/",
+    "duration": 0.0795625,
+    "query": "metal ricochet",
+    "slot": "tank.hit_light"
+  },
+  "tank.hit_light__v5__fs855656.ogg": {
+    "freesound_id": 855656,
+    "name": "A silenced/suppressed handgun being shot once w/ phaser sounding trail // pretty metallic sounding",
+    "author": "ser\u00f8ut\u014dnin--depriv\u0259d",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/ser%C3%B8ut%C5%8Dnin--depriv%C9%99d/sounds/855656/",
+    "duration": 0.60254,
+    "query": "metal ricochet",
+    "slot": "tank.hit_light"
+  },
+  "tank.reload__v1__fs642749.ogg": {
+    "freesound_id": 642749,
+    "name": "CLOCKMech pomodoro timer ringing mechanisms single hits_Sauli.wav",
+    "author": "Sauli",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Sauli/sounds/642749/",
+    "duration": 14.0,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v2__fs94120.ogg": {
+    "freesound_id": 94120,
+    "name": "Mechanical1.wav",
+    "author": "BMacZero",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/BMacZero/sounds/94120/",
+    "duration": 0.917188,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v3__fs94127.ogg": {
+    "freesound_id": 94127,
+    "name": "Clank1.wav",
+    "author": "BMacZero",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/BMacZero/sounds/94127/",
+    "duration": 0.673379,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v4__fs245932.ogg": {
+    "freesound_id": 245932,
+    "name": "Deep wooshing.wav",
+    "author": "sophiehall3535",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/sophiehall3535/sounds/245932/",
+    "duration": 3.8544,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v5__fs94121.ogg": {
+    "freesound_id": 94121,
+    "name": "Mechanical2.wav",
+    "author": "BMacZero",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/BMacZero/sounds/94121/",
+    "duration": 0.603719,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v6__fs136824.ogg": {
+    "freesound_id": 136824,
+    "name": "INDUSTHIT009",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136824/",
+    "duration": 1.41277,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v7__fs136832.ogg": {
+    "freesound_id": 136832,
+    "name": "INDUSTSNARE004",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136832/",
+    "duration": 0.921882,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v8__fs136817.ogg": {
+    "freesound_id": 136817,
+    "name": "INDUSTHIT008",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136817/",
+    "duration": 1.41537,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v9__fs136812.ogg": {
+    "freesound_id": 136812,
+    "name": "INDUSTHIT017",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136812/",
+    "duration": 0.861973,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v10__fs136714.ogg": {
+    "freesound_id": 136714,
+    "name": "INDUSTHIT019.wav",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136714/",
+    "duration": 0.838549,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v11__fs245934.ogg": {
+    "freesound_id": 245934,
+    "name": "Spinning machine.wav",
+    "author": "sophiehall3535",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/sophiehall3535/sounds/245934/",
+    "duration": 3.02058,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.reload__v12__fs136816.ogg": {
+    "freesound_id": 136816,
+    "name": "INDUSTSNARE002",
+    "author": "mitchelk",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/mitchelk/sounds/136816/",
+    "duration": 48.0,
+    "query": "mechanical clank",
+    "slot": "tank.reload"
+  },
+  "tank.destroyed__v1__fs165909.ogg": {
+    "freesound_id": 165909,
+    "name": "Explosion 3.wav",
+    "author": "Deganoth",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Deganoth/sounds/165909/",
+    "duration": 6.768,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v2__fs482992.ogg": {
+    "freesound_id": 482992,
+    "name": "large explosion 2",
+    "author": "V-ktor",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/V-ktor/sounds/482992/",
+    "duration": 3.86853,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v3__fs336010.ogg": {
+    "freesound_id": 336010,
+    "name": "Sharp Explosion 5 (of 5)",
+    "author": "Rudmer_Rotteveel",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Rudmer_Rotteveel/sounds/336010/",
+    "duration": 1.39454,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v4__fs336007.ogg": {
+    "freesound_id": 336007,
+    "name": "Multiple Deep Explosions (Noisy rec)",
+    "author": "Rudmer_Rotteveel",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Rudmer_Rotteveel/sounds/336007/",
+    "duration": 17.5906,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v5__fs336005.ogg": {
+    "freesound_id": 336005,
+    "name": "Sharp Explosion 2 (of 5)",
+    "author": "Rudmer_Rotteveel",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Rudmer_Rotteveel/sounds/336005/",
+    "duration": 1.0161,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v6__fs587445.ogg": {
+    "freesound_id": 587445,
+    "name": "Explosion / Gun",
+    "author": "SamsterBirdies",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/SamsterBirdies/sounds/587445/",
+    "duration": 5.98798,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v7__fs587444.ogg": {
+    "freesound_id": 587444,
+    "name": "Explosion / Gun - 2",
+    "author": "SamsterBirdies",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/SamsterBirdies/sounds/587444/",
+    "duration": 5.98798,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v8__fs587887.ogg": {
+    "freesound_id": 587887,
+    "name": "Explosion in a can",
+    "author": "SamsterBirdies",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/SamsterBirdies/sounds/587887/",
+    "duration": 3.35576,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v9__fs435416.ogg": {
+    "freesound_id": 435416,
+    "name": "explosion13.wav",
+    "author": "V-ktor",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/V-ktor/sounds/435416/",
+    "duration": 1.06052,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v10__fs478276.ogg": {
+    "freesound_id": 478276,
+    "name": "8-Bit Explosion 1_7",
+    "author": "Joao_Janz",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Joao_Janz/sounds/478276/",
+    "duration": 1.3125,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v11__fs478274.ogg": {
+    "freesound_id": 478274,
+    "name": "8-Bit Explosion 1_1",
+    "author": "Joao_Janz",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Joao_Janz/sounds/478274/",
+    "duration": 1.0625,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  },
+  "tank.destroyed__v12__fs478273.ogg": {
+    "freesound_id": 478273,
+    "name": "8-Bit Explosion 1_2",
+    "author": "Joao_Janz",
+    "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://freesound.org/people/Joao_Janz/sounds/478273/",
+    "duration": 1.3125,
+    "query": "explosion",
+    "slot": "tank.destroyed"
+  }
+}

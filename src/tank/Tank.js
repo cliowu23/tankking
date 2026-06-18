@@ -4,6 +4,14 @@ import { hullFootprint } from '../utils/meshBounds.js';
 import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
 import { audio } from '../core/audio/AudioManager.js';
 
+// --- Engine audio: throttle-driven RPM → pitch (revving). Tune live. ---
+const ENGINE_IDLE_RATE   = 1.0;   // playbackRate at idle = true recorded pitch
+const ENGINE_REV_RANGE   = 0.5;   // added at redline → top pitch ~1.5 (diesel stays believable)
+const ENGINE_RPM_ATTACK  = 6;     // RPM climb rate on the gas (higher = snappier rev-up)
+const ENGINE_RPM_RELEASE = 2.5;   // slower spool-down when coasting (engines fall off gently)
+const ENGINE_GAS_REV     = 0.45;  // instant RPM floor while on throttle (revs before speed builds)
+const ENGINE_SPEED_REV   = 0.60;  // RPM contribution from sustained speed (cruise sits revved)
+
 export default class Tank {
   constructor(scene, x, z) {
     this.scene = scene;
@@ -310,8 +318,21 @@ export default class Tank {
     }
     const shieldMove = this.shield.active ? SHIELD_MOVE_MULT : 1;
 
+    // --- Engine RPM (throttle-driven): revs up on the gas, spools down coasting ---
+    const speedRatio = Math.min(1, Math.abs(this.speed) / this.maxSpeed);
+    const onGas      = this.keys.w || this.keys.s;
+    const boosting   = this.dashTimeLeft > 0 || Math.abs(this.speed) > this.maxSpeed * 1.01;
+    let rpmTarget    = speedRatio * ENGINE_SPEED_REV + (onGas ? ENGINE_GAS_REV : 0);
+    if (boosting) rpmTarget = 1;
+    rpmTarget = Math.min(1, rpmTarget);
+    const prevRpm = this._rpm ?? 0;
+    // Asymmetric smoothing: climb fast on the gas, fall gently off it (no zipper noise).
+    const rpmRate = rpmTarget > prevRpm ? ENGINE_RPM_ATTACK : ENGINE_RPM_RELEASE;
+    this._rpm = prevRpm + (rpmTarget - prevRpm) * Math.min(1, rpmRate * dt);
+    audio.setPlaybackRate('tank.engine', ENGINE_IDLE_RATE + this._rpm * ENGINE_REV_RANGE);
+
     // --- Engine swell: louder/fuller with speed (throttled to avoid click thrash) ---
-    const engineTarget = 0.07 + 0.55 * Math.min(1, Math.abs(this.speed) / this.maxSpeed);
+    const engineTarget = 0.05 + 0.40 * speedRatio;
     if (this._engineVol === undefined || Math.abs(engineTarget - this._engineVol) > 0.04) {
       this._engineVol = engineTarget;
       audio.setVolume('tank.engine', engineTarget);
