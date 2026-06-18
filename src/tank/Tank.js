@@ -2,6 +2,7 @@ import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, DynamicT
 import { shortAngle } from '../utils/mathUtils.js';
 import { hullFootprint } from '../utils/meshBounds.js';
 import { makeShieldState, stepShield, shieldDamageMultiplier, SHIELD_MOVE_MULT } from './shield.js';
+import { stepThrottle, turnRateAt } from './movement.js';
 import { audio } from '../core/audio/AudioManager.js';
 
 // --- Engine audio: throttle-driven RPM → pitch (revving). Tune live. ---
@@ -27,19 +28,20 @@ export default class Tank {
     this._halfW           = 1.2;  // collision half-extents — refit to the model via fitCollisionToModel()
     this._halfD           = 1.6;
     this.rotY             = 0; // start facing north (+Z, away from camera)
-    this.acceleration     = 6;
-    this.maxSpeed         = 8;
+    this.acceleration     = 4.5;   // slow spool-up (~3.5s to top) = heavy machine
+    this.maxSpeed         = 16;    // real top speed (just under old boost)
     this.drag             = 20;   // units/s² — high so tank stops fast when gas released (not slidey)
+    this.brakeDecel       = 28;   // units/s² — active braking when input opposes motion (> drag)
     this.rotateSpeed      = 2.1;    // rad/s
     this.maxFuel          = 100;
     this.fuel             = 100;
     this.fuelRecharge     = 18;
     this.tapCost          = 18;
     this.tapDashDist      = 3.0;
-    this.tapDashExit      = 16;
+    this.tapDashExit      = 18;
     this.holdBoostAccel   = 30;
     this.holdFuelDrain    = 20;
-    this.boostMaxSpeed    = 18;
+    this.boostMaxSpeed    = 19;
     this.boostDecay       = 15;   // units/s² bleed from boostMaxSpeed back to maxSpeed
     this.momentumDuration = 0.175;  // seconds to coast at boost speed after releasing
     this.turretSpeed      = 72 * Math.PI / 180; // rad/s — 72°/s traverse rate
@@ -359,21 +361,15 @@ export default class Tank {
       return;
     }
 
-    // --- Rotation ---
-    if (this.keys.a) this.rotY -= this.rotateSpeed * dt;
-    if (this.keys.d) this.rotY += this.rotateSpeed * dt;
+    // --- Rotation (tight at crawl, wide at full tilt) ---
+    const turn = turnRateAt(this.speed, this.maxSpeed, this.rotateSpeed);
+    if (this.keys.a) this.rotY -= turn * dt;
+    if (this.keys.d) this.rotY += turn * dt;
 
     const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
 
-    // --- Acceleration ---
-    if (this.keys.w) {
-      this.speed += this.acceleration * dt;
-    } else if (this.keys.s) {
-      this.speed -= this.acceleration * dt;
-    } else {
-      if (this.speed > 0) this.speed = Math.max(0, this.speed - this.drag * dt);
-      else if (this.speed < 0) this.speed = Math.min(0, this.speed + this.drag * dt);
-    }
+    // --- Acceleration / braking (S brakes harder than coasting; no glide) ---
+    this.speed = stepThrottle(this.speed, this.keys.w, this.keys.s, dt, this);
     // Hard cap only at boostMaxSpeed; bleed back to maxSpeed is handled below
     this.speed = Math.max(-(this.boostMaxSpeed * 0.5), Math.min(this.boostMaxSpeed, this.speed));
 
