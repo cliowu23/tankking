@@ -39,7 +39,7 @@ export default class AIEnemy {
     this._rotateSpeed          = 1.2;
     this._turretSpeed          = 55 * Math.PI / 180;
     this._optimalRange         = opts.optimalRange ?? 15;
-    this._aggroRange           = opts.aggroRange ?? 22;
+    this._aggroRange           = opts.aggroRange ?? 30;   // general detection buff (was 22)
     this._aimTolerance         = 5 * Math.PI / 180;
     this._fireCooldownDuration = opts.cooldown ?? 2.0;
 
@@ -190,6 +190,13 @@ export default class AIEnemy {
     if (d <= radius) this.state = 'APPROACH';
   }
 
+  // Snap an unaware unit to engage — taking a hit, or a shell whizzing past, gives
+  // away the player even from outside normal detection range.
+  alert() {
+    if (!this.alive) return;
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') this.state = 'APPROACH';
+  }
+
   // Freeze this unit (parry result). Stacks by taking the longer remaining time.
   stun(seconds) {
     if (!this.alive) return;
@@ -252,6 +259,7 @@ export default class AIEnemy {
 
   takeDamage(amount) {
     if (!this.alive) return;
+    this.alert();   // getting hit always gives away the player
     this.hp = Math.max(0, this.hp - amount);
     this._updateHealthBar();
     if (this.hp <= 0) this._die();

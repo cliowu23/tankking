@@ -20,6 +20,7 @@
 // this.ready to that promise — the beam/charge logic below is model-agnostic.
 import { MeshBuilder, StandardMaterial, Color3, Color4, TransformNode, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import AIEnemy from './AIEnemy.js';
+import { shortAngle } from '../utils/mathUtils.js';
 import EyeBeam from '../combat/EyeBeam.js';
 import { loadEnemyTemplate } from './enemyModels.js';
 import { audio } from '../core/audio/AudioManager.js';
@@ -31,6 +32,8 @@ const isTurretMesh = (n) => { n = (n || '').toLowerCase(); return TURRET_PARTS.s
 const BEAM_POOL   = 3;                  // single heavy shot + recovery — no stream needed
 const BEAM_HSPEED = 80;                 // fast: it's dodged via the tell, not the bolt
 const BEAM_RANGE  = 60;                 // despawn distance
+const SCREEN_MARGIN = 0.04;             // fire only once the bot is this far inside the viewport
+                                        // (never beam from off-screen) — see _onScreen
 const CHARGE_TIME = 1.1;                // wind-up tell before the beam releases (s)
 
 const BODY_STEEL = [0.40, 0.43, 0.47];  // cold gunmetal — the King's machine palette
@@ -43,11 +46,17 @@ export default class SentinelEnemy extends AIEnemy {
   constructor(scene, x, z, opts = {}) {
     super(scene, x, z, {
       aiSpeed: 4.5,        // planted/heavy — slower than the old light tank
-      optimalRange: 16,    // hangs back and beams you
-      aggroRange: 26,
+      optimalRange: 30,    // SNIPER: holds at the far edge of what's ON-SCREEN (~35u ahead on
+                           // desktop) — long range, but it never beams from off-screen (see _onScreen).
+      aggroRange: 50,      // detects from far so it's already closing/aimed as it enters view;
+                           // the on-screen fire gate is what actually limits when it shoots.
       ...opts,
       noPrimitiveVisuals: true,   // we draw our own placeholder below
     });
+
+    // Sniper: it'll open fire on anything it can detect (out to its aggro range),
+    // not only once it has closed to optimalRange — see _tryEngage.
+    this._engageRange = this._aggroRange;
 
     this._halfW = 1.30;  // chassis footprint ~2.6 wide (slab overhangs the tracks)
     this._halfD = 1.80;  // ~3.6 long (sloped nose + rear plate)
@@ -261,6 +270,7 @@ export default class SentinelEnemy extends AIEnemy {
   // charge completes; park fireCooldown so the base loop won't retrigger mid-charge.
   _fire() {
     if (this._charging) return;
+    if (!this._onScreen()) return;   // never start a beam from off-screen — engage at the screen edge in
     this._charging = true;
     this._chargeT  = 0;
     this.fireCooldown = 999;
@@ -271,9 +281,41 @@ export default class SentinelEnemy extends AIEnemy {
     super.update(dt, playerPos);
     if (this.alive) {
       this._moveBeep(dt);   // deep beep on a slow cadence while relocating
+      this._tryEngage(playerPos);   // open fire from range / on the move
       this._updateCharge(dt);
       this._updateEye(dt);
     }
+  }
+
+  // Begin a charge whenever it has a target in range and the eye is roughly on it —
+  // in ANY engaged state, so it fires from distance the moment it detects you AND
+  // keeps firing while still closing/repositioning (it's too slow to also have to
+  // plant). Decoupled from the base's COMBAT-only fire gate; the base may also start
+  // the charge in COMBAT, but the _charging guard makes that a no-op.
+  _tryEngage(playerPos) {
+    if (this._charging || this.fireCooldown > 0) return;
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') return;
+    const dx = playerPos.x - this.root.position.x;
+    const dz = playerPos.z - this.root.position.z;
+    if (dx * dx + dz * dz > this._engageRange * this._engageRange) return;
+    if (Math.abs(shortAngle(this.turretAimAngle, Math.atan2(dx, dz))) < this._aimTolerance) this._fire();
+  }
+
+  // Is the bot currently visible in the player's viewport? Projects its position to
+  // screen space; off-screen (or behind the camera) → don't fire. Device-agnostic —
+  // handles desktop vs. the mobile zoom-out without hardcoding a world distance.
+  _onScreen() {
+    const cam = this.scene.activeCamera;
+    if (!cam) return true;
+    const eng = this.scene.getEngine();
+    const w = eng.getRenderWidth(), h = eng.getRenderHeight();
+    const p = Vector3.Project(
+      this.root.position, Matrix.Identity(), this.scene.getTransformationMatrix(),
+      cam.viewport.toGlobal(w, h),
+    );
+    if (p.z < 0 || p.z > 1) return false;   // behind the camera / clipped
+    return p.x >= w * SCREEN_MARGIN && p.x <= w * (1 - SCREEN_MARGIN) &&
+           p.y >= h * SCREEN_MARGIN && p.y <= h * (1 - SCREEN_MARGIN);
   }
 
   // Deep movement beep: fires on a slow cadence only while the bot is actually
@@ -292,8 +334,10 @@ export default class SentinelEnemy extends AIEnemy {
 
   _updateCharge(dt) {
     if (!this._charging) return;
-    // Abort the wind-up if the player slips out of the fight (fled / broke LoS).
-    if (this.state !== 'COMBAT') {
+    // Abort the wind-up only if the target is fully lost (back to an unaware state) —
+    // NOT just because it's APPROACH/RETREAT, so a charge begun from range while moving
+    // still releases.
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') {
       this._charging = false;
       this._chargeT  = 0;
       this.fireCooldown = 0.4;

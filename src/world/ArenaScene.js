@@ -1582,6 +1582,7 @@ export default class ArenaScene {
     }
 
     const allTargets = this.enemies;
+    const SHELL_ALERT_R2 = 7 * 7;   // a player shell whizzing this close alerts an unaware enemy
 
     for (const shell of this.shells) {
       if (!shell.active) continue;
@@ -1590,6 +1591,8 @@ export default class ArenaScene {
         if (!enemy.alive) continue;
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
+        // Near-miss: a shot streaking past gives the player away (no break — one shell can pass several).
+        if (dx * dx + dz * dz < SHELL_ALERT_R2) enemy.alert?.();
         if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
           const speed      = Math.hypot(shell.vx, shell.vz);
           const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;

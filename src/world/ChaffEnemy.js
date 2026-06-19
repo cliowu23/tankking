@@ -44,8 +44,9 @@ export default class ChaffEnemy extends AIEnemy {
       hp: 30,            // dies in ~1 player shot (34 dmg)
       damage: 5,         // CHIP per laser bolt
       aiSpeed: 9,        // fast
-      optimalRange: 9,   // gets in your face
-      aggroRange: 30,    // notices you from far
+      optimalRange: 9,   // RUSHER: gets in your face
+      aggroRange: 40,    // notices and charges from far (it's fast — closes the gap before
+                         // you can pick it off from your 45u shell range)
       cooldown: LASER_INTERVAL,
       ...opts,
       noPrimitiveVisuals: true,   // we draw our own walker below
