@@ -8,6 +8,15 @@ const HSPEED = 35;
 // above 1 to push diffuse colors up toward white. ~7× whites out gunmetal/dark parts.
 const STUN_FLASH_GAIN = 7;
 
+// --- §③ AI foundation: PATROL roaming + group spacing ---
+const PATROL_SPEED_MULT = 0.5;   // roam at half aiSpeed — relaxed, not charging
+const LEASH_DEFAULT     = 10;    // wander radius around the anchor if a patrol omits `leash`
+const WANDER_ARRIVE     = 1.5;   // within this of the goal point → reached (advance / repick)
+const WANDER_REPICK     = 4;     // seconds before forcing a fresh wander point (anti-loiter)
+// "Light confidence" (W1): a unit with no nearby allies, or this wounded, plays cautious
+// (kites instead of holding ground). The encirclement/high-aggression layers are W2+.
+const CAUTIOUS_HP_FRAC  = 0.35;
+
 export default class AIEnemy {
   // opts tune the unit (zone band tuning) and select behavior:
   //   hp, damage, cooldown, aiSpeed, optimalRange, aggroRange, bounds,
@@ -37,11 +46,23 @@ export default class AIEnemy {
     this._ambush       = !!opts.ambush;
     this._ambushRadius = opts.ambushRadius ?? 14;
 
+    // Patrol config from the spawn layer: either { anchor:[x,z], leash } (wander an
+    // area) or { route:[[x,z]…], loop } (walk waypoints). Null = static IDLE/AMBUSH.
+    this._patrol       = opts.patrol || null;
+    this._wanderTarget = null;   // [x,z] current wander goal (anchor mode)
+    this._wanderT      = 0;      // countdown to forced repick
+    this._routeIdx     = 0;      // current waypoint (route mode)
+    this._routeDir     = 1;      // ping-pong direction for non-looping routes
+    // Group steering, written each frame by ArenaScene's pre-pass, consumed in update().
+    this._sepX = 0; this._sepZ = 0;   // separation nudge (anti-clump)
+    this._nearbyAllies = 0;           // living allies in range (feeds light confidence)
+
     this.rotY            = Math.PI; // face south toward player spawn
     this.speed           = 0;
     this.turretAimAngle  = Math.PI;
     this.barrelElevation = 0;
-    this.state           = this._ambush ? 'AMBUSH' : 'IDLE';
+    this._initialState   = this._patrol ? 'PATROL' : (this._ambush ? 'AMBUSH' : 'IDLE');
+    this.state           = this._initialState;
     this.fireCooldown    = 1.5; // brief delay before first shot
     this._recoil         = 0;
     this._stunTimer = 0;   // > 0 while frozen by a parry
@@ -164,7 +185,7 @@ export default class AIEnemy {
 
   // Wake a hidden ambusher when the player fires nearby.
   hearNoise(pos, radius = 30) {
-    if (!this.alive || this.state !== 'AMBUSH') return;
+    if (!this.alive || (this.state !== 'AMBUSH' && this.state !== 'PATROL')) return;
     const d = Math.hypot(pos.x - this.root.position.x, pos.z - this.root.position.z);
     if (d <= radius) this.state = 'APPROACH';
   }
@@ -245,7 +266,13 @@ export default class AIEnemy {
     this.rotY  = Math.PI;
     this.turretAimAngle  = Math.PI;
     this.barrelElevation = 0;
-    this.state           = this._ambush ? 'AMBUSH' : 'IDLE';
+    this.state           = this._initialState;
+    this._wanderTarget   = null;
+    this._wanderT        = 0;
+    this._routeIdx       = 0;
+    this._routeDir       = 1;
+    this._sepX = 0; this._sepZ = 0;
+    this._nearbyAllies   = 0;
     this.fireCooldown    = 1.5;
     this._recoil         = 0;
     this._stunTimer = 0;
@@ -300,7 +327,7 @@ export default class AIEnemy {
 
     // --- State transitions ---
     // AMBUSH = hidden idle with a tight trigger radius (also sprung by hearNoise).
-    if ((this.state === 'IDLE' && dist <= this._aggroRange) ||
+    if (((this.state === 'IDLE' || this.state === 'PATROL') && dist <= this._aggroRange) ||
         (this.state === 'AMBUSH' && dist <= this._ambushRadius)) {
       this.state = 'APPROACH';
     } else if (this.state === 'APPROACH' && dist <= this._optimalRange + 4) {
@@ -318,6 +345,21 @@ export default class AIEnemy {
     if (this.state === 'IDLE' || this.state === 'AMBUSH') {
       // do nothing — waiting for the player (or, ambushing, for the trigger)
 
+    } else if (this.state === 'PATROL') {
+      // Roam toward the current goal (route waypoint or wander point) at a relaxed pace.
+      const goal = this._patrolGoal(dt);
+      if (goal) {
+        const goalAngle   = Math.atan2(goal.x - this.root.position.x, goal.z - this.root.position.z);
+        const hullDiff    = shortAngle(this.rotY, goalAngle);
+        this.rotY += Math.sign(hullDiff) * Math.min(Math.abs(hullDiff), this._rotateSpeed * dt);
+        const patrolSpeed = this._aiSpeed * PATROL_SPEED_MULT;
+        this.speed = Math.abs(hullDiff) < Math.PI / 2
+          ? Math.min(this.speed + 6 * dt, patrolSpeed)
+          : Math.max(this.speed - 6 * dt, 0);
+      } else {
+        this.speed = Math.max(this.speed - 6 * dt, 0);
+      }
+
     } else if (this.state === 'APPROACH') {
       const hullDiff    = shortAngle(this.rotY, angleToPlayer);
       const maxHullTurn = this._rotateSpeed * dt;
@@ -327,9 +369,19 @@ export default class AIEnemy {
         : Math.max(this.speed - 6 * dt, 0);
 
     } else if (this.state === 'COMBAT') {
-      this.speed = this.speed > 0
-        ? Math.max(0, this.speed - 8 * dt)
-        : Math.min(0, this.speed + 8 * dt);
+      // Light confidence (W1): a lone or wounded scout kites instead of holding ground —
+      // backs off and waits rather than trading head-on. (Encirclement/press is W2+.)
+      const cautious = this._nearbyAllies === 0 || this.hp < this.maxHp * CAUTIOUS_HP_FRAC;
+      if (cautious) {
+        const awayAngle = angleToPlayer + Math.PI;
+        const hullDiff  = shortAngle(this.rotY, awayAngle);
+        this.rotY += Math.sign(hullDiff) * Math.min(Math.abs(hullDiff), this._rotateSpeed * dt);
+        this.speed = Math.max(this.speed - 6 * dt, -this._aiSpeed * 0.5);
+      } else {
+        this.speed = this.speed > 0
+          ? Math.max(0, this.speed - 8 * dt)
+          : Math.min(0, this.speed + 8 * dt);
+      }
 
     } else if (this.state === 'RETREAT') {
       const awayAngle   = angleToPlayer + Math.PI;
@@ -339,11 +391,18 @@ export default class AIEnemy {
       this.speed = Math.max(this.speed - 6 * dt, -this._aiSpeed * 0.7);
     }
 
-    // --- Apply position ---
+    // --- Apply position (forward drive + knockback + group-separation nudge) ---
+    // Separation only applies to active units, so static IDLE/AMBUSH guards hold their
+    // anchor. The nudge is set by ArenaScene's pre-pass and consumed (zeroed) here, so a
+    // stale value can't accumulate; the stun path returns earlier, so stunned units don't drift.
+    const active  = this.state !== 'IDLE' && this.state !== 'AMBUSH';
+    const sepX    = active ? this._sepX : 0;
+    const sepZ    = active ? this._sepZ : 0;
     const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
-    this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + (forward.x * this.speed + this.vx) * dt));
-    this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + (forward.z * this.speed + this.vz) * dt));
+    this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + (forward.x * this.speed + this.vx + sepX) * dt));
+    this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + (forward.z * this.speed + this.vz + sepZ) * dt));
     this.root.rotation.y = this.rotY;
+    this._sepX = 0; this._sepZ = 0;
 
     this._updateTurret(dt, playerPos);
 
@@ -357,12 +416,55 @@ export default class AIEnemy {
     }
   }
 
+  // Current PATROL goal as {x,z}: walks route waypoints (loop or ping-pong), or picks
+  // wander points within `leash` of the anchor. Advances/repicks as the unit arrives.
+  _patrolGoal(dt) {
+    if (!this._patrol) return null;
+    const px = this.root.position.x, pz = this.root.position.z;
+
+    const route = this._patrol.route;
+    if (route && route.length) {
+      const wp = route[this._routeIdx];
+      if (Math.hypot(wp[0] - px, wp[1] - pz) < WANDER_ARRIVE) {
+        if (this._patrol.loop) {
+          this._routeIdx = (this._routeIdx + 1) % route.length;
+        } else {
+          if (this._routeIdx + this._routeDir >= route.length || this._routeIdx + this._routeDir < 0) {
+            this._routeDir *= -1;
+          }
+          this._routeIdx += this._routeDir;
+        }
+      }
+      const g = route[this._routeIdx];
+      return { x: g[0], z: g[1] };
+    }
+
+    // Anchor + leash wander.
+    const anchor = this._patrol.anchor || [px, pz];
+    const leash  = this._patrol.leash ?? LEASH_DEFAULT;
+    this._wanderT -= dt;
+    if (!this._wanderTarget || this._wanderT <= 0 ||
+        Math.hypot(this._wanderTarget[0] - px, this._wanderTarget[1] - pz) < WANDER_ARRIVE) {
+      const a   = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * leash;   // uniform over the disc
+      this._wanderTarget = [anchor[0] + Math.sin(a) * rad, anchor[1] + Math.cos(a) * rad];
+      this._wanderT = WANDER_REPICK;
+    }
+    return { x: this._wanderTarget[0], z: this._wanderTarget[1] };
+  }
+
   _updateTurret(dt, playerPos) {
     if (this.state === 'IDLE' || this.state === 'AMBUSH') return;   // stay still while hidden
 
-    const dx        = playerPos.x - this.root.position.x;
-    const dz        = playerPos.z - this.root.position.z;
-    const targetAim = Math.atan2(dx, dz);
+    // Relaxed turret while roaming: face travel direction, not the player.
+    let targetAim;
+    if (this.state === 'PATROL') {
+      targetAim = this.rotY;
+    } else {
+      const dx  = playerPos.x - this.root.position.x;
+      const dz  = playerPos.z - this.root.position.z;
+      targetAim = Math.atan2(dx, dz);
+    }
     const diff      = shortAngle(this.turretAimAngle, targetAim);
     const maxTurn   = this._turretSpeed * dt;
     this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);

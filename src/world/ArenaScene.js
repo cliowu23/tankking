@@ -420,8 +420,14 @@ export default class ArenaScene {
         }
         return out;
       };
-      const spawnChaff = (cx, cz, n) => {
-        for (const [px, pz] of scatter(cx, cz, n, 3.2)) add(new ChaffEnemy(this.scene, px, pz, { bounds }), px, pz);
+      // patrol: null = static; { route, loop } = shared waypoint path; { leash } = each
+      // unit wanders an area anchored to its own spawn point (leash optional → default).
+      const spawnChaff = (cx, cz, n, patrol = null) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.2)) {
+          let p = null;
+          if (patrol) p = patrol.route ? patrol : { anchor: [px, pz], leash: patrol.leash };
+          add(new ChaffEnemy(this.scene, px, pz, { bounds, patrol: p }), px, pz);
+        }
       };
       const spawnSentinels = (cx, cz, n, t, ambush) => {
         for (const [px, pz] of scatter(cx, cz, n, 3.6))
@@ -434,6 +440,10 @@ export default class ArenaScene {
         if (e.poi) {
           if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
           else                     spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+        } else if (e.mode === 'patrol') {
+          // §③: roaming pack — shared route if authored, else per-unit area wander.
+          const patrol = e.route ? { route: e.route, loop: e.loop } : { leash: e.leash };
+          spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2), patrol);
         } else {
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
         }
@@ -892,6 +902,31 @@ export default class ArenaScene {
 
       this.tank.update(dt);
       this._clampCorridor();
+
+      // Group-steering pre-pass (§③): per living enemy, sum an inverse-distance
+      // separation nudge from packmates (anti-clump) and count nearby allies (feeds
+      // light "confidence" — lone scouts kite). N² over the small living pack = cheap.
+      // Encirclement/high-aggression layers are deferred to W2+ (see design doc).
+      const SEP_RADIUS = 6, SEP_MAX = 2.5;
+      for (const e of this.enemies) {
+        if (!e.alive) { e._sepX = 0; e._sepZ = 0; e._nearbyAllies = 0; continue; }
+        let sx = 0, sz = 0, allies = 0;
+        for (const o of this.enemies) {
+          if (o === e || !o.alive) continue;
+          const dx = e.position.x - o.position.x, dz = e.position.z - o.position.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= SEP_RADIUS * SEP_RADIUS || d2 < 1e-4) continue;
+          allies++;
+          const d = Math.sqrt(d2), w = (SEP_RADIUS - d) / SEP_RADIUS;   // 1 when overlapping → 0 at edge
+          sx += (dx / d) * w; sz += (dz / d) * w;
+        }
+        const mag = Math.hypot(sx, sz);
+        if (mag > 1e-4) {
+          const strength = Math.min(mag, 1) * SEP_MAX;   // smooth 0→cap; reaches SEP_MAX when crowded
+          e._sepX = (sx / mag) * strength; e._sepZ = (sz / mag) * strength;
+        } else { e._sepX = 0; e._sepZ = 0; }
+        e._nearbyAllies = allies;
+      }
 
       let _aliveEnemies = 0;
       for (const enemy of this.enemies) {
