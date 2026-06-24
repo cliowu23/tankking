@@ -15,6 +15,7 @@ import { attachCrt } from '../core/crtFilter.js';
 import { measureBasket } from '../tank/parts/measureBasket.js';
 import SentinelEnemy from '../world/SentinelEnemy.js';
 import ChaffEnemy from '../world/ChaffEnemy.js';
+import MortarEnemy from '../world/MortarEnemy.js';
 
 const PAD_Y = 0.06;
 
@@ -472,7 +473,7 @@ export default class TankDesignerScene {
         enemyTitle.className = 'ds-title';
         enemyTitle.textContent = 'ENEMIES · VIEW';
         sidebar.appendChild(enemyTitle);
-        for (const [kind, name] of [['sentinel', 'SENTINEL-BOT'], ['chaff', 'CHAFF SCOUT']]) {
+        for (const [kind, name] of [['sentinel', 'SENTINEL-BOT'], ['chaff', 'CHAFF SCOUT'], ['mortar', 'MORTAR-BOT']]) {
           const eb = document.createElement('button');
           eb.className = 'shape-btn';
           eb.textContent = name;
@@ -607,7 +608,7 @@ export default class TankDesignerScene {
 
     this._clearCurrentModel();
 
-    const EnemyClass = kind === 'chaff' ? ChaffEnemy : SentinelEnemy;
+    const EnemyClass = kind === 'chaff' ? ChaffEnemy : kind === 'mortar' ? MortarEnemy : SentinelEnemy;
     const enemy = new EnemyClass(this.scene, 0, 0, { bounds: 9999 });
     this._enemyInstance = enemy;
 

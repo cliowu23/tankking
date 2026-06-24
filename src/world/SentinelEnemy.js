@@ -310,7 +310,7 @@ export default class SentinelEnemy extends AIEnemy {
     const eng = this.scene.getEngine();
     const w = eng.getRenderWidth(), h = eng.getRenderHeight();
     const p = Vector3.Project(
-      this.root.position, Matrix.Identity(), this.scene.getTransformationMatrix(),
+      this.root.position, Matrix.Identity(), this.scene.getTransformMatrix(),
       cam.viewport.toGlobal(w, h),
     );
     if (p.z < 0 || p.z > 1) return false;   // behind the camera / clipped

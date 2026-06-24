@@ -34,7 +34,7 @@ export function loadEnemyTemplate(scene, key, palette) {
   if (c['_p_' + key]) return c['_p_' + key];
 
   c['_p_' + key] = (async () => {
-    const file = key === 'chaff' ? 'chaff.glb' : 'sentinel.glb';
+    const file = `${key}.glb`;   // 'chaff' → chaff.glb, 'sentinel' → sentinel.glb, 'mortar' → mortar.glb
     const res = await SceneLoader.ImportMeshAsync('', DIR, file, scene);
     const body = flatMat(scene, `${key}_body`, palette.body);
     const dark = flatMat(scene, `${key}_dark`, palette.dark, { spec: [0.05, 0.05, 0.06] });

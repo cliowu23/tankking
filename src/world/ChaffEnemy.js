@@ -52,7 +52,7 @@ export default class ChaffEnemy extends AIEnemy {
   constructor(scene, x, z, opts = {}) {
     super(scene, x, z, {
       hp: 30,            // dies in ~1 player shot (34 dmg)
-      damage: 5,         // CHIP per laser bolt
+      damage: 4,         // CHIP per laser bolt (pure background tick; the Mortar carries the spike)
       aiSpeed: 9,        // fast
       optimalRange: 9,   // RUSHER: gets in your face
       aggroRange: 35,    // ≈ tank-to-top-of-screen on desktop: an engagement only STARTS

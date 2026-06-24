@@ -1,4 +1,4 @@
-import { MeshBuilder, StandardMaterial, Color3, Color4, Vector3 } from '@babylonjs/core';
+import { MeshBuilder, StandardMaterial, Color3, Color4, Vector3, Constants } from '@babylonjs/core';
 
 // Impact + muzzle visual effects for the arena. Self-contained: receives world
 // positions (and a critical flag) only — never reads tank/enemy/scene game state.
@@ -149,6 +149,45 @@ export default class ArenaVFX {
       mesh._vfxActive = false;
       this._muzzleSmokes.push(mesh);
     }
+
+    // --- Mortar plasma bursts (3 slots): bright core + expanding plasma shell +
+    // a flat ground ring. All RED (the King's plasma) and SIZED to the splash radius. ---
+    const additive = (name, rgb, alpha) => {
+      const m = new StandardMaterial(name, this.scene);
+      m.emissiveColor = new Color3(...rgb); m.diffuseColor = new Color3(0, 0, 0);
+      m.disableLighting = true; m.alpha = alpha; m.alphaMode = Constants.ALPHA_ADD; m.backFaceCulling = false;
+      return m;
+    };
+    this._plasmaBursts = [];
+    for (let i = 0; i < 3; i++) {
+      const core = MeshBuilder.CreateSphere(`plasmaCore_${i}`, { diameter: 1.0, segments: 12 }, this.scene);
+      core.material = additive(`plasmaCoreMat_${i}`, [1.0, 0.45, 0.38], 1.0);   // hot red-white centre
+      core.isVisible = false; core.isPickable = false;
+      const shell = MeshBuilder.CreateSphere(`plasmaShell_${i}`, { diameter: 1.0, segments: 12 }, this.scene);
+      shell.material = additive(`plasmaShellMat_${i}`, [1.0, 0.12, 0.08], 0.55); // red plasma ball
+      shell.isVisible = false; shell.isPickable = false;
+      const ring = MeshBuilder.CreateDisc(`plasmaRing_${i}`, { radius: 1.0, tessellation: 28 }, this.scene);
+      ring.rotation.x = Math.PI / 2;
+      ring.material = additive(`plasmaRingMat_${i}`, [1.0, 0.16, 0.10], 0.85);   // ground shockwave
+      ring.isVisible = false; ring.isPickable = false;
+      this._plasmaBursts.push({ core, shell, ring, _vfxActive: false });
+    }
+  }
+
+  // Big red plasma detonation sized to `radius` (== the splash damage circle): a bright
+  // core flash, an expanding plasma sphere whose radius reaches `radius`, and a flat
+  // ground ring marking the blast edge. Pooled; silently drops if all slots are busy.
+  spawnPlasmaBurst(pos, radius = 4.5) {
+    let slot = -1;
+    for (let i = 0; i < this._plasmaBursts.length; i++) if (!this._plasmaBursts[i]._vfxActive) { slot = i; break; }
+    if (slot === -1) return;
+    const b = this._plasmaBursts[slot];
+    b._vfxActive = true;
+    const oy = Math.max(0.5, pos.y);
+    b.core.isVisible  = true; b.core.position.set(pos.x, oy, pos.z);  b.core.scaling.setAll(radius * 0.4);  b.core.material.alpha = 1.0;
+    b.shell.isVisible = true; b.shell.position.set(pos.x, oy, pos.z); b.shell.scaling.setAll(radius * 0.5); b.shell.material.alpha = 0.55;
+    b.ring.isVisible  = true; b.ring.position.set(pos.x, 0.12, pos.z); b.ring.scaling.setAll(radius * 0.25); b.ring.material.alpha = 0.85;
+    this._activeVFX.push({ type: 'plasmaBurst', burst: b, radius, t: 0, duration: 0.5 });
   }
 
   spawnMuzzleFlash(pos) {
@@ -311,6 +350,10 @@ export default class ArenaVFX {
           entry.flash.isVisible  = false; entry.flash._vfxActive = false;
           for (const s of entry.sparks) { s.isVisible = false; s._vfxActive = false; }
           for (const s of entry.smokes) { s.isVisible = false; s._vfxActive = false; }
+        } else if (entry.type === 'plasmaBurst') {
+          const b = entry.burst;
+          b.core.isVisible = false; b.shell.isVisible = false; b.ring.isVisible = false;
+          b._vfxActive = false;
         } else {
           entry.mesh.isVisible  = false;
           entry.mesh._vfxActive = false;
@@ -431,6 +474,20 @@ export default class ArenaVFX {
             }
           }
         }
+      } else if (entry.type === 'plasmaBurst') {
+        const b = entry.burst, R = entry.radius;
+        const eased = 1 - (1 - p) * (1 - p);
+        // Core flash: bright, peaks small, fades out by ~45%
+        const cp = Math.min(1, p / 0.45);
+        b.core.scaling.setAll(R * (0.4 + eased * 0.5));
+        b.core.material.alpha = 1.0 - cp;
+        if (cp >= 1) b.core.isVisible = false;
+        // Plasma shell: sphere radius expands to exactly R (== splash circle), fades out
+        b.shell.scaling.setAll(2 * R * eased);          // diameter-1 sphere → radius R at full
+        b.shell.material.alpha = 0.55 * (1 - p);
+        // Ground ring: disc radius expands to R, fades (snappier)
+        b.ring.scaling.setAll(R * eased);               // radius-1 disc → radius R
+        b.ring.material.alpha = 0.85 * (1 - p * p);
       } else if (entry.type === 'normalImpact') {
         const eased = 1 - (1 - p) * (1 - p);
 
