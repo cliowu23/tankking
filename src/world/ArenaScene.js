@@ -38,6 +38,10 @@ const LOCKON_ENABLED     = false;
 const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
 const CAM_RADIUS         = 48;    // distance (zoomed out a tad from 42)
 const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
+// Hitting an enemy wakes its whole squad within this radius. Counterweight to the
+// tightened on-screen aggro: the player out-ranges a scout's detection, so picking
+// one off can't be free — its packmates turn on you the moment you draw blood.
+const PACK_ALERT_RADIUS  = 40;
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -1558,6 +1562,18 @@ export default class ArenaScene {
   }
 
 
+  // Wake every living enemy within PACK_ALERT_RADIUS of `hit` (it included). Lets a
+  // single landed/landing shot rouse a scout's whole squad, so the player can't farm
+  // them one by one from beyond their (deliberately on-screen) detection range.
+  _alertPack(hit) {
+    const ox = hit.position.x, oz = hit.position.z, r2 = PACK_ALERT_RADIUS * PACK_ALERT_RADIUS;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const dx = e.position.x - ox, dz = e.position.z - oz;
+      if (dx * dx + dz * dz <= r2) e.alert?.();
+    }
+  }
+
   _checkShellHits() {
     // Enemy shells hitting the player — every enemy's pool, per-enemy damage
     outer:
@@ -1601,6 +1617,7 @@ export default class ArenaScene {
           this.vfx.spawnTankImpact(shell.position.clone(), isCritical);
           shell.deactivate();
           enemy.takeDamage(damage);
+          this._alertPack(enemy);   // drawing blood turns the whole nearby squad on you
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
           music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
           if (!enemy.alive && this.lockedEnemy === enemy) {

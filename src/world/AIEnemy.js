@@ -416,13 +416,18 @@ export default class AIEnemy {
 
     // --- Fire ---
     this.fireCooldown -= dt;
-    if (this.state === 'COMBAT' && this.fireCooldown <= 0) {
+    if (this._shouldFire() && this.fireCooldown <= 0) {
       const aimDiff = Math.abs(shortAngle(this.turretAimAngle, angleToPlayer));
       if (aimDiff < this._aimTolerance) {
         this._fire();
       }
     }
   }
+
+  // Which states this unit opens fire in. Base = hold-and-shoot: only once it has
+  // settled into COMBAT at its optimal range. Subclasses widen this — e.g. a chaff
+  // scout suppresses while still closing (APPROACH) for constant pressure.
+  _shouldFire() { return this.state === 'COMBAT'; }
 
   // Current PATROL goal as {x,z}: walks route waypoints (loop or ping-pong), or picks
   // wander points within `leash` of the anchor. Advances/repicks as the unit arrives.

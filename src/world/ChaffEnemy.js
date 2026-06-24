@@ -2,8 +2,14 @@
 // World 1 chaff: a tiny legged SCOUT-BOT whose glowing red eye fires laser
 // bolts — the King's disposable swarm and the horde on-ramp (Duckov spider-bot
 // energy). Extends AIEnemy and reuses its state machine; swaps the single-shell
-// cannon for an eye-laser that fires a STREAM of bolts (big pool + wide
-// tolerance + short interval, in readable bursts).
+// cannon for an eye-laser.
+//
+// Weapon feel (2026-06-24 rework): a STEADY, slower plink rather than a burst.
+// The old 5-bolt-burst-then-regroup model concentrated damage into point-blank
+// shreds while reading as passive at range; the new model is one bolt on a
+// consistent ~0.8s cadence so a chaff is a constant low-grade pressure source —
+// you always see (and hear) it shooting at you. It also fires while CLOSING, not
+// only once settled at range, so an advancing swarm lays down suppressing fire.
 //
 // Visuals are a primitive placeholder (the real walker model is a separate
 // visuals-session task): a low gunmetal body on four animated spider legs, and
@@ -20,14 +26,18 @@ import LaserBolt from '../combat/LaserBolt.js';
 import { loadEnemyTemplate } from './enemyModels.js';
 import { audio } from '../core/audio/AudioManager.js';
 
-const LASER_POOL     = 14;                  // bolts in flight at once (stream needs depth)
+const LASER_POOL     = 8;                   // bolts in flight at once (steady plink needs less depth)
 const LASER_HSPEED   = 60;                  // bolt travels faster than a shell (35)
-const LASER_SPREAD   = 4.5 * Math.PI / 180; // azimuth cone — a dodgeable stream, not a beam
+const LASER_SPREAD   = 4.5 * Math.PI / 180; // azimuth cone — a dodgeable bolt, not a beam
 const LASER_RANGE    = 40;                  // despawn distance
-const LASER_INTERVAL = 0.10;                // seconds between bolts while bursting (10/s)
-const LASER_BURST    = 5;                   // bolts per burst before a short regroup pause
-const LASER_REGROUP  = 0.7;                 // pause between bursts (readable, not a wall)
-const LASER_AIM_TOL  = 14 * Math.PI / 180;  // wide — fires when roughly on target
+const LASER_INTERVAL = 0.8;                 // seconds between bolts — steady ~1.25/s pressure
+const LASER_JITTER   = 0.15;               // ± cadence jitter so a swarm doesn't fire in lockstep
+const LASER_AIM_TOL  = 18 * Math.PI / 180;  // wide — suppresses even while turning/closing
+// Eye sits at ~1.62 world, but enemy bolts only register on the player below y=1.6
+// (ArenaScene._checkShellHits). Spawn the bolt just under the lens so it travels
+// inside the hit window at every range — the old code only landed point-blank,
+// when the barrel happened to pitch down. Flat bolt (no ballistic elevation).
+const LASER_FIRE_Y   = 1.4;
 
 const GAIT_FREQ  = 1.7;   // leg-cycle speed per unit of ground speed (skitter cadence)
 const GAIT_SWING = 0.55;  // radians the legs swing fore-aft
@@ -45,8 +55,9 @@ export default class ChaffEnemy extends AIEnemy {
       damage: 5,         // CHIP per laser bolt
       aiSpeed: 9,        // fast
       optimalRange: 9,   // RUSHER: gets in your face
-      aggroRange: 40,    // notices and charges from far (it's fast — closes the gap before
-                         // you can pick it off from your 45u shell range)
+      aggroRange: 35,    // ≈ tank-to-top-of-screen on desktop: an engagement only STARTS
+                         // once the scout is on-screen — no sniping you from beyond view.
+                         // Once aggro'd it commits, closing + firing the whole way in.
       cooldown: LASER_INTERVAL,
       ...opts,
       noPrimitiveVisuals: true,   // we draw our own walker below
@@ -58,7 +69,6 @@ export default class ChaffEnemy extends AIEnemy {
     this._aimTolerance = LASER_AIM_TOL;
     this._tipOffset    = 0.12;         // bolt spawn just ahead of the eye lens
     this._eyeFlash     = 0;            // 0..1, brightens the eye briefly on each shot
-    this._burstLeft    = LASER_BURST;
     this._gaitPhase = 0; this._gaitSpeed = 0; this._legs = [];
 
     // Replace the inherited 4-shell cannon pool with a laser-bolt pool.
@@ -245,8 +255,20 @@ export default class ChaffEnemy extends AIEnemy {
     if (this.turret && !this.turret.isAnInstance) shadowGen.addShadowCaster(this.turret);
   }
 
-  // Fire a single laser bolt from the eye with azimuth spread, in bursts so the
-  // stream stays readable (the player must be able to boost across the gaps).
+  // A scout suppresses while still closing, not only once parked at optimal range —
+  // an advancing swarm should be visibly shooting at you the whole approach.
+  _shouldFire() {
+    return this.state === 'COMBAT' || this.state === 'APPROACH' || this.state === 'RETREAT';
+  }
+
+  // Lasers are flat energy bolts — skip the inherited ballistic elevation (whose
+  // tiny tipOffset made it saturate to ±90° and pitch the eye). Keeping the dome
+  // level also keeps the bolt origin stable inside the player hit window.
+  _elevationForHeight() { return 0; }
+
+  // Fire one laser bolt from the eye with a little azimuth spread, on a steady
+  // cadence (with jitter). Spawned just under the lens so it stays inside the
+  // player hit window at any range — consistent chip pressure, not a burst.
   _fire() {
     const bolt = this.shells.find(s => !s.active);
     if (!bolt) return;
@@ -254,20 +276,13 @@ export default class ChaffEnemy extends AIEnemy {
     const spread = (Math.random() - 0.5) * 2 * LASER_SPREAD;
     const aim = this.turretAimAngle + spread;
     bolt.fire(
-      tip.x, tip.y, tip.z,
+      tip.x, Math.min(tip.y, LASER_FIRE_Y), tip.z,
       Math.sin(aim) * LASER_HSPEED, 0, Math.cos(aim) * LASER_HSPEED,
       LASER_RANGE,
     );
     audio.play('enemy.chaff_laser_fire', { emitter: this.root });
 
-    // Burst cadence: after LASER_BURST bolts, take a longer regroup pause.
-    this._burstLeft -= 1;
-    if (this._burstLeft <= 0) {
-      this._burstLeft = LASER_BURST;
-      this.fireCooldown = LASER_REGROUP;
-    } else {
-      this.fireCooldown = LASER_INTERVAL;
-    }
+    this.fireCooldown = LASER_INTERVAL + (Math.random() - 0.5) * 2 * LASER_JITTER;
     this._eyeFlash = 1;   // eye pulses bright on the shot (no recoil — it's a laser)
   }
 
