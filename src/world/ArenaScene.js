@@ -43,6 +43,9 @@ const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigge
 // tightened on-screen aggro: the player out-ranges a scout's detection, so picking
 // one off can't be free — its packmates turn on you the moment you draw blood.
 const PACK_ALERT_RADIUS  = 40;
+// World-1 mortar support odds (mid/deep bands only — the near on-ramp stays gentle).
+const MORTAR_SUPPORT_CHANCE = 0.40;   // a sentinel group brings artillery support
+const MORTAR_SQUAD_CHANCE   = 0.12;   // rare: a chaff squad rolls a lone mortar
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -438,19 +441,39 @@ export default class ArenaScene {
         for (const [px, pz] of scatter(cx, cz, n, 3.6))
           add(new SentinelEnemy(this.scene, px, pz, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ambush, bounds }), px, pz);
       };
+      // Artillery support: place n mortar(s) set BACK from the squad (deeper into the
+      // field, +Z away from the player's southern approach) so they lob over their own
+      // line rather than standing in it.
+      const spawnMortarSupport = (cx, cz, n = 1) => {
+        for (let i = 0; i < n; i++) {
+          const px = cx + (Math.random() - 0.5) * 8;
+          const pz = cz + 10 + Math.random() * 6;   // 10–16u deeper than the squad
+          add(new MortarEnemy(this.scene, px, pz, { bounds }), px, pz);
+        }
+      };
       // Each former single-tank spawn becomes a spider-bot pack; POI markers become
-      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm.
+      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm. Mid/deep
+      // encounters can additionally bring a Mortar-bot: likely behind a Sentinel group
+      // (artillery support), rarely behind a spider squad. The 'near' on-ramp stays gentle.
       for (const e of this.zone.enemies) {
         const t = tuning[e.band] || tuning.mid;
+        const escalated = e.band !== 'near';   // gate artillery to mid/deep depth
         if (e.poi) {
-          if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
-          else                     spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+          if (Math.random() < 0.5) {
+            spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+            if (escalated && Math.random() < MORTAR_SUPPORT_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          } else {
+            spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+            if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          }
         } else if (e.mode === 'patrol') {
           // §③: roaming pack — shared route if authored, else per-unit area wander.
           const patrol = e.route ? { route: e.route, loop: e.loop } : { leash: e.leash };
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2), patrol);
+          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
         } else {
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
+          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
         }
       }
       // Any explicitly-seeded chaff from the zone config.

@@ -22,6 +22,7 @@ const CHARGE_TIME   = 0.9;    // wind-up tell before it lobs (s)
 const FLIGHT_TIME   = 0.85;   // shell airtime (you watch it arc + the ring)
 const ARC_PEAK      = 6.5;    // shell apex height
 const SPLASH_RADIUS = 4.5;
+const LEAD_MAX      = 16;     // cap on how far ahead of the player the lob will lead (u)
 const RECOVERY      = 1.6;    // exposed window after a shot
 const MODEL_SCALE   = 0.72;   // tune to Sentinel scale
 const SCREEN_MARGIN = 0.03;
@@ -53,7 +54,7 @@ export default class MortarEnemy extends AIEnemy {
     this._charging = false;
     this._chargeT  = 0;
     this._eyeFlash = 0;
-    this._lockX = 0; this._lockZ = 0;          // ground point locked at charge start
+    this._pvx = 0; this._pvz = 0;              // tracked player velocity (for target leading)
     this._legs = []; this._gaitPhase = 0; this._gaitSpeed = 0;
 
     for (const s of this.shells) s.deactivate?.();
@@ -146,13 +147,20 @@ export default class MortarEnemy extends AIEnemy {
     if (!this._onScreen()) return;
     this._charging = true; this._chargeT = 0;
     this.fireCooldown = 999;            // parked; release sets the real recovery
-    this._lockX = this._lastPlayer?.x ?? this.root.position.x;
-    this._lockZ = this._lastPlayer?.z ?? this.root.position.z;
     audio.play('enemy.sentinel_beam_charge', { emitter: this.root });   // reuse charge SFX for now
   }
 
   update(dt, playerPos) {
     this._lastPlayer = playerPos;
+    // Track the player's (smoothed) velocity so the lob can LEAD a moving target.
+    const dtc = Math.max(dt, 1e-3);
+    if (this._prevPX !== undefined) {
+      const vx = (playerPos.x - this._prevPX) / dtc, vz = (playerPos.z - this._prevPZ) / dtc;
+      const k = Math.min(1, dt * 8);
+      this._pvx = (this._pvx ?? 0) + (vx - (this._pvx ?? 0)) * k;
+      this._pvz = (this._pvz ?? 0) + (vz - (this._pvz ?? 0)) * k;
+    }
+    this._prevPX = playerPos.x; this._prevPZ = playerPos.z;
     super.update(dt, playerPos);
     if (!this.alive) return;
     // Artillery keeps its body (and the rear mortar + eye) facing you, even while
@@ -184,7 +192,15 @@ export default class MortarEnemy extends AIEnemy {
     if (shell && this.muzzle) {
       this.muzzle.computeWorldMatrix(true);
       const m = this.muzzle.getBoundingInfo().boundingBox.centerWorld;
-      shell.fire(m.x, m.y, m.z, this._lockX, this._lockZ, FLIGHT_TIME, ARC_PEAK, SPLASH_RADIUS, this.shellDamage);
+      // LEAD the shot: aim where the player will be when it lands (pos + vel × airtime).
+      // A constant-heading runner gets hit; you dodge by CHANGING direction mid-flight.
+      const px = this._lastPlayer?.x ?? this.root.position.x;
+      const pz = this._lastPlayer?.z ?? this.root.position.z;
+      let tx = px + (this._pvx ?? 0) * FLIGHT_TIME;
+      let tz = pz + (this._pvz ?? 0) * FLIGHT_TIME;
+      const ldx = tx - px, ldz = tz - pz, ld = Math.hypot(ldx, ldz);
+      if (ld > LEAD_MAX) { tx = px + ldx / ld * LEAD_MAX; tz = pz + ldz / ld * LEAD_MAX; }  // cap a boost-dash overshoot
+      shell.fire(m.x, m.y, m.z, tx, tz, FLIGHT_TIME, ARC_PEAK, SPLASH_RADIUS, this.shellDamage);
     }
     this._eyeFlash = 1;
     audio.play('enemy.sentinel_beam_fire', { emitter: this.root });
