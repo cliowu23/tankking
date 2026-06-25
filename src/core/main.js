@@ -482,6 +482,7 @@ function startGame() {
 }
 
 function startHangar() {
+  document.getElementById('dev-spawn-menu')?.remove();   // sweep the dev-arena spawn panel on exit
   music.playShutter();       // iris/aperture whoosh under the wipe
   transition(
     () => {
@@ -617,6 +618,7 @@ function dismissControls() {
 function goToMenu() {
   const overlay = document.getElementById('crt-off');
   if (overlay.classList.contains('playing') || _tBusy) return;
+  document.getElementById('dev-spawn-menu')?.remove();   // sweep the dev-arena spawn panel on exit
   document.getElementById('pause').style.display = 'none';
   document.getElementById('death').style.display = 'none';
   document.getElementById('hud').style.display   = 'none';

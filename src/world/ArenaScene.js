@@ -15,6 +15,7 @@ import { PARTS_BY_ID, DEFAULT_LOADOUT, validLoadout } from '../tank/parts/index.
 import Tank from '../tank/Tank.js';
 import SentinelEnemy from './SentinelEnemy.js';
 import ChaffEnemy from './ChaffEnemy.js';
+import MortarEnemy from './MortarEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -38,6 +39,13 @@ const LOCKON_ENABLED     = false;
 const CAM_BETA           = 0.6;   // tilt (was a fixed 0.5 top-down)
 const CAM_RADIUS         = 48;    // distance (zoomed out a tad from 42)
 const CAM_YAW_SMOOTH_TIME = 0.40; // critically-damped yaw smoothTime (s): bigger = more lag/smoother
+// Hitting an enemy wakes its whole squad within this radius. Counterweight to the
+// tightened on-screen aggro: the player out-ranges a scout's detection, so picking
+// one off can't be free — its packmates turn on you the moment you draw blood.
+const PACK_ALERT_RADIUS  = 40;
+// World-1 mortar support odds (mid/deep bands only — the near on-ramp stays gentle).
+const MORTAR_SUPPORT_CHANCE = 0.40;   // a sentinel group brings artillery support
+const MORTAR_SQUAD_CHANCE   = 0.12;   // rare: a chaff squad rolls a lone mortar
 
 export default class ArenaScene {
   constructor(engine, onExtract, zone = null) {
@@ -420,22 +428,52 @@ export default class ArenaScene {
         }
         return out;
       };
-      const spawnChaff = (cx, cz, n) => {
-        for (const [px, pz] of scatter(cx, cz, n, 3.2)) add(new ChaffEnemy(this.scene, px, pz, { bounds }), px, pz);
+      // patrol: null = static; { route, loop } = shared waypoint path; { leash } = each
+      // unit wanders an area anchored to its own spawn point (leash optional → default).
+      const spawnChaff = (cx, cz, n, patrol = null) => {
+        for (const [px, pz] of scatter(cx, cz, n, 3.2)) {
+          let p = null;
+          if (patrol) p = patrol.route ? patrol : { anchor: [px, pz], leash: patrol.leash };
+          add(new ChaffEnemy(this.scene, px, pz, { bounds, patrol: p }), px, pz);
+        }
       };
       const spawnSentinels = (cx, cz, n, t, ambush) => {
         for (const [px, pz] of scatter(cx, cz, n, 3.6))
           add(new SentinelEnemy(this.scene, px, pz, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ambush, bounds }), px, pz);
       };
+      // Artillery support: place n mortar(s) set BACK from the squad (deeper into the
+      // field, +Z away from the player's southern approach) so they lob over their own
+      // line rather than standing in it.
+      const spawnMortarSupport = (cx, cz, n = 1) => {
+        for (let i = 0; i < n; i++) {
+          const px = cx + (Math.random() - 0.5) * 8;
+          const pz = cz + 10 + Math.random() * 6;   // 10–16u deeper than the squad
+          add(new MortarEnemy(this.scene, px, pz, { bounds }), px, pz);
+        }
+      };
       // Each former single-tank spawn becomes a spider-bot pack; POI markers become
-      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm.
+      // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm. Mid/deep
+      // encounters can additionally bring a Mortar-bot: likely behind a Sentinel group
+      // (artillery support), rarely behind a spider squad. The 'near' on-ramp stays gentle.
       for (const e of this.zone.enemies) {
         const t = tuning[e.band] || tuning.mid;
+        const escalated = e.band !== 'near';   // gate artillery to mid/deep depth
         if (e.poi) {
-          if (Math.random() < 0.5) spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
-          else                     spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+          if (Math.random() < 0.5) {
+            spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+            if (escalated && Math.random() < MORTAR_SUPPORT_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          } else {
+            spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
+            if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          }
+        } else if (e.mode === 'patrol') {
+          // §③: roaming pack — shared route if authored, else per-unit area wander.
+          const patrol = e.route ? { route: e.route, loop: e.loop } : { leash: e.leash };
+          spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2), patrol);
+          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
         } else {
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
+          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
         }
       }
       // Any explicitly-seeded chaff from the zone config.
@@ -443,31 +481,13 @@ export default class ArenaScene {
       // The loading screen waits for the player AND the composed enemies.
       this.ready = Promise.all([this.ready, ...this.enemies.map(e => e.ready)]);
     } else {
-      // Dev arena (the grid blank room) = a clean enemy-testing sandbox.
-      // NOTE: the old static `Enemy` class has no `rotY`, which makes the
-      // tank-vs-enemy OBB collision compute Math.cos(undefined)=NaN and poison
-      // the tank position → black/sky screen. So we DON'T spawn it here; only
-      // SentinelEnemy + ChaffEnemy, which have proper rotY/getVelocity/extents.
+      // Dev arena (the grid blank room) = a clean enemy-testing sandbox with a live
+      // spawn menu (pick the mix on the fly). Only rotY-capable enemies spawn here.
       this.enemies = [];
       this._spawnDefs = [];
-
-      const sentinel = new SentinelEnemy(this.scene, 0, 42, { bounds });
-      sentinel.addShadows(this.shadowGen);
-      this.enemies.push(sentinel);
-      this._spawnDefs.push([0, 42]);
-
-      // A ring of scout-bot chaff to fight.
-      const CHAFF_RING_COUNT  = 8;
-      const CHAFF_RING_RADIUS = 22;
-      for (let i = 0; i < CHAFF_RING_COUNT; i++) {
-        const ang = (i / CHAFF_RING_COUNT) * Math.PI * 2;
-        const cx  = Math.sin(ang) * CHAFF_RING_RADIUS;
-        const cz  = Math.cos(ang) * CHAFF_RING_RADIUS;
-        const c   = new ChaffEnemy(this.scene, cx, cz, { bounds });
-        c.addShadows(this.shadowGen);
-        this.enemies.push(c);
-        this._spawnDefs.push([cx, cz]);
-      }
+      this._devBounds = bounds;
+      this._spawnDevSet({ chaff: 6, sentinel: 1, mortar: 2 });   // sensible default mix
+      this._buildDevSpawnMenu();
     }
 
 
@@ -893,6 +913,31 @@ export default class ArenaScene {
       this.tank.update(dt);
       this._clampCorridor();
 
+      // Group-steering pre-pass (§③): per living enemy, sum an inverse-distance
+      // separation nudge from packmates (anti-clump) and count nearby allies (feeds
+      // light "confidence" — lone scouts kite). N² over the small living pack = cheap.
+      // Encirclement/high-aggression layers are deferred to W2+ (see design doc).
+      const SEP_RADIUS = 6, SEP_MAX = 2.5;
+      for (const e of this.enemies) {
+        if (!e.alive) { e._sepX = 0; e._sepZ = 0; e._nearbyAllies = 0; continue; }
+        let sx = 0, sz = 0, allies = 0;
+        for (const o of this.enemies) {
+          if (o === e || !o.alive) continue;
+          const dx = e.position.x - o.position.x, dz = e.position.z - o.position.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= SEP_RADIUS * SEP_RADIUS || d2 < 1e-4) continue;
+          allies++;
+          const d = Math.sqrt(d2), w = (SEP_RADIUS - d) / SEP_RADIUS;   // 1 when overlapping → 0 at edge
+          sx += (dx / d) * w; sz += (dz / d) * w;
+        }
+        const mag = Math.hypot(sx, sz);
+        if (mag > 1e-4) {
+          const strength = Math.min(mag, 1) * SEP_MAX;   // smooth 0→cap; reaches SEP_MAX when crowded
+          e._sepX = (sx / mag) * strength; e._sepZ = (sz / mag) * strength;
+        } else { e._sepX = 0; e._sepZ = 0; }
+        e._nearbyAllies = allies;
+      }
+
       let _aliveEnemies = 0;
       for (const enemy of this.enemies) {
         enemy.update(dt, this.tank.position);
@@ -925,6 +970,7 @@ export default class ArenaScene {
       if (_cdBefore > 0 && this._fireCooldown === 0) audio.play('tank.reload', { emitter: this.tank.root }); // cannon ready
       for (const shell of this.shells) shell.update(dt);
       this._checkShellHits();
+      this._checkMortarSplash();
       this._updateExtraction(dt);
       this._updateContainers();
       this.vfx.update(dt);
@@ -1523,6 +1569,117 @@ export default class ArenaScene {
   }
 
 
+  // Wake every living enemy within PACK_ALERT_RADIUS of `hit` (it included). Lets a
+  // single landed/landing shot rouse a scout's whole squad, so the player can't farm
+  // them one by one from beyond their (deliberately on-screen) detection range.
+  _alertPack(hit) {
+    const ox = hit.position.x, oz = hit.position.z, r2 = PACK_ALERT_RADIUS * PACK_ALERT_RADIUS;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const dx = e.position.x - ox, dz = e.position.z - oz;
+      if (dx * dx + dz * dz <= r2) e.alert?.();
+    }
+  }
+
+  // --- Dev-arena spawn menu (zoneless sandbox only) ---------------------------------
+  // Spawn a mix of enemies in tidy rows ahead of the player. `replace` clears the
+  // current field first (SPAWN); false appends to it (ADD).
+  _spawnDevSet(counts, replace = true) {
+    if (replace) this._clearEnemies();
+    const bounds = this._devBounds ?? 48;
+    const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy };
+    const rows = [['sentinel', counts.sentinel | 0, 40], ['mortar', counts.mortar | 0, 30], ['chaff', counts.chaff | 0, 20]];
+    for (const [type, n, baseZ] of rows) {
+      for (let i = 0; i < n; i++) {
+        const spread = n === 1 ? 0 : (i / (n - 1) - 0.5);
+        const x = spread * Math.min(40, 8 + n * 4);
+        const z = baseZ + (i % 2) * 4;
+        const e = new ctor[type](this.scene, x, z, { bounds });
+        e.addShadows?.(this.shadowGen);
+        this.enemies.push(e);
+        this._spawnDefs.push([x, z]);
+      }
+    }
+  }
+
+  // Dispose the current enemy field (subtrees + their shell meshes), keeping the
+  // shared GLB templates. Used by the dev SPAWN/CLEAR buttons.
+  _clearEnemies() {
+    for (const e of this.enemies) {
+      if (this.lockedEnemy === e) this.lockedEnemy = null;
+      if (e.shells) for (const s of e.shells) { s.mesh?.dispose(); s._tail?.dispose?.(); s._halo?.dispose?.(); s.halo?.dispose?.(); }
+      e.hpBarBg?.dispose(); e.hpBarFill?.dispose();
+      e.root?.dispose();   // recurses children, leaves shared template materials alone
+    }
+    this.enemies = [];
+    this._spawnDefs = [];
+  }
+
+  _buildDevSpawnMenu() {
+    document.getElementById('dev-spawn-menu')?.remove();
+    const counts = { chaff: 6, sentinel: 1, mortar: 2 };
+    const bs = 'background:#15303a;color:#bfe;border:1px solid #2a6;border-radius:3px;padding:3px 8px;cursor:pointer;font:inherit;font-size:11px;';
+    const el = document.createElement('div');
+    el.id = 'dev-spawn-menu';
+    el.style.cssText = 'position:fixed;top:64px;right:12px;z-index:50;background:rgba(8,14,20,0.92);' +
+      'border:1px solid #2a6;border-radius:6px;padding:10px 12px;font-family:inherit;color:#cfe;' +
+      'font-size:12px;min-width:178px;box-shadow:0 4px 18px rgba(0,0,0,0.55);';
+    const types = [['chaff', 'CHAFF'], ['sentinel', 'SENTINEL'], ['mortar', 'MORTAR']];
+    el.innerHTML = '<div style="color:#6fd;letter-spacing:1px;margin-bottom:8px;">DEV · SPAWN</div>';
+    for (const [key, label] of types) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:5px 0;';
+      row.innerHTML = `<span style="opacity:.85">${label}</span>` +
+        `<span style="display:flex;align-items:center;gap:6px;">` +
+        `<button data-d="${key}" style="${bs}">−</button>` +
+        `<span id="dev-c-${key}" style="min-width:16px;text-align:center;">${counts[key]}</span>` +
+        `<button data-i="${key}" style="${bs}">+</button></span>`;
+      el.appendChild(row);
+    }
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:6px;margin-top:9px;';
+    btns.innerHTML =
+      `<button id="dev-spawn" style="${bs}flex:1;color:#9fe;border-color:#3b8;">SPAWN</button>` +
+      `<button id="dev-add" style="${bs}">ADD</button>` +
+      `<button id="dev-clear" style="${bs}color:#f99;border-color:#a55;">CLEAR</button>`;
+    el.appendChild(btns);
+    document.body.appendChild(el);
+
+    const setC = (k, v) => { counts[k] = Math.max(0, Math.min(30, v)); el.querySelector(`#dev-c-${k}`).textContent = counts[k]; };
+    el.querySelectorAll('[data-i]').forEach(b => b.onclick = () => setC(b.dataset.i, counts[b.dataset.i] + 1));
+    el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => setC(b.dataset.d, counts[b.dataset.d] - 1));
+    el.querySelector('#dev-spawn').onclick = () => this._spawnDevSet({ ...counts }, true);
+    el.querySelector('#dev-add').onclick = () => this._spawnDevSet({ ...counts }, false);
+    el.querySelector('#dev-clear').onclick = () => this._clearEnemies();
+    this.scene.onDisposeObservable.addOnce(() => el.remove());
+    this._devMenuEl = el;
+  }
+
+  // Mortar shells detonate on landing with a radial splash (full centre damage
+  // falling to ~1/3 at the edge). Shield mitigates as usual, and parrying the blast
+  // (bubble up while in radius) stuns the mortar. Explosion VFX + a heavy shake fire
+  // regardless of whether the player was caught.
+  _checkMortarSplash() {
+    const t = this.tank;
+    for (const enemy of this.enemies) {
+      if (!enemy.shells) continue;
+      for (const shell of enemy.shells) {
+        if (!shell.isMortar || !shell.exploded) continue;
+        shell.clearExplosion();
+        this.vfx.spawnPlasmaBurst(shell.position.clone(), shell.splashRadius);   // explosion == splash circle
+        this._triggerShake(0.22, 0.7);
+        if (!t.alive) continue;
+        const d = Math.hypot(t.position.x - shell.position.x, t.position.z - shell.position.z);
+        if (d <= shell.splashRadius) {
+          const frac = 1 - d / shell.splashRadius;                 // 1 centre → 0 edge
+          if (t.shield?.active) enemy.stun?.(SHIELD_STUN_DURATION);
+          t.takeDamage(shell.splashDamage * (0.34 + 0.66 * frac)); // mitigation auto-applied while shielded
+          if (!t.alive) this._showDeath();
+        }
+      }
+    }
+  }
+
   _checkShellHits() {
     // Enemy shells hitting the player — every enemy's pool, per-enemy damage
     outer:
@@ -1530,6 +1687,7 @@ export default class ArenaScene {
       if (!enemy.shells) continue;
       for (const shell of enemy.shells) {
         if (!shell.active) continue;
+        if (shell.isMortar) continue;   // arcing shells hit via radial splash, not this AABB path
         if (shell.position.y < 0 || shell.position.y > 1.6) continue;
         const dx = shell.position.x - this.tank.position.x;
         const dz = shell.position.z - this.tank.position.z;
@@ -1547,6 +1705,7 @@ export default class ArenaScene {
     }
 
     const allTargets = this.enemies;
+    const SHELL_ALERT_R2 = 7 * 7;   // a player shell whizzing this close alerts an unaware enemy
 
     for (const shell of this.shells) {
       if (!shell.active) continue;
@@ -1555,6 +1714,8 @@ export default class ArenaScene {
         if (!enemy.alive) continue;
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
+        // Near-miss: a shot streaking past gives the player away (no break — one shell can pass several).
+        if (dx * dx + dz * dz < SHELL_ALERT_R2) enemy.alert?.();
         if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
           const speed      = Math.hypot(shell.vx, shell.vz);
           const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;
@@ -1563,6 +1724,7 @@ export default class ArenaScene {
           this.vfx.spawnTankImpact(shell.position.clone(), isCritical);
           shell.deactivate();
           enemy.takeDamage(damage);
+          this._alertPack(enemy);   // drawing blood turns the whole nearby squad on you
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
           music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
           if (!enemy.alive && this.lockedEnemy === enemy) {

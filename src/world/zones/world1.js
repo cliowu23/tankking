@@ -101,9 +101,9 @@ export const WORLD1 = {
   // mode 'patrol' roams/chases on sight; 'ambush' sits hidden until sprung.
   enemies: [
     // NEAR (3)
-    { x:12,  z:-95, mode:'patrol', band:'near' },
+    { x:12,  z:-95, mode:'patrol', band:'near', route:[[16,-93],[-14,-85]] }, // ping-pong across the road
     { x:-38, z:-78, mode:'ambush', band:'near' },
-    { x:35,  z:-55, mode:'patrol', band:'near' },
+    { x:35,  z:-55, mode:'patrol', band:'near', leash:14 },                   // wider wander area
     // MID (5)
     { x:-20, z:-10, mode:'ambush', band:'mid' },
     { x:25,  z:5,   mode:'patrol', band:'mid' },
