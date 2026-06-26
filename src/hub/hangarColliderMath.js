@@ -4,7 +4,7 @@
 // but rises from the floor to a climbable top so the character can step on
 // and read as sitting (the cushion itself is too low for the ellipsoid feet).
 
-export const SEAT_PAD_TOP   = 1.30; // world-Y the pad top reaches (climbable/sit height)
+export const SEAT_PAD_TOP   = 1.05; // world-Y the pad top reaches — low enough to step onto directly (tuned in-game)
 export const SEAT_PAD_INSET = 0.10; // shrink each side so the pad doesn't overhang the cushion
 export const SEAT_PAD_MIN   = 0.30; // min pad width/depth after inset
 
