@@ -52,7 +52,10 @@ function place(ctx, rand, opts = {}) {
     { x: ix, z: iz, role: 'lurker', door: hatchN, exitOrder: 2 },
     { x: ix, z: iz, role: 'sentry', door: hatchN, exitOrder: 3 },
   ];
-  return { poiType: ID, anchor: { x: bx, z: bz }, props, enemies: [], loot: [], containers, bunkerHalf: o.bunkerHalf, clearR: 13, guards };
+  // The live cannon fires down the road-facing lane (the King's roadblock): ArenaScene spawns a
+  // static PlasmaTurret here that charges + beams along `fireAngle`. atan2(-px,-pz) = toward road.
+  const turret = { fireAngle: Math.atan2(-px, -pz), muzzleDist: 3.0 };
+  return { poiType: ID, anchor: { x: bx, z: bz }, props, enemies: [], loot: [], containers, bunkerHalf: o.bunkerHalf, clearR: 13, guards, turret };
 }
 
 function build(scene, inst, helpers) {

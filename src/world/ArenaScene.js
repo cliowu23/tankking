@@ -16,6 +16,7 @@ import Tank from '../tank/Tank.js';
 import SentinelEnemy from './SentinelEnemy.js';
 import ChaffEnemy from './ChaffEnemy.js';
 import MortarEnemy from './MortarEnemy.js';
+import PlasmaTurret from './PlasmaTurret.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -480,6 +481,14 @@ export default class ArenaScene {
         const escalated = e.band !== 'near';   // gate artillery to mid/deep depth
         const mustSentinel = idx === forceSentinelIdx;
         const mustMortar   = idx === forceMortarIdx;
+        if (e.poi && e.turret) {
+          // Live cannon: a static, destructible PlasmaTurret that charges + beams down its locked
+          // lane (the road). Tanky + heavy + slow vs a normal bot — the stronghold's outer gun.
+          add(new PlasmaTurret(this.scene, e.x, e.z, {
+            bounds, fireAngle: e.turret.fireAngle, muzzleDist: e.turret.muzzleDist,
+            hp: Math.round(t.hp * 2.4), damage: Math.round(t.dmg * 1.7), cooldown: t.cooldown * 1.25,
+          }), e.x, e.z);
+        }
         if (e.poi && e.guards && e.guards.length) {
           // Intentional POI encounter: spawn one unit per authored guard slot.
           //  • lurkers  → spider-bots in AMBUSH (tight radius) AT a building → "burst from building"

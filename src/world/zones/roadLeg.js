@@ -186,7 +186,7 @@ export function generateRoadLeg(seed = 1) {
         { offset: 13 + rand() * 3, sideForce: eside });
       if (!inst) continue;
       pois.push(inst);
-      enemies.push({ x: inst.anchor.x, z: inst.anchor.z, mode: 'ambush', band: bandFor(eidx / total), poi: true, guards: inst.guards });
+      enemies.push({ x: inst.anchor.x, z: inst.anchor.z, mode: 'ambush', band: bandFor(eidx / total), poi: true, guards: inst.guards, turret: inst.turret });
       for (const c of (inst.containers || [])) containers.push(c);
     }
   }

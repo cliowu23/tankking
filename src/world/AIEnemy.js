@@ -46,6 +46,11 @@ export default class AIEnemy {
 
     this._ambush       = !!opts.ambush;
     this._ambushRadius = opts.ambushRadius ?? 14;
+    // Dug-in emplacement flags: a _static unit never moves/separates (holds its anchor); a
+    // _fixedAimAngle (world radians) locks the turret to one lane instead of tracking. Used by
+    // PlasmaTurret — see turretBunker. Default null/false → normal mobile, tracking enemy.
+    this._static        = !!opts.static;
+    this._fixedAimAngle = (opts.fixedAim ?? null);
     // Emergence: a hidden POI unit reveals itself on wake (EMERGE state) instead of sliding out.
     //   'burrow' — buried below ground, CLAWS UP in place (saved for future burrow-bots).
     //   'door'   — waits INSIDE the building, then DRIVES OUT the front door in single file
@@ -447,11 +452,15 @@ export default class AIEnemy {
     // anchor. The nudge is set by ArenaScene's pre-pass and consumed (zeroed) here, so a
     // stale value can't accumulate; the stun path returns earlier, so stunned units don't drift.
     const active  = this.state !== 'IDLE' && this.state !== 'AMBUSH' && this.state !== 'EMERGE';
-    const sepX    = active ? this._sepX : 0;
-    const sepZ    = active ? this._sepZ : 0;
+    // _static units (dug-in emplacements) never drive, get knocked, or separate — they hold their
+    // exact anchor. The hull rotation is still applied so a fixed-aim turret can face its lane.
+    const sepX    = (active && !this._static) ? this._sepX : 0;
+    const sepZ    = (active && !this._static) ? this._sepZ : 0;
     const forward = new Vector3(Math.sin(this.rotY), 0, Math.cos(this.rotY));
-    this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + (forward.x * this.speed + this.vx + sepX) * dt));
-    this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + (forward.z * this.speed + this.vz + sepZ) * dt));
+    if (!this._static) {
+      this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + (forward.x * this.speed + this.vx + sepX) * dt));
+      this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + (forward.z * this.speed + this.vz + sepZ) * dt));
+    }
     this.root.rotation.y = this.rotY;
     this._sepX = 0; this._sepZ = 0;
 
@@ -538,6 +547,8 @@ export default class AIEnemy {
   }
 
   _updateTurret(dt, playerPos) {
+    // Fixed-aim emplacements (dug-in turrets) never track — the gun covers one locked lane.
+    if (this._fixedAimAngle != null) { this.turretAimAngle = this._fixedAimAngle; return; }
     if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'EMERGE') return;   // hold while hidden / clawing up
 
     // Relaxed turret while roaming: face travel direction, not the player.
