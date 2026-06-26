@@ -18,7 +18,6 @@ const POOL = Math.ceil((TOP_SPEED / EMIT_SPACING) * 2 * LIFE * 1.15);
 
 export default class TrackMarks {
   constructor(scene) {
-    this.scene = scene;
     this._marks = [];           // { mesh, age, life, active }
     this._head  = 0;
     this._accum = 0;
@@ -38,6 +37,7 @@ export default class TrackMarks {
     ctx.fillRect(0, 0, 32, 32);
     tex.hasAlpha = true;
     tex.update();
+    this._tex = tex;
 
     const mat = new StandardMaterial('trackMarkMat', scene);
     mat.diffuseTexture = tex;
@@ -88,8 +88,6 @@ export default class TrackMarks {
       this._head = (this._head + 1) % POOL;
       const q = m.mesh;
       q.position.set(x + rgtX * s, Y_OFFSET, z + rgtZ * s);
-      q.rotation.x = Math.PI / 2;
-      q.rotation.y = 0;
       q.rotation.z = -rotY;     // align the quad's long axis to heading
       q.visibility = OPACITY;
       q.isVisible  = true;
@@ -99,6 +97,7 @@ export default class TrackMarks {
 
   dispose() {
     for (const m of this._marks) m.mesh.dispose();
+    this._tex.dispose();
     this._mat.dispose();
   }
 }
