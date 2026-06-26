@@ -325,7 +325,7 @@ export default class HangarScene {
     // SE-corner kitchen — static INTERACT station (galley/mess), scaled into the
     // corner the same way as the lounge.
     this._kitchen = buildKitchen(s, propMats);
-    this._stationMeshes.push({ mesh: this._kitchen.collider, data: this._stationDefs.kitchen });
+    this._stationMeshes.push({ mesh: this._kitchen.trigger, data: this._stationDefs.kitchen });
 
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
