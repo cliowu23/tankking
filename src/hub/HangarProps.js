@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight, DynamicTexture } from '@babylonjs/core';
-import { markSolid, makeTrigger } from './hangarColliders.js';
+import { markSolid, makeTrigger, makeWorldWall } from './hangarColliders.js';
 
 // ── Blob shadows ─────────────────────────────────────────────────────────────
 // Soft dark oval decals on the floor under props — fake grounding shadows that
@@ -286,6 +286,8 @@ export function buildQMCrates(s, cx, cz, M, scale = 1.8) {
   });
 
   const trigger = makeTrigger(s, 'qm-trigger', new Vector3(cx, 0.5, cz));
+  // Collision seal wall — user-marked in hangar-collision-editor.html, world-space.
+  makeWorldWall(s, 'qm-wall-0', { cx: 10.67, cz: -0.46, w: 2.49, d: 7.77 });
   return { root, trigger };
 }
 

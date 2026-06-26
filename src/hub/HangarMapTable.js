@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
-import { makeTrigger } from './hangarColliders.js';
+import { makeTrigger, makeWorldWall } from './hangarColliders.js';
 
 // ── helpers (local so this module stays decoupled from HangarProps) ───────────
 function vis(mesh) {
@@ -180,6 +180,12 @@ export function buildMapTable(s, M) {
   const sz = (zc) => root.position.z + S * (zc + OZ - CAZ);
   const cx = sx(-2.159), cz = sz(1.36);   // baked stool position
   const trigger = makeTrigger(s, 'map-trigger', new Vector3(cx, 0.5, cz));
+
+  // Collision seal walls — user-marked in hangar-collision-editor.html, world-space.
+  [
+    { cx: -11.04, cz: 12.68, w: 1.89, d: 6.14 },
+    { cx: -8.50,  cz: 15.21, w: 7.07, d: 1.35 },
+  ].forEach((b, i) => makeWorldWall(s, `map-wall-${i}`, b));
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), radio };
 }

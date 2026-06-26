@@ -41,6 +41,20 @@ export function makeTrigger(scene, name, center, size = 1) {
   return m;
 }
 
+// Invisible WORLD-SPACE blocker — placed at absolute (cx,cz), NOT parented to any
+// scaled station root, so collision-editor marks (which are in world coords) bake
+// directly with no authored→world transform. `height` is tall by default so the
+// player can't ride up and walk on top (use a low height for a step-pad instead).
+// box: { cx, cz, w, d }.
+export function makeWorldWall(scene, name, box, height = 3.0) {
+  const m = MeshBuilder.CreateBox(name, { width: box.w, height, depth: box.d }, scene);
+  m.position        = new Vector3(box.cx, height / 2, box.cz);
+  m.isVisible       = false;
+  m.isPickable      = false;
+  m.checkCollisions = true;
+  return m;
+}
+
 // DEV tuner: every seat-pad is created at local height == SEAT_PAD_TOP, so a
 // new top is just a Y-scale + recentre — collision geometry follows scaling,
 // so this tunes live with no reload. Bake the winning number into
