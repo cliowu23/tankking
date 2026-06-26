@@ -210,6 +210,8 @@ export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
   socketHead.position = new Vector3(0.20, 1.32, -0.54); socketHead.material = M.darkMetal; vp(socketHead);
 
   const trigger = makeTrigger(s, 'mechanic-trigger', new Vector3(cx, 0.5, cz));
+  // Collision seal wall — user-marked, world-space.
+  makeWorldWall(s, 'wb-wall-0', { cx: -11.03, cz: -2.08, w: 1.8, d: 5.21 });
   return { root, trigger };
 }
 

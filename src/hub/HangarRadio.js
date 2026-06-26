@@ -203,6 +203,8 @@ export function buildRadio(s, M) {
     { cx: 8.91,  cz: 14.89, w: 5.86, d: 1.60 },
     { cx: 11.03, cz: 13.05, w: 1.82, d: 5.55 },
   ].forEach((b, i) => makeWorldWall(s, `radio-wall-${i}`, b));
+  // Step-pad (1.05 = low/climbable) — the radio chair reads as sit-on.
+  makeWorldWall(s, 'radio-seat-0', { cx: 8.65, cz: 12.69, w: 1.06, d: 1.06 }, 1.05);
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), setPoster, setCustomPhoto, posterMesh: art, get posterDesign() { return posterDesign; } };
 }
