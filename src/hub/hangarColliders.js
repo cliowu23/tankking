@@ -1,6 +1,6 @@
 // src/hub/hangarColliders.js
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
-import { computeSeatPad, SEAT_PAD_TOP, SEAT_PAD_INSET } from './hangarColliderMath.js';
+import { computeSeatPad } from './hangarColliderMath.js';
 
 // Shared hangar collision helpers. Three kinds of collider:
 //   • solid  → the visual mesh itself (markSolid) — collider == what you see.
@@ -8,8 +8,6 @@ import { computeSeatPad, SEAT_PAD_TOP, SEAT_PAD_INSET } from './hangarColliderMa
 //              case where the collider is taller than the visual, so the
 //              character can climb on and read as sitting.
 //   • trigger→ an invisible NON-colliding proximity marker for the [E] prompt.
-
-const _seatPads = [];   // live-tuner registry: { mesh, footprint }
 
 export function markSolid(mesh) {
   mesh.checkCollisions = true;
@@ -28,7 +26,6 @@ export function makeSeatPad(scene, name, footprint, parent) {
   m.isPickable      = false;
   m.checkCollisions = true;
   if (parent) m.parent = parent;
-  _seatPads.push({ mesh: m, footprint });
   return m;
 }
 
@@ -53,21 +50,4 @@ export function makeWorldWall(scene, name, box, height = 3.0) {
   m.isPickable      = false;
   m.checkCollisions = true;
   return m;
-}
-
-// DEV tuner: every seat-pad is created at local height == SEAT_PAD_TOP, so a
-// new top is just a Y-scale + recentre — collision geometry follows scaling,
-// so this tunes live with no reload. Bake the winning number into
-// hangarColliderMath.js, then this whole block is removed before merge.
-if (typeof window !== 'undefined') {
-  window.__hangarColliders = {
-    pads: _seatPads,
-    setSeatTop(top) {
-      for (const { mesh } of _seatPads) {
-        mesh.scaling.y  = top / SEAT_PAD_TOP;  // original local height == SEAT_PAD_TOP
-        mesh.position.y = top / 2;
-      }
-      console.log('[hangarColliders] seat top →', top);
-    },
-  };
 }
