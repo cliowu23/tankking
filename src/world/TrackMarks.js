@@ -13,7 +13,7 @@ const MARK_L    = 1.00;  // quad length (along the heading)
 const Y_OFFSET  = 0.03;  // height above ground — gap that helps beat z-fighting
 const FADE_TAIL = 0.40;  // fraction of life spent fading out (full opacity before)
 // Pool covers LIFE seconds at a generous top speed, 2 quads per step, + headroom.
-const TOP_SPEED = 18;    // ballpark sustained/boost speed; oversizing the pool is cheap
+const TOP_SPEED = 19;    // = Tank.js boostMaxSpeed; sizes the pool so it never truncates a live trail
 const POOL = Math.ceil((TOP_SPEED / EMIT_SPACING) * 2 * LIFE * 1.15);
 
 export default class TrackMarks {
