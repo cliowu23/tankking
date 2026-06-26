@@ -320,7 +320,7 @@ export default class HangarScene {
     // HangarLounge.js, no longer customizable). Pressing E opens the character
     // customization panel (driver look) via openLounge().
     this._lounge = buildLounge(s, propMats);
-    this._stationMeshes.push({ mesh: this._lounge.collider, data: this._stationDefs.lounge });
+    this._stationMeshes.push({ mesh: this._lounge.trigger, data: this._stationDefs.lounge });
 
     // SE-corner kitchen — static INTERACT station (galley/mess), scaled into the
     // corner the same way as the lounge.

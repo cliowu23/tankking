@@ -1,18 +1,11 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
+import { markSolid, makeSeatPad, makeTrigger } from './hangarColliders.js';
 
 // ── helpers (kept local so this module stays decoupled from HangarProps) ──────
 function vis(mesh) {
   mesh.isPickable      = false;
   mesh.checkCollisions = false;
   return mesh;
-}
-function makeCollider(name, size, pos, s) {
-  const m = MeshBuilder.CreateBox(name, size, s);
-  m.position        = pos.clone();
-  m.isVisible       = false;
-  m.checkCollisions = true;
-  m.isPickable      = false;
-  return m;
 }
 
 // Final hand-tuned look (locked via the lounge layout editor — no longer
@@ -88,10 +81,16 @@ export function buildLounge(s, M) {
   // Offset-aware primitive helpers (author in mockup space, build in world space)
   // Author in world coords (x+OX, z+OZ) but store relative to the scale anchor,
   // so root.scaling expands the layout about (CAX, CAZ).
-  const box = (parent, name, w, h, d, x, y, z, m) => {
+  // tag: 'solid' (collider = this mesh), 'seat' (record a cushion footprint),
+  // or undefined (decorative — no collision). Seat footprints collect in seats[].
+  const seats = [];
+  const box = (parent, name, w, h, d, x, y, z, m, tag) => {
     const b = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, s);
     b.position = new Vector3(x + OX - CAX, y, z + OZ - CAZ);
-    b.material = m; vis(b); b.parent = parent;
+    b.material = m; b.parent = parent; b.isPickable = false;
+    if (tag === 'solid')      { b.checkCollisions = false; markSolid(b); }
+    else if (tag === 'seat')  { b.checkCollisions = false; seats.push({ x: x + OX - CAX, z: z + OZ - CAZ, w, d }); }
+    else                      { b.checkCollisions = false; }
     return b;
   };
   const cyl = (parent, name, dia, h, x, y, z, m, tess = 16, opts = {}) => {
@@ -105,28 +104,28 @@ export function buildLounge(s, M) {
   const couchNode = new TransformNode('lng-couch', s);
   couchNode.parent = root;
   // WEST ARM
-  box(couchNode, 'wa-base', 0.95, 0.34, 2.7, -2.55, 0.17, -1.3, frame);
-  box(couchNode, 'wa-back', 0.26, 0.50, 2.7, -2.92, 0.59, -1.3, cushion);
-  box(couchNode, 'wa-seat1', 0.78, 0.20, 1.18, -2.50, 0.44, -1.95, cushion);
-  box(couchNode, 'wa-seat2', 0.78, 0.20, 1.18, -2.50, 0.44, -0.65, cushion);
+  box(couchNode, 'wa-base', 0.95, 0.34, 2.7, -2.55, 0.17, -1.3, frame, 'solid');
+  box(couchNode, 'wa-back', 0.26, 0.50, 2.7, -2.92, 0.59, -1.3, cushion, 'solid');
+  box(couchNode, 'wa-seat1', 0.78, 0.20, 1.18, -2.50, 0.44, -1.95, cushion, 'seat');
+  box(couchNode, 'wa-seat2', 0.78, 0.20, 1.18, -2.50, 0.44, -0.65, cushion, 'seat');
   box(couchNode, 'wa-seam',  0.80, 0.205, 0.04, -2.50, 0.445, -1.30, seam);
-  box(couchNode, 'wa-arm',   0.95, 0.56, 0.26, -2.55, 0.45, 0.18, frame);
+  box(couchNode, 'wa-arm',   0.95, 0.56, 0.26, -2.55, 0.45, 0.18, frame, 'solid');
   // SOUTH ARM
-  box(couchNode, 'sa-base', 2.7, 0.34, 0.95, -1.3, 0.17, -2.55, frame);
-  box(couchNode, 'sa-back', 2.7, 0.50, 0.26, -1.3, 0.59, -2.92, cushion);
-  box(couchNode, 'sa-seat1', 1.18, 0.20, 0.78, -1.95, 0.44, -2.50, cushion);
-  box(couchNode, 'sa-seat2', 1.18, 0.20, 0.78, -0.65, 0.44, -2.50, cushion);
+  box(couchNode, 'sa-base', 2.7, 0.34, 0.95, -1.3, 0.17, -2.55, frame, 'solid');
+  box(couchNode, 'sa-back', 2.7, 0.50, 0.26, -1.3, 0.59, -2.92, cushion, 'solid');
+  box(couchNode, 'sa-seat1', 1.18, 0.20, 0.78, -1.95, 0.44, -2.50, cushion, 'seat');
+  box(couchNode, 'sa-seat2', 1.18, 0.20, 0.78, -0.65, 0.44, -2.50, cushion, 'seat');
   box(couchNode, 'sa-seam',  0.04, 0.205, 0.80, -1.30, 0.445, -2.50, seam);
-  box(couchNode, 'sa-arm',   0.26, 0.56, 0.95, 0.18, 0.45, -2.55, frame);
+  box(couchNode, 'sa-arm',   0.26, 0.56, 0.95, 0.18, 0.45, -2.55, frame, 'solid');
   // CORNER cushion + back wedge
-  box(couchNode, 'c-seat', 0.85, 0.20, 0.85, -2.50, 0.44, -2.50, cushion);
-  box(couchNode, 'c-back', 0.55, 0.50, 0.55, -2.78, 0.59, -2.78, cushion);
+  box(couchNode, 'c-seat', 0.85, 0.20, 0.85, -2.50, 0.44, -2.50, cushion, 'seat');
+  box(couchNode, 'c-back', 0.55, 0.50, 0.55, -2.78, 0.59, -2.78, cushion, 'solid');
 
   // ── coffee table (metal) — baked off the authored centre ────────────────────
   const TX = T0X + TABLE_DX, TZ = T0Z + TABLE_DZ;
   const tableNode = new TransformNode('lng-table', s);
   tableNode.parent = root;
-  box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal);
+  box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal, 'solid');
   [[-0.45, -0.28], [0.45, -0.28], [-0.45, 0.28], [0.45, 0.28]].forEach(([dx, dz], i) =>
     box(tableNode, 't-leg' + i, 0.07, 0.42, 0.07, TX + dx, 0.21, TZ + dz, metal));
 
@@ -157,14 +156,14 @@ export function buildLounge(s, M) {
   box(scatterNode, 'mag1', 0.34, 0.03, 0.26, SX - 0.25, 0.49, SZ + 0.12, paper);
   box(scatterNode, 'mag2', 0.34, 0.03, 0.26, SX - 0.22, 0.52, SZ + 0.16, olive);
 
-  // Scaled couch centre (world). Collider stays a touch smaller than the visual
-  // footprint so the driver can step close enough to trigger the INTERACT prompt
-  // (proximity threshold is 3.5 from the collider centre).
+  // Seat-pads (raised step-pads over each cushion footprint) + solid colliders
+  // are already on the meshes (tags above). Build the [E] proximity trigger at
+  // the scaled couch centre, matching the old collider centre.
   const cx = CAX + NUDGE_X + S * (LOUNGE_CX - CAX);
   const cz = CAZ + NUDGE_Z + S * (LOUNGE_CZ - CAZ);
-  const collider = makeCollider('station-lounge',
-    { width: 3.4, height: 1.5, depth: 3.4 },
-    new Vector3(cx, 0.75, cz), s);
 
-  return { collider, root, center: new Vector3(cx, 0.5, cz) };
+  const colliders = seats.map((f, i) => makeSeatPad(s, `lng-seatpad-${i}`, f, root));
+  const trigger   = makeTrigger(s, 'lng-trigger', new Vector3(cx, 0.5, cz));
+
+  return { root, colliders, trigger, center: new Vector3(cx, 0.5, cz) };
 }
