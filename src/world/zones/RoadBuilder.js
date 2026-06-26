@@ -238,16 +238,18 @@ export function buildRoadLeg(scene, zone) {
           makeRock: (x, z, s = 1, r = 0) => instanceProp(tpl, s >= 0.9 ? 'Rock_A' : 'Rock_B', { x, z, scale: s * POI_ROCK_SCALE, rotY: r, parent: root }),
           prop:     (name, x, z, s = 1, r = 0) => instanceProp(tpl, name, { x, z, scale: s, rotY: r, parent: root }),
           pickTree: () => pick(TREE_VARIANTS),
-          // A flat churned-earth apron under a POI (e.g. the turret-bunker) so it doesn't sit bare
-          // on the grass. Reuses the road's dirt grain; lifted just above the grass + zOffset to
-          // avoid flicker (see feedback_avoid_zfighting).
-          dirtPatch: (x, z, r = 4) => {
-            if (!M.poiDirt) { M.poiDirt = mat('poiDirt', 0.30, 0.22, 0.14); surf(M.poiDirt, 'dirt', 6); M.poiDirt.zOffset = -2; M.poiDirt.backFaceCulling = false; }
-            const d = MeshBuilder.CreateDisc('poi-dirt', { radius: r, tessellation: 24 }, scene);
-            d.rotation.x = -Math.PI / 2;          // lay flat, visible face up
-            d.position.set(x, 0.06, z);
-            d.material = M.poiDirt; d.parent = root; d.isPickable = false; d.receiveShadows = true;
-            return [d];
+          // A raised CONCRETE OCTAGON PAD under a machine emplacement (the turret-bunker) so it
+          // reads as a built, fortified gun position rather than sitting bare on the grass. Two
+          // stacked octagons (a darker trim lip + the concrete top) echoing the turret's 8-gon.
+          emplacementPad: (x, z, r = 4.3) => {
+            if (!M.padTrim) { M.padTrim = mat('poiPadTrim', 0.24, 0.23, 0.22); surf(M.padTrim, 'concrete', 1, 'hangar'); }
+            const trim = MeshBuilder.CreateCylinder('poi-pad-trim', { diameter: r * 2 + 0.6, height: 0.18, tessellation: 8 }, scene);
+            trim.position.set(x, 0.09, z); trim.rotation.y = Math.PI / 8; trim.material = M.padTrim;
+            trim.parent = root; trim.isPickable = false; trim.receiveShadows = true;
+            const pad = MeshBuilder.CreateCylinder('poi-pad', { diameter: r * 2, height: 0.3, tessellation: 8 }, scene);
+            pad.position.set(x, 0.14, z); pad.rotation.y = Math.PI / 8; pad.material = M.concrete;
+            pad.parent = root; pad.isPickable = false; pad.receiveShadows = true;
+            return [trim, pad];
           },
         };
         for (const inst of (leg.pois ?? [])) {

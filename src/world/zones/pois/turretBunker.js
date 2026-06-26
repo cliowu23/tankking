@@ -21,7 +21,7 @@ const DEFAULTS = {
   scale: 1.0,        // turret-bunker.glb is authored at game scale
   faceOffset: 0,     // fine-tune the cannon heading if needed (baseline aim is computed below)
   bunkerHalf: 1.95,  // AABB half-extent blocking the solid bunker mass (turret/cannon are high)
-  dirtR: 4.6,        // radius of the churned-earth apron under the emplacement
+  padR: 4.3,         // radius of the concrete emplacement pad under the bunker
 };
 
 function place(ctx, rand, opts = {}) {
@@ -66,14 +66,14 @@ function place(ctx, rand, opts = {}) {
   };
   return {
     poiType: ID, anchor: { x: bx, z: bz }, props, enemies: [], loot: [], containers: [],
-    bunkerHalf: o.bunkerHalf, dirtR: o.dirtR, clearR: 13, guards, turret,
+    bunkerHalf: o.bunkerHalf, padR: o.padR, clearR: 13, guards, turret,
   };
 }
 
 function build(scene, inst, helpers) {
   const meshes = [], obstacles = [], shadowCasters = [];
-  // churned-earth apron under the emplacement so it doesn't sit bare on the grass
-  if (helpers.dirtPatch) helpers.dirtPatch(inst.anchor.x, inst.anchor.z, inst.dirtR ?? DEFAULTS.dirtR);
+  // concrete octagon pad under the emplacement — a built, fortified gun position (not bare grass)
+  if (helpers.emplacementPad) helpers.emplacementPad(inst.anchor.x, inst.anchor.z, inst.padR ?? DEFAULTS.padR);
   for (const pr of inst.props) {
     let made;
     if (pr.name === 'Bush') made = helpers.makeBush(pr.x, pr.z, pr.scale, pr.rotY);
