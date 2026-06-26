@@ -258,12 +258,13 @@ export function buildKitchen(s, M) {
     (CAZ + NUDGE_Z) + S * (-2.0 + OZ - CAZ),
   );
 
-  // Raised blockers for SHORT solids: the counter tops (~0.90), stove (~0.90)
-  // and round dining table (~0.75) sit at/under the player's collision capsule
-  // floor (~0.9), so their visual-mesh colliders don't block. Each gets a tall
-  // invisible box (floor→BLOCK_H) over its footprint, parented to the same prop
-  // group so the group/scale offsets are inherited automatically. (The fridge,
-  // top ~1.85, already blocks — no blocker needed.)
+  // Short solids (counter tops ~0.90, stove, table) sit at/under the player's
+  // collision capsule floor (~0.9), so their visual colliders don't block — and
+  // there are gaps BETWEEN props you could squeeze through. So instead of per-prop
+  // blockers, fence the whole SE cook corner with a tall invisible L-barrier along
+  // the cook-line's room-facing front (south leg + east leg, sealed to the walls);
+  // plus one blocker for the free-standing dining table. Parented to the prop
+  // group (or root) so the group/scale offsets are inherited.
   const BLOCK_H = 1.6;
   const block = (parent, name, w, d, x, z) => {
     const m = MeshBuilder.CreateBox(name, { width: w, height: BLOCK_H, depth: d }, s);
@@ -274,10 +275,9 @@ export function buildKitchen(s, M) {
     m.parent          = parent;
     return m;
   };
-  block(sc, 'cs-block', 3.0,  0.82, -1.4,  -2.98);  // south counter
-  block(ec, 'ce-block', 0.82, 1.1,   2.98, -0.15);  // east counter
-  block(st, 'st-block', 0.86, 1.05,  2.85, -1.45);  // stove
-  block(tb, 'tb-block', 0.90, 0.90,  0.25, -0.55);  // dining table (round → box approx)
+  block(root, 'kit-barrier-s', 6.0,  0.12, 0.0,  -2.45);  // south cook-line front → east wall
+  block(root, 'kit-barrier-e', 0.12, 3.5,  2.45, -1.25);  // east cook-line front → south wall
+  block(tb,   'tb-block',      0.90, 0.90, 0.25, -0.55);  // free-standing dining table
 
   const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
   const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));
