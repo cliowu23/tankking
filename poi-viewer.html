@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>POI Viewer</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a1420;font-family:ui-monospace,Menlo,monospace}
+  #c{width:100vw;height:100vh;display:block}
+  .panel{position:fixed;z-index:20;background:#081830ee;border:1px solid #16385c;border-radius:10px;color:#ddfff8;padding:12px 14px;font-size:12px;line-height:1.7}
+  #hud{top:14px;left:14px;max-width:520px}
+  #hud b{color:#ffcc00} #hud .k{color:#55ffbb}
+  #title{top:14px;right:14px;color:#00eedd}
+  #pin-labels{position:fixed;inset:0;pointer-events:none;z-index:15}
+  .pin-label{position:absolute;transform:translate(-50%,-50%);background:#ffcc00;color:#102;min-width:20px;height:20px;border-radius:10px;font-size:12px;font-weight:bold;text-align:center;line-height:20px;padding:0 4px;box-shadow:0 0 0 2px #102,0 2px 6px #0008}
+  #pins-panel{bottom:14px;left:14px;max-width:360px;max-height:48vh;overflow:auto}
+  .pin-row{display:flex;gap:6px;align-items:center;margin:4px 0}
+  .pin-row .pn{color:#ffcc00;width:28px;font-weight:bold}
+  .pin-row input{flex:1;background:#04101f;border:1px solid #16385c;color:#ddfff8;border-radius:5px;padding:4px 6px;font:inherit;font-size:11px}
+  .pin-del{background:#3a1020;border:1px solid #5c1630;color:#ffd;border-radius:5px;cursor:pointer;padding:2px 7px}
+  .pbtn{background:#04243f;border:1px solid #16385c;color:#9ef;border-radius:6px;padding:6px 9px;cursor:pointer;font:inherit;font-size:11px;margin:0 6px 6px 0}
+  .pbtn.on{background:#0aa06a;color:#021;border-color:#0f8;font-weight:bold}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" class="panel">
+  <b id="h">POI VIEWER</b><br>
+  Drag to orbit · scroll to zoom. <span class="k">[R]</span> turntable · <span class="k">[T]</span> top-down (game cam) · <span class="k">[G]</span> ground · <span class="k">[P]</span> pin mode.<br>
+  <b style="color:#0fa">Pin mode:</b> click the model to drop a numbered pin, type your critique, then <span class="k">COPY CRITIQUES</span> and paste it to me.
+</div>
+<div id="title" class="panel"></div>
+<div id="pin-labels"></div>
+<div id="pins-panel" class="panel">
+  <div style="margin-bottom:4px">
+    <button id="pin-btn" class="pbtn">PIN MODE: OFF</button>
+    <button id="pin-copy" class="pbtn">COPY CRITIQUES</button>
+    <button id="pin-clear" class="pbtn">CLEAR</button>
+  </div>
+  <div id="pin-list"></div>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script>
+const C3=BABYLON.Color3, V3=BABYLON.Vector3;
+const params=new URLSearchParams(location.search);
+const GLB=params.get('glb')||'farmstead.glb';
+document.getElementById('title').textContent=GLB;
+document.getElementById('h').textContent='POI VIEWER — '+GLB;
+
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{adaptToDeviceRatio:true});
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(0.42,0.62,0.85,1);          // World 1 bright sky
+// lighting rig copied from the game / props-viewer
+const hemi=new BABYLON.HemisphericLight('h',new V3(0.2,1,0.1),scene); hemi.intensity=0.9; hemi.groundColor=new C3(0.28,0.5,0.12);
+const dir=new BABYLON.DirectionalLight('d',new V3(0.3,-1,0.2),scene); dir.intensity=0.6;
+
+const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2.3,0.95,30,new V3(0,2,0),scene);
+cam.attachControl(canvas,true); cam.wheelDeltaPercentage=0.02; cam.lowerRadiusLimit=3; cam.upperRadiusLimit=120;
+
+const ground=BABYLON.MeshBuilder.CreateGround('g',{width:120,height:120},scene);
+const gmat=new BABYLON.StandardMaterial('gm',scene); gmat.diffuseColor=new C3(0.34,0.56,0.22); gmat.specularColor=new C3(0,0,0);
+ground.material=gmat; ground.position.y=-0.01;
+
+// Grain pipeline — identical to src/world/props/loadProp.js (nearest grain set by RGB).
+const TEXDIR='/assets/textures/props/', TILE=6, THRESH=0.045;
+const SETS=[['prop_foliage',[0.24,0.50,0.20]],['prop_bark',[0.36,0.25,0.14]],['prop_wood',[0.34,0.22,0.12]],
+  ['prop_stone',[0.53,0.51,0.47]],['prop_plaster',[0.88,0.80,0.66]],['prop_roof',[0.66,0.30,0.22]],['prop_brick',[0.52,0.32,0.26]]];
+const mc={};
+function baseRGB(mat){const c=mat&&(mat.albedoColor||mat.diffuseColor);return c?[c.r,c.g,c.b]:[0.7,0.7,0.7];}
+function nearest([r,g,b]){let best=null,bd=1e9;for(const[s,c]of SETS){const d=(c[0]-r)**2+(c[1]-g)**2+(c[2]-b)**2;if(d<bd){bd=d;best=s;}}return bd<=THRESH?best:null;}
+const isWin=([r,g,b])=>r>0.9&&g>0.78&&b<0.66;
+function grain(set){if(mc[set])return mc[set];const m=new BABYLON.StandardMaterial('g_'+set,scene);
+  const d=new BABYLON.Texture(TEXDIR+set+'_diff.png',scene),n=new BABYLON.Texture(TEXDIR+set+'_nrm.png',scene);
+  d.uScale=d.vScale=TILE;n.uScale=n.vScale=TILE;m.diffuseTexture=d;m.bumpTexture=n;m.specularColor=new C3(0.04,0.04,0.04);m.specularPower=32;mc[set]=m;return m;}
+function flat(rgb,warm){const k=(warm?'w':'f')+rgb.map(v=>v.toFixed(2)).join('_');if(mc[k])return mc[k];
+  const m=new BABYLON.StandardMaterial(k,scene);m.diffuseColor=new C3(...rgb);m.specularColor=new C3(0.05,0.05,0.05);
+  if(warm)m.emissiveColor=new C3(rgb[0]*0.35,rgb[1]*0.30,rgb[2]*0.18);mc[k]=m;return m;}
+function texturize(mesh){const rgb=baseRGB(mesh.material);if(isWin(rgb)){mesh.material=flat(rgb,true);return;}const s=nearest(rgb);mesh.material=s?grain(s):flat(rgb,false);}
+
+BABYLON.SceneLoader.ImportMeshAsync('','/assets/models/props/',GLB,scene).then(res=>{
+  let n=0, min=new V3(1e9,1e9,1e9), max=new V3(-1e9,-1e9,-1e9);
+  for(const m of res.meshes){ if(!(m.getTotalVertices&&m.getTotalVertices()>0)) continue;
+    texturize(m); n++; m.refreshBoundingInfo(true);
+    const bb=m.getBoundingInfo().boundingBox;
+    min=V3.Minimize(min,bb.minimumWorld); max=V3.Maximize(max,bb.maximumWorld);
+  }
+  // auto-frame the model
+  const c=V3.Center(min,max), size=max.subtract(min);
+  const radius=Math.max(size.x,size.y,size.z)*1.7+4;
+  cam.setTarget(new V3(c.x,c.y*0.6+0.5,c.z)); cam.radius=radius;
+  console.log('loaded meshes:',n,'size:',size.x.toFixed(1),size.y.toFixed(1),size.z.toFixed(1));
+});
+
+let rotate=true, topDown=false;
+
+// ---- Pin-critique mode: click the model to drop numbered pins with comments ----
+const LS_KEY='poi_pins_'+GLB;
+let pinMode=false, pins=[], pinSeq=0;
+const labelsEl=document.getElementById('pin-labels'), listEl=document.getElementById('pin-list');
+const pinBtn=document.getElementById('pin-btn');
+const Mtx=BABYLON.Matrix, Proj=BABYLON.Vector3.Project;
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(pins.map(p=>({id:p.id,x:p.x,y:p.y,z:p.z,mesh:p.mesh,comment:p.comment})))); }catch(e){} }
+function makeMarker(p){
+  const s=BABYLON.MeshBuilder.CreateSphere('pin'+p.id,{diameter:0.45},scene); s.position.set(p.x,p.y,p.z);
+  const m=new BABYLON.StandardMaterial('pm'+p.id,scene); m.emissiveColor=new C3(1,0.8,0); m.diffuseColor=new C3(1,0.8,0);
+  s.material=m; s.isPickable=false; p.marker=s;
+  const lab=document.createElement('div'); lab.className='pin-label'; lab.textContent=p.id; labelsEl.appendChild(lab); p.label=lab;
+}
+function addPin(pick){
+  const pt=pick.pickedPoint;
+  const p={id:++pinSeq,x:pt.x,y:pt.y,z:pt.z,mesh:(pick.pickedMesh&&pick.pickedMesh.name)||'',comment:''};
+  pins.push(p); makeMarker(p); renderList(); save();
+}
+function renderList(){
+  listEl.innerHTML='';
+  for(const p of pins){
+    const row=document.createElement('div'); row.className='pin-row';
+    const pn=document.createElement('span'); pn.className='pn'; pn.textContent='#'+p.id; row.appendChild(pn);
+    const inp=document.createElement('input'); inp.value=p.comment; inp.placeholder='critique…';
+    inp.oninput=()=>{ p.comment=inp.value; save(); }; row.appendChild(inp);
+    const del=document.createElement('button'); del.className='pin-del'; del.textContent='×';
+    del.onclick=()=>{ p.marker.dispose(); p.label.remove(); const i=pins.indexOf(p); if(i>=0) pins.splice(i,1); renderList(); save(); }; row.appendChild(del);
+    listEl.appendChild(row);
+  }
+}
+function updateLabels(){
+  const w=engine.getRenderWidth(), h=engine.getRenderHeight();
+  for(const p of pins){
+    const sp=Proj(p.marker.position, Mtx.Identity(), scene.getTransformMatrix(), cam.viewport.toGlobal(w,h));
+    const vis=sp.z>0&&sp.z<1;
+    p.label.style.display=vis?'block':'none';
+    if(vis){ p.label.style.left=(sp.x/w*100)+'%'; p.label.style.top=(sp.y/h*100)+'%'; }
+  }
+}
+function setPinMode(on){ pinMode=on; if(on) rotate=false; pinBtn.textContent='PIN MODE: '+(on?'ON':'OFF'); pinBtn.classList.toggle('on',on); canvas.style.cursor=on?'crosshair':'default'; }
+let dn=null;
+canvas.addEventListener('pointerdown',e=>{ dn={x:e.clientX,y:e.clientY}; });
+canvas.addEventListener('pointerup',e=>{
+  if(!pinMode||!dn){ dn=null; return; }
+  const moved=Math.hypot(e.clientX-dn.x,e.clientY-dn.y); dn=null;
+  if(moved>6) return;   // it was an orbit drag, not a click
+  const pick=scene.pick(scene.pointerX,scene.pointerY,m=>m!==ground&&m.isPickable!==false&&m.getTotalVertices&&m.getTotalVertices()>0);
+  if(pick&&pick.hit&&pick.pickedPoint) addPin(pick);
+});
+pinBtn.onclick=()=>setPinMode(!pinMode);
+document.getElementById('pin-copy').onclick=()=>{
+  const txt='POI '+GLB+' critiques:\n'+(pins.length?pins.map(p=>'#'+p.id+' ['+p.x.toFixed(1)+','+p.y.toFixed(1)+','+p.z.toFixed(1)+(p.mesh?' on '+p.mesh:'')+']: '+(p.comment||'(no comment)')).join('\n'):'(none)');
+  navigator.clipboard&&navigator.clipboard.writeText(txt); console.log(txt);
+  const b=document.getElementById('pin-copy'); b.textContent='COPIED ✓'; setTimeout(()=>b.textContent='COPY CRITIQUES',1200);
+};
+document.getElementById('pin-clear').onclick=()=>{ for(const p of pins){ p.marker.dispose(); p.label.remove(); } pins.length=0; renderList(); save(); };
+try{ for(const s of JSON.parse(localStorage.getItem(LS_KEY)||'[]')){ pinSeq=Math.max(pinSeq,s.id); const p={...s,comment:s.comment||''}; pins.push(p); makeMarker(p); } renderList(); }catch(e){}
+
+addEventListener('keydown',e=>{
+  if(e.target&&e.target.tagName==='INPUT') return;   // don't hijack typing in a critique field
+  if(e.code==='KeyG') ground.setEnabled(!ground.isEnabled());
+  if(e.code==='KeyR') rotate=!rotate;
+  if(e.code==='KeyT'){ topDown=!topDown; cam.beta = topDown?0.18:0.95; }   // ~0.18 ≈ near-vertical game cam
+  if(e.code==='KeyP') setPinMode(!pinMode);
+});
+engine.runRenderLoop(()=>{ if(rotate) cam.alpha+=0.0035; updateLabels(); scene.render(); });
+addEventListener('resize',()=>engine.resize());
+window.__scene=scene; window.__cam=cam; window.__engine=engine; window.__pins=pins;   // debug/verify hooks
+</script>
+</body>
+</html>

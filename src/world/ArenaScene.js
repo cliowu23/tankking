@@ -81,6 +81,7 @@ export default class ArenaScene {
     this._corridor = zone?.corridor ?? null;
 
     this._obstacles = [];
+    this._slowZones = [];   // soft terrain (bocage hedges) that drags the tank's top speed
     this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
 
     // Resolves when the player tank's async model work is done (or immediately
@@ -182,8 +183,9 @@ export default class ArenaScene {
       this._obstacles.push(...built.obstacles);
       for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
       if (built.propsReady) {
-        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters }) => {
+        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters, slowZones }) => {
           this._obstacles.push(...obstacles);
+          if (slowZones) this._slowZones.push(...slowZones);
           for (const m of shadowCasters) this.shadowGen.addShadowCaster(m);
         });
       }
@@ -455,27 +457,65 @@ export default class ArenaScene {
       // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm. Mid/deep
       // encounters can additionally bring a Mortar-bot: likely behind a Sentinel group
       // (artillery support), rarely behind a spider squad. The 'near' on-ramp stays gentle.
-      for (const e of this.zone.enemies) {
+      //
+      // GUARANTEE — the player MEETS the heavies every leg. Force one marker to field a
+      // Sentinel pair, and one mid/deep marker to bring a Mortar, regardless of the rolls:
+      // a spider pack is reliably traded for a Sentinel group, and another for a Mortar.
+      const markers  = this.zone.enemies;
+      const heavyIdx = markers.map((e, i) => (e.band !== 'near' ? i : -1)).filter(i => i >= 0);
+      const poiIdx   = markers.map((e, i) => (e.poi ? i : -1)).filter(i => i >= 0);
+      const pickRand = (arr) => (arr.length ? arr[Math.floor(Math.random() * arr.length)] : -1);
+      // Sentinel: prefer a POI (a heavier set-piece reads right), else the deepest marker.
+      const forceSentinelIdx = poiIdx.length ? pickRand(poiIdx)
+        : (heavyIdx.length ? heavyIdx[heavyIdx.length - 1] : markers.length - 1);
+      // Mortar: a mid/deep marker, ideally a different spot than the forced Sentinel.
+      const mortarPool = heavyIdx.filter(i => i !== forceSentinelIdx);
+      const forceMortarIdx = pickRand(mortarPool.length ? mortarPool : heavyIdx);
+
+      markers.forEach((e, idx) => {
         const t = tuning[e.band] || tuning.mid;
         const escalated = e.band !== 'near';   // gate artillery to mid/deep depth
-        if (e.poi) {
-          if (Math.random() < 0.5) {
+        const mustSentinel = idx === forceSentinelIdx;
+        const mustMortar   = idx === forceMortarIdx;
+        if (e.poi && e.guards && e.guards.length) {
+          // Intentional POI encounter: spawn one unit per authored guard slot.
+          //  • lurkers  → spider-bots in AMBUSH (tight radius) AT a building → "burst from building"
+          //  • sentries → posted guards (IDLE hold, engage on approach); Sentinels on the forced
+          //    POI (or a roll) so the heavies still show, else spider-bots. Mortar set back as usual.
+          const sentinelSentries = mustSentinel || Math.random() < 0.4;
+          for (const g of e.guards) {
+            if (g.role === 'lurker') {
+              add(new ChaffEnemy(this.scene, g.x, g.z, { bounds, ambush: true, ambushRadius: 12 }), g.x, g.z);
+            } else if (sentinelSentries) {
+              add(new SentinelEnemy(this.scene, g.x, g.z, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, bounds }), g.x, g.z);
+            } else {
+              add(new ChaffEnemy(this.scene, g.x, g.z, { bounds }), g.x, g.z);
+            }
+          }
+          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
+        } else if (e.poi) {
+          // fallback (POI without an authored guard plan): the old scatter behaviour
+          if (mustSentinel || Math.random() < 0.5) {
             spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
-            if (escalated && Math.random() < MORTAR_SUPPORT_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+            if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
           } else {
             spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
-            if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+            if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
           }
+        } else if (mustSentinel) {
+          // a roadside/patrol pack traded for a Sentinel pair so one shows up every leg
+          spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         } else if (e.mode === 'patrol') {
           // §③: roaming pack — shared route if authored, else per-unit area wander.
           const patrol = e.route ? { route: e.route, loop: e.loop } : { leash: e.leash };
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2), patrol);
-          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         } else {
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
-          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         }
-      }
+      });
       // Any explicitly-seeded chaff from the zone config.
       for (const c of (this.zone.chaff ?? [])) add(new ChaffEnemy(this.scene, c.x, c.z, { bounds }), c.x, c.z);
       // The loading screen waits for the player AND the composed enemies.
@@ -871,6 +911,20 @@ export default class ArenaScene {
     }
   }
 
+  // Bocage hedges are soft cover: drive through them and they drag your top speed (you don't
+  // stop, you just slow). While inside a hedge zone, ease the tank's speed down toward a cap.
+  _checkSlowZones() {
+    if (!this.tank.alive || !this._slowZones.length) return;
+    const t = this.tank, CAP = 11;   // ~70% of cruise — a slight drag through the brush, never a wall
+    for (const z of this._slowZones) {
+      if (Math.abs(t.position.x - z.position.x) < z.halfW && Math.abs(t.position.z - z.position.z) < z.halfD) {
+        const sp = Math.abs(t.speed);
+        if (sp > CAP) t.speed = Math.max(CAP, sp * 0.9) * Math.sign(t.speed);
+        return;   // one zone is enough
+      }
+    }
+  }
+
   _setupGameLoop() {
     let lastTime = performance.now();
 
@@ -965,6 +1019,7 @@ export default class ArenaScene {
       this._checkHazards(dt);
       this._checkCollisions();
       this._checkObstacleCollisions();
+      this._checkSlowZones();
       const _cdBefore = this._fireCooldown;
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
       if (_cdBefore > 0 && this._fireCooldown === 0) audio.play('tank.reload', { emitter: this.tank.root }); // cannon ready

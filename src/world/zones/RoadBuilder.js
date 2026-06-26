@@ -20,6 +20,7 @@ import { loadPropTemplates, instanceProp } from '../props/loadProp.js';
 const POI_TREE_SCALE = 1.4, POI_BUSH_SCALE = 1.2, POI_ROCK_SCALE = 1.2;
 const ROAD_TREE_SCALE = 1.3;   // roadside dressing trees (× per-tree variation)
 const TREE_VARIANTS  = ['Tree_Round', 'Tree_Pine', 'Tree_Cluster'];
+const HEDGE_ROT = Math.PI / 2; // offset so the hedge long-axis runs ALONG the road (verified in-game: model local-X is 90° off)
 
 const PATH_Y = 0.055, SEG = 14, PATH_MASK_TILE = 300;
 
@@ -130,9 +131,9 @@ export function buildRoadLeg(scene, zone) {
   // ── textured dirt road (game's buildPath: Catmull-Rom ribbon + patchy mask) ───
   M.path.opacityTexture = makePathMask(scene, leg.seed);
   M.path.transparencyMode = 2;  // ALPHABLEND
-  const buildPath = (wps, w=7) => {
+  const buildPath = (wps, w=7, fadeEnd=false, y=PATH_Y, alphaIdx=0) => {
     if (!wps || wps.length < 2) return;
-    const ctrl = wps.map(([x,z]) => new Vector3(x, PATH_Y, z));
+    const ctrl = wps.map(([x,z]) => new Vector3(x, y, z));
     const center = [];
     for (let i=0;i<ctrl.length-1;i++){ const p0=ctrl[Math.max(0,i-1)],p1=ctrl[i],p2=ctrl[i+1],p3=ctrl[Math.min(ctrl.length-1,i+2)];
       for (let s=0;s<SEG;s++) center.push(Vector3.CatmullRom(p0,p1,p2,p3,s/SEG)); }
@@ -140,21 +141,40 @@ export function buildRoadLeg(scene, zone) {
     const HW = w*1.5/2, L=[], R=[];
     for (let i=0;i<center.length;i++){ const a=center[Math.max(0,i-1)], b=center[Math.min(center.length-1,i+1)];
       const tx=b.x-a.x, tz=b.z-a.z, tl=Math.hypot(tx,tz)||1, px=-tz/tl, pz=tx/tl;
-      L.push(new Vector3(center[i].x+px*HW, PATH_Y, center[i].z+pz*HW));
-      R.push(new Vector3(center[i].x-px*HW, PATH_Y, center[i].z-pz*HW)); }
+      L.push(new Vector3(center[i].x+px*HW, y, center[i].z+pz*HW));
+      R.push(new Vector3(center[i].x-px*HW, y, center[i].z-pz*HW)); }
     const ribbon = MeshBuilder.CreateRibbon('road-ribbon', { pathArray:[L,R] }, scene);
     ribbon.material = M.path; ribbon.parent = root; ribbon.receiveShadows = true; ribbon.isPickable = false;
+    ribbon.alphaIndex = alphaIdx;   // draw order: higher = on top (main road over spurs at junctions)
     worldUV(ribbon, 6);
     const K = center.length; let total=0; const cum=[0];
     for (let i=1;i<K;i++){ total+=Vector3.Distance(center[i-1],center[i]); cum.push(total); }
     const uv2 = new Float32Array(2*K*2);
     for (let i=0;i<K;i++){ const t=cum[i]/PATH_MASK_TILE; uv2[i*2]=0; uv2[i*2+1]=t; uv2[(K+i)*2]=1; uv2[(K+i)*2+1]=t; }
     ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
+    // Blotchy END fade (spurs only): per-vertex alpha (white rgb) ramps to 0 over the last
+    // FADE units, jittered per vertex (L/R independently) so the dead end frays into the grass
+    // instead of a hard rectangular cut. Multiplies with the dirt opacity-mask. Start stays
+    // solid (alpha 1) so the junction with the main road reads seamless.
+    if (fadeEnd) {
+      const FADE = 6, cols = new Float32Array(2 * K * 4);   // SHORT, abrupt fray at the very tip
+      for (let i = 0; i < K; i++) {
+        const dEnd = total - cum[i];
+        const fa = (j) => { let v = (dEnd + (Math.random() * 2 - 1) * 2.5) / FADE; v = v < 0 ? 0 : v > 1 ? 1 : v; return v * v * (3 - 2 * v); };
+        cols[i*4]=1; cols[i*4+1]=1; cols[i*4+2]=1; cols[i*4+3]=fa();
+        cols[(K+i)*4]=1; cols[(K+i)*4+1]=1; cols[(K+i)*4+2]=1; cols[(K+i)*4+3]=fa();
+      }
+      ribbon.setVerticesData(VertexBuffer.ColorKind, cols);
+      ribbon.hasVertexAlpha = true;
+    }
   };
   // ONE continuous ribbon over the full centerline (southern approach + generated road) —
   // seamless join (single Catmull-Rom + single mask run).
-  buildPath(leg.centerline, 8);
-  for (const sp of leg.spurs) buildPath(sp.wps, 5);
+  // Spurs draw FIRST (alphaIndex 0) at the SAME height; the main road draws LAST (alphaIndex 1)
+  // so its solid dirt covers the spur where they overlap at the junction — no double-feathered
+  // dark wedge at the crook, while the spur still shows where it runs past the road.
+  for (const sp of leg.spurs) buildPath(sp.wps, 5, true, PATH_Y, 0);
+  buildPath(leg.centerline, 8, false, PATH_Y, 1);
 
   // ── all GLB props (roadside dressing trees + POI thickets/set-pieces) — native low-poly
   // models (treepatch.glb), instanced per placement. Loading is async, so they build in
@@ -162,17 +182,44 @@ export function buildRoadLeg(scene, zone) {
   // already in the leg's arrays (built by ArenaScene), so combat/pickups don't wait. ──────
   const propsReady = (leg.trees?.length || leg.pois?.length)
     ? (async () => {
-        // Merge both prop GLBs into one template map: trees/bush/rock + Hut/Chest.
+        // Merge the prop GLBs into one template map: trees/bush/rock + Hut/Chest + Farmstead.
         const tpl = { ...(await loadPropTemplates(scene, 'treepatch.glb')),
-                      ...(await loadPropTemplates(scene, 'buildings.glb')) };
+                      ...(await loadPropTemplates(scene, 'buildings.glb')),
+                      ...(await loadPropTemplates(scene, 'farmstead.glb')),
+                      ...(await loadPropTemplates(scene, 'windmill.glb')),
+                      ...(await loadPropTemplates(scene, 'hedge.glb')) };
         const pick = (a) => a[Math.floor(Math.random() * a.length)];
-        const obs = [], sc = [];
+        const obs = [], sc = [], slow = [];   // slow[] = soft hedge zones that drag the tank (not walls)
 
         // roadside dressing trees (line the road) — the GLB tree variants
-        (leg.trees ?? []).forEach(([x, z], i) => {
-          const scale = ROAD_TREE_SCALE * (0.85 + ((i * 37) % 10) / 22);
+        (leg.trees ?? []).forEach(([x, z, s], i) => {
+          const scale = (s ?? 1) * ROAD_TREE_SCALE * (0.85 + ((i * 37) % 10) / 22);
           sc.push(...instanceProp(tpl, pick(TREE_VARIANTS), { x, z, scale, rotY: (i * 1.3) % Math.PI, parent: root }));
         });
+
+        // bocage hedgerows: instance the hedge segment at each placement. Hedges are SOFT cover —
+        // you can drive through them, they just slow you down — so each becomes a slow-zone (AABB
+        // from its world bbox), not a solid wall.
+        for (const h of (leg.hedges ?? [])) {
+          const parts = instanceProp(tpl, 'Hedge', { x: h.x, z: h.z, scale: 1.0, rotY: h.rotY + HEDGE_ROT, parent: root });
+          if (!parts.length) continue;
+          // Per-hedge variation: HEIGHT stagger (taller/shorter → no hard flat top across a row)
+          // + slight length/rotation/lift so overlapping neighbours never sit perfectly coplanar
+          // (continuous hedge, no z-fight). Length scale stays >0.95 so tiles keep overlapping.
+          const sy = 0.78 + Math.random() * 0.55;     // 0.78–1.33 height
+          const sxz = 0.97 + Math.random() * 0.28;    // 0.97–1.25 length/width
+          const ry = (Math.random() - 0.5) * 0.18;
+          const dy = (Math.random() - 0.5) * 0.06;
+          let mnx = Infinity, mxx = -Infinity, mnz = Infinity, mxz = -Infinity;
+          for (const mm of parts) {
+            mm.scaling.set(sxz, sy, sxz); mm.rotation.y += ry; mm.position.y += dy;
+            sc.push(mm); mm.refreshBoundingInfo?.(true);
+            const bb = mm.getBoundingInfo().boundingBox;
+            mnx = Math.min(mnx, bb.minimumWorld.x); mxx = Math.max(mxx, bb.maximumWorld.x);
+            mnz = Math.min(mnz, bb.minimumWorld.z); mxz = Math.max(mxz, bb.maximumWorld.z);
+          }
+          slow.push({ position: { x: (mnx + mxx) / 2, z: (mnz + mxz) / 2 }, halfW: (mxx - mnx) / 2 * 0.85, halfD: (mxz - mnz) / 2 * 0.85 });
+        }
 
         // POI build helpers: tree/bush/rock conveniences + a generic `prop` (Hut, Chest, …).
         const helpers = {
@@ -189,7 +236,7 @@ export function buildRoadLeg(scene, zone) {
           if (out?.obstacles)     obs.push(...out.obstacles);
           if (out?.shadowCasters) sc.push(...out.shadowCasters.filter(Boolean));
         }
-        return { obstacles: obs, shadowCasters: sc };
+        return { obstacles: obs, shadowCasters: sc, slowZones: slow };
       })()
     : null;
 

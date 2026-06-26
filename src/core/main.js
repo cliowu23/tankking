@@ -512,15 +512,6 @@ function startHangar() {
   );
 }
 
-const DEPLOY_TIPS = [
-  'AMBUSHERS HIDE IN THE TALL GRASS — WATCH FOR THE OFF-COLOR PATCHES',
-  'EXTRACTION = DRIVE BACK INTO THE TUNNEL AND HOLD THE PAD',
-  'LOOT GETS RICHER THE FURTHER NORTH YOU PUSH — SO DO THE PATROLS',
-  'THE FLANKS HIDE POINTS OF INTEREST. GREED IS A CHOICE',
-  'DIE OUT THERE AND THE RUN\'S SALVAGE STAYS OUT THERE',
-  'LOCK-ON (HOLD F) ALERTS THE TARGET — MANUAL AIM KEEPS YOU QUIET',
-];
-
 // Deploy uses the loading screen, not the checker transition: the overlay goes
 // up instantly, the arena builds + the tank GLB loads behind it (arenaScene.ready),
 // then it fades into the world. _tBusy still guards against double-deploys.
@@ -531,17 +522,16 @@ function deployToArena(dev = false) {
   _tBusy = true;
 
   const lo = document.getElementById('deploy-loading');
-  // Loading-screen title/sub/tip reflect the destination (reset for World 1 in
-  // case a prior dev deploy changed them).
+  // Loading-screen title/sub reflect the destination (reset for World 1 in case a prior dev
+  // deploy changed them). Tips were removed — keep the element empty.
+  const tipEl = document.getElementById('deploy-tip');
+  if (tipEl) tipEl.textContent = '';
   if (dev) {
     document.getElementById('deploy-loading-title').textContent = 'DEV ARENA';
     document.getElementById('deploy-loading-sub').textContent   = 'ENEMY TESTING';
-    document.getElementById('deploy-tip').textContent           = 'SANDBOX — TEST ENEMIES & MECHANICS';
   } else {
     document.getElementById('deploy-loading-title').textContent = 'WORLD 1';
     document.getElementById('deploy-loading-sub').textContent   = 'GREEN FIELDS';
-    document.getElementById('deploy-tip').textContent =
-      DEPLOY_TIPS[Math.floor(Math.random() * DEPLOY_TIPS.length)];
   }
   lo.classList.remove('done');
   lo.style.opacity = '1';

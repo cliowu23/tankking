@@ -19,7 +19,8 @@ function place(ctx, rand, opts = {}) {
   const p = pts[anchorIdx], d = dirAt(pts, anchorIdx);
   const side = rand() < 0.5 ? 1 : -1;
   const px = -d.z * side, pz = d.x * side;                 // unit perpendicular, off-road
-  const hx = p.x + px * o.offset, hz = p.z + pz * o.offset; // hut position
+  const off = o.offset + (o.offsetBonus || 0);             // leg may push it farther out (varied distance)
+  const hx = p.x + px * off, hz = p.z + pz * off;          // hut position
   const faceRoad = Math.atan2(-px, -pz);                   // toward the road
   const hutRot = faceRoad + o.doorOffset;
   const chx = hx - px * 4.5, chz = hz - pz * 4.5;          // chest in front, toward the road
@@ -34,11 +35,12 @@ function place(ctx, rand, opts = {}) {
 
   const band = bandFor(anchorIdx / total);
   const containers = [{ x: chx, z: chz, value: Math.round(valueFor(band) * o.lootMult), radius: 6 }];
-  const enemies = [
-    { x: hx - px * 7, z: hz - pz * 7, mode: 'ambush', band },           // guard between road & hut
-    ...(rand() < 0.6 ? [{ x: hx + d.x * 6, z: hz + d.z * 6, mode: 'patrol', band }] : []),
+  // Guard plan: a sentry posted by the door (road side), a lurker hidden inside the hut.
+  const guards = [
+    { x: hx - px * 5, z: hz - pz * 5, role: 'sentry' },   // out front, road side
+    { x: hx, z: hz, role: 'lurker' },                     // inside the hut
   ];
-  return { poiType: ID, anchor: { x: hx, z: hz }, props, enemies, loot: [], containers };
+  return { poiType: ID, anchor: { x: hx, z: hz }, props, enemies: [], loot: [], containers, guards };
 }
 
 function build(scene, inst, helpers) {

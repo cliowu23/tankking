@@ -34,6 +34,11 @@ const EYE   = [1.0, 0.12, 0.10];
 const MUZ   = [0.85, 0.35, 0.10];   // idle muzzle ember
 const DEATH_TINT = [0.10, 0.10, 0.11];
 
+const GAIT_SWEEP = 0.28;   // radians a leg steps fore-aft (azimuthal swing around Y)
+const GAIT_LIFT  = 0.50;   // radians a foot lifts during its swing half (arc, not drag)
+const _qLift = new Quaternion();   // per-frame scratch (synchronous, safe to share)
+const _qSweep = new Quaternion();
+
 export default class MortarEnemy extends AIEnemy {
   constructor(scene, x, z, opts = {}) {
     super(scene, x, z, {
@@ -87,6 +92,7 @@ export default class MortarEnemy extends AIEnemy {
     holder.rotation.y = 0;                // model is already built eye/mortar-forward (+Z); no flip
     holder.scaling.setAll(MODEL_SCALE);
     holder.position.y = 0;
+    this._holder = holder;
 
     this.eyeMat = this._mat('mortarEyeGlow', EYE, true);
     this.muzMat = this._mat('mortarMuzGlow', MUZ, true);
@@ -124,11 +130,19 @@ export default class MortarEnemy extends AIEnemy {
       const pivot = new TransformNode(`mortarLeg${i}_${id}`, scene);
       pivot.parent = holder;
       pivot.position = Vector3.TransformCoordinates(hipW, holderInv);
+      pivot.rotationQuaternion = new Quaternion();   // driven by _animateLegs
       for (const seg of ['thigh', 'knee', 'shin']) {
         const lm = made.find(m => m.name === `${seg}_${i}`);
         if (lm) lm.node.setParent(pivot);
       }
-      this._legs.push({ pivot, phase: (i % 2) * Math.PI });   // alternate tripod phase
+      // Per-leg outward azimuth → the horizontal axis we pitch the limb around to LIFT the
+      // foot. Each radial leg arcs up cleanly along its own direction instead of all six
+      // pitching the same body-forward way (the old uniform rotation.x dragged side legs).
+      // Axis is oriented (−cos, 0, +sin) so a POSITIVE lift angle raises the foot upward
+      // (the opposite sign would drive it into the ground — see cross-product with outward).
+      const ang = Math.atan2(pivot.position.x, pivot.position.z);
+      const liftAxis = new Vector3(-Math.cos(ang), 0, Math.sin(ang));
+      this._legs.push({ pivot, phase: (i % 2) * Math.PI, liftAxis });   // alternate tripod phase
     }
 
     this.hpBarBg.position.y = 3.0;
@@ -237,14 +251,35 @@ export default class MortarEnemy extends AIEnemy {
     this.muzMat?.emissiveColor.set(MUZ[0] * mf, MUZ[1] * mf, MUZ[2] * mf);
   }
 
+  // Spider gait: each leg arcs its foot UP during the swing half and plants it for the
+  // stance half (lift = max(0,cos) bump while sweeping forward; drags back when planted),
+  // tripod-phased (even/odd legs antiphase) so three feet always carry the body. Lift is
+  // about each leg's own outward axis, sweep is azimuthal (around Y) — radial-spider true.
+  // A subtle body bob + roll rides the gait; a faint idle shimmer keeps the holding
+  // artillery alive rather than a frozen statue; charging digs the whole rig down to brace.
   _animateLegs(dt) {
     const moving = Math.abs(this.speed);
     this._gaitSpeed += (moving - this._gaitSpeed) * Math.min(1, dt * 6);
-    this._gaitPhase += this._gaitSpeed * 1.4 * dt;
-    const amp = Math.min(1, this._gaitSpeed / 3);
-    const brace = this._charging ? 1 : 0;   // dig-in dip while charging
+    this._gaitPhase += this._gaitSpeed * 1.6 * dt;
+    this._idleT = (this._idleT || 0) + dt;
+    const amp   = Math.min(1, this._gaitSpeed / 3);
+    const brace = this._charging ? 1 : 0;
+    const idle  = (1 - amp) * (1 - brace);   // idle sway only when not walking / charging
     for (const leg of this._legs) {
-      leg.pivot.rotation.x = Math.sin(this._gaitPhase + leg.phase) * 0.22 * amp - brace * 0.06;
+      const ph = this._gaitPhase + leg.phase;
+      const sweep = Math.sin(ph) * GAIT_SWEEP * amp;
+      let lift = Math.max(0, Math.cos(ph)) * GAIT_LIFT * amp;
+      lift += Math.sin(this._idleT * 1.1 + leg.phase) * 0.02 * idle;   // faint idle breath
+      lift -= brace * 0.12;                                            // dig in to brace
+      Quaternion.RotationAxisToRef(leg.liftAxis, lift, _qLift);
+      Quaternion.RotationYawPitchRollToRef(sweep, 0, 0, _qSweep);
+      _qSweep.multiplyToRef(_qLift, leg.pivot.rotationQuaternion);     // sweep ∘ lift
+    }
+    if (this._holder) {
+      this._holder.position.y = -Math.abs(Math.sin(this._gaitPhase)) * 0.05 * amp
+                              + Math.sin(this._idleT * 1.2) * 0.03 * idle
+                              - brace * 0.12;
+      this._holder.rotation.z = Math.sin(this._gaitPhase) * 0.025 * amp;
     }
   }
 
