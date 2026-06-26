@@ -287,20 +287,22 @@ export default class HangarScene {
 
     const propMats = makeMats(s);
     this._blobMat = propMats.blob;
+    const _wb = buildWorkbench(s, -11, -2, propMats);
+    const _qm = buildQMCrates(s,   11,  0, propMats);
     this._stationMeshes = [
-      { mesh: buildWorkbench(s,  -11,  -2, propMats), data: this._stationDefs.mechanic },
-      { mesh: buildQMCrates(s,    11,   0, propMats), data: this._stationDefs.qm       },
+      { mesh: _wb.trigger, data: this._stationDefs.mechanic },
+      { mesh: _qm.trigger, data: this._stationDefs.qm       },
     ];
 
     // NW-corner planning desk — the redesigned tactical map. Hand-tuned layout
     // baked into HangarMapTable.js, scaled into the corner like lounge/kitchen.
     this._map = buildMapTable(s, propMats);
-    this._stationMeshes.push({ mesh: this._map.collider, data: this._stationDefs.map });
+    this._stationMeshes.push({ mesh: this._map.trigger, data: this._stationDefs.map });
 
     // NE-corner radio / intercept station (quest-giver comms hub) — baked into
     // HangarRadio.js. Carries the swappable north-wall poster (this._radio.setPoster).
     this._radio = buildRadio(s, propMats);
-    this._stationMeshes.push({ mesh: this._radio.collider, data: this._stationDefs.radio });
+    this._stationMeshes.push({ mesh: this._radio.trigger, data: this._stationDefs.radio });
     // Poster: if the player deliberately pinned one via the 5-click chooser, honor
     // it; otherwise show a fresh random design each hangar visit.
     try {

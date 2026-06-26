@@ -1,4 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight, DynamicTexture } from '@babylonjs/core';
+import { markSolid, makeTrigger } from './hangarColliders.js';
 
 // ── Blob shadows ─────────────────────────────────────────────────────────────
 // Soft dark oval decals on the floor under props — fake grounding shadows that
@@ -42,16 +43,6 @@ function vis(mesh) {
   mesh.isPickable      = false;
   mesh.checkCollisions = false;
   return mesh;
-}
-
-// Invisible collision box for proximity detection
-function makeCollider(name, size, pos, s) {
-  const m = MeshBuilder.CreateBox(name, size, s);
-  m.position        = pos.clone();
-  m.isVisible       = false;
-  m.checkCollisions = true;
-  m.isPickable      = false;
-  return m;
 }
 
 // Shared material factory — creates fresh materials per scene
@@ -192,6 +183,7 @@ export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
   // ── Pegboard ──
   const pegboard = MeshBuilder.CreateBox('wb-pegboard', { width: 2.4, height: 1.6, depth: 0.04 }, s);
   pegboard.position = new Vector3(0, 1.88, -0.52); pegboard.material = M.wood; vp(pegboard);
+  markSolid(pegboard);   // genuinely tall structural prop — local top ≈ 2.68
 
   // Wrench
   const wrench = MeshBuilder.CreateBox('wb-wrench', { width: 0.08, height: 0.9, depth: 0.03 }, s);
@@ -217,7 +209,8 @@ export function buildWorkbench(s, cx, cz, M, scale = 1.8) {
   const socketHead = MeshBuilder.CreateBox('wb-socket-hd', { width: 0.18, height: 0.15, depth: 0.07 }, s);
   socketHead.position = new Vector3(0.20, 1.32, -0.54); socketHead.material = M.darkMetal; vp(socketHead);
 
-  return makeCollider('station-mechanic', { width: 2.0, height: 1.5, depth: 5.5 }, new Vector3(cx, 0.75, cz), s);
+  const trigger = makeTrigger(s, 'mechanic-trigger', new Vector3(cx, 0.5, cz));
+  return { root, trigger };
 }
 
 // ── 4b: Quartermaster — warehouse module (rack + cabinet + drums) ─────────────
@@ -271,6 +264,7 @@ export function buildQMCrates(s, cx, cz, M, scale = 1.8) {
   const cab = MeshBuilder.CreateBox('qm-cab', { width: 0.8, height: 2.3, depth: 0.55 }, s);
   cab.position = new Vector3(1.75, 1.15, 0);
   cab.material = M.darkGreen; vp(cab);
+  markSolid(cab);   // genuinely tall structural prop — local top ≈ 2.3
 
   const seam = MeshBuilder.CreateBox('qm-seam', { width: 0.025, height: 2.28, depth: 0.57 }, s);
   seam.position = new Vector3(1.75, 1.15, 0);
@@ -291,7 +285,8 @@ export function buildQMCrates(s, cx, cz, M, scale = 1.8) {
     band.material = M.metal; vp(band);
   });
 
-  return makeCollider('station-qm', { width: 1.4, height: 1.0, depth: 3.5 }, new Vector3(cx, 0.5, cz), s);
+  const trigger = makeTrigger(s, 'qm-trigger', new Vector3(cx, 0.5, cz));
+  return { root, trigger };
 }
 
 // (Tactical Map Table moved to its own module — see src/hub/HangarMapTable.js,

@@ -1,18 +1,11 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
+import { makeTrigger } from './hangarColliders.js';
 
 // ── helpers (local so this module stays decoupled from HangarProps) ───────────
 function vis(mesh) {
   mesh.isPickable      = false;
   mesh.checkCollisions = false;
   return mesh;
-}
-function makeCollider(name, size, pos, s) {
-  const m = MeshBuilder.CreateBox(name, size, s);
-  m.position        = pos.clone();
-  m.isVisible       = false;
-  m.checkCollisions = true;
-  m.isPickable      = false;
-  return m;
 }
 
 // Port the mockup's LOCAL frame (west wall x=-3.55, north wall z=+3.55) into the
@@ -182,12 +175,11 @@ export function buildMapTable(s, M) {
   box(clutter, 'book2', 0.28, 0.06, 0.2, -3.04, T + 0.06, 0.02, bookB);
   box(clutter, 'book3', 0.26, 0.05, 0.2, -3.05, T + 0.115, -0.01, bookT).rotation.y = -0.08;
 
-  // ── collider + center (interaction point at the seat, east of the desk) ─────
+  // ── trigger + center (interaction point at the seat, east of the desk) ──────
   const sx = (xc) => root.position.x + S * (xc + OX - CAX);
   const sz = (zc) => root.position.z + S * (zc + OZ - CAZ);
   const cx = sx(-2.159), cz = sz(1.36);   // baked stool position
-  const collider = makeCollider('station-map',
-    { width: 3.6, height: 1.6, depth: 3.6 }, new Vector3(cx, 0.8, cz), s);
+  const trigger = makeTrigger(s, 'map-trigger', new Vector3(cx, 0.5, cz));
 
-  return { collider, root, center: new Vector3(cx, 0.5, cz), radio };
+  return { trigger, root, center: new Vector3(cx, 0.5, cz), radio };
 }
