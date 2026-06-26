@@ -258,6 +258,27 @@ export function buildKitchen(s, M) {
     (CAZ + NUDGE_Z) + S * (-2.0 + OZ - CAZ),
   );
 
+  // Raised blockers for SHORT solids: the counter tops (~0.90), stove (~0.90)
+  // and round dining table (~0.75) sit at/under the player's collision capsule
+  // floor (~0.9), so their visual-mesh colliders don't block. Each gets a tall
+  // invisible box (floor→BLOCK_H) over its footprint, parented to the same prop
+  // group so the group/scale offsets are inherited automatically. (The fridge,
+  // top ~1.85, already blocks — no blocker needed.)
+  const BLOCK_H = 1.6;
+  const block = (parent, name, w, d, x, z) => {
+    const m = MeshBuilder.CreateBox(name, { width: w, height: BLOCK_H, depth: d }, s);
+    m.position        = new Vector3(x + OX - CAX, BLOCK_H / 2, z + OZ - CAZ);
+    m.isVisible       = false;
+    m.isPickable      = false;
+    m.checkCollisions = true;
+    m.parent          = parent;
+    return m;
+  };
+  block(sc, 'cs-block', 3.0,  0.82, -1.4,  -2.98);  // south counter
+  block(ec, 'ce-block', 0.82, 1.1,   2.98, -0.15);  // east counter
+  block(st, 'st-block', 0.86, 1.05,  2.85, -1.45);  // stove
+  block(tb, 'tb-block', 0.90, 0.90,  0.25, -0.55);  // dining table (round → box approx)
+
   const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
   const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));
   return { root, colliders, trigger, center: new Vector3(center.x, 0.5, center.z) };
