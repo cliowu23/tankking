@@ -48,8 +48,8 @@ export default class SentinelEnemy extends AIEnemy {
       aiSpeed: 4.5,        // planted/heavy — slower than the old light tank
       optimalRange: 30,    // SNIPER: holds at the far edge of what's ON-SCREEN (~35u ahead on
                            // desktop) — long range, but it never beams from off-screen (see _onScreen).
-      aggroRange: 50,      // detects from far so it's already closing/aimed as it enters view;
-                           // the on-screen fire gate is what actually limits when it shoots.
+      aggroRange: 34,      // ≈ screen edge: engages as it enters view, not way off-screen (was 50).
+                           // Shooting (hearNoise) wakes it from further; the on-screen gate limits firing.
       ...opts,
       noPrimitiveVisuals: true,   // we draw our own placeholder below
     });
@@ -294,7 +294,7 @@ export default class SentinelEnemy extends AIEnemy {
   // the charge in COMBAT, but the _charging guard makes that a no-op.
   _tryEngage(playerPos) {
     if (this._charging || this.fireCooldown > 0) return;
-    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') return;
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL' || this.state === 'EMERGE') return;
     const dx = playerPos.x - this.root.position.x;
     const dz = playerPos.z - this.root.position.z;
     if (dx * dx + dz * dz > this._engageRange * this._engageRange) return;
@@ -337,7 +337,7 @@ export default class SentinelEnemy extends AIEnemy {
     // Abort the wind-up only if the target is fully lost (back to an unaware state) —
     // NOT just because it's APPROACH/RETREAT, so a charge begun from range while moving
     // still releases.
-    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') {
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL' || this.state === 'EMERGE') {
       this._charging = false;
       this._chargeT  = 0;
       this.fireCooldown = 0.4;

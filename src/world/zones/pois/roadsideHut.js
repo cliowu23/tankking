@@ -35,10 +35,12 @@ function place(ctx, rand, opts = {}) {
 
   const band = bandFor(anchorIdx / total);
   const containers = [{ x: chx, z: chz, value: Math.round(valueFor(band) * o.lootMult), radius: 6 }];
-  // Guard plan: a sentry posted by the door (road side), a lurker hidden inside the hut.
+  // Guard plan: bots wait inside the hut and file out the front door (road side) in single file.
+  const doorN = { nx: -px, nz: -pz };
+  const ix = hx - px * 1.2, iz = hz - pz * 1.2;        // just inside the hut, at the door
   const guards = [
-    { x: hx - px * 5, z: hz - pz * 5, role: 'sentry' },   // out front, road side
-    { x: hx, z: hz, role: 'lurker' },                     // inside the hut
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 0 },
+    { x: ix, z: iz, role: 'sentry', door: doorN, exitOrder: 1 },
   ];
   return { poiType: ID, anchor: { x: hx, z: hz }, props, enemies: [], loot: [], containers, guards };
 }

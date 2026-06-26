@@ -46,7 +46,7 @@ export default class MortarEnemy extends AIEnemy {
       damage: 60,           // splash CENTRE damage (falloff to ~1/3 at the edge, in ArenaScene)
       aiSpeed: 3.5,         // slow — artillery, only repositions
       optimalRange: 30,     // long hold — it lobs from the back of the field
-      aggroRange: 46,       // detects/positions from far; the _onScreen gate still bars off-screen lobs
+      aggroRange: 34,       // positions as it nears view (was 46); the _onScreen gate still bars off-screen lobs, shooting wakes it from further
       cooldown: RECOVERY,
       ...opts,
       noPrimitiveVisuals: true,
@@ -192,7 +192,7 @@ export default class MortarEnemy extends AIEnemy {
 
   _updateCharge(dt) {
     if (!this._charging) return;
-    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL') {
+    if (this.state === 'IDLE' || this.state === 'AMBUSH' || this.state === 'PATROL' || this.state === 'EMERGE') {
       this._charging = false; this._chargeT = 0; this.fireCooldown = 0.5;
       return;
     }

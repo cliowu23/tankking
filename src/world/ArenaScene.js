@@ -104,6 +104,7 @@ export default class ArenaScene {
     this._setupLockOn();
     this._setupFiring();
     this.vfx = new ArenaVFX(this.scene);
+    this.scene._arenaVfx = this.vfx;   // let enemies trigger VFX (e.g. the lurker emergence dust puff)
     this._setupGameLoop();
   }
 
@@ -446,11 +447,13 @@ export default class ArenaScene {
       // Artillery support: place n mortar(s) set BACK from the squad (deeper into the
       // field, +Z away from the player's southern approach) so they lob over their own
       // line rather than standing in it.
-      const spawnMortarSupport = (cx, cz, n = 1) => {
+      const spawnMortarSupport = (cx, cz, n = 1, door = null) => {
         for (let i = 0; i < n; i++) {
           const px = cx + (Math.random() - 0.5) * 8;
           const pz = cz + 10 + Math.random() * 6;   // 10–16u deeper than the squad
-          add(new MortarEnemy(this.scene, px, pz, { bounds }), px, pz);
+          // POI mortars hide + file out a door too; road-blocker mortars stay visible.
+          const o = door ? { bounds, ambush: true, ambushRadius: 18, emerge: 'door', door, exitOrder: 5 } : { bounds };
+          add(new MortarEnemy(this.scene, px, pz, o), px, pz);
         }
       };
       // Each former single-tank spawn becomes a spider-bot pack; POI markers become
@@ -482,17 +485,19 @@ export default class ArenaScene {
           //  • lurkers  → spider-bots in AMBUSH (tight radius) AT a building → "burst from building"
           //  • sentries → posted guards (IDLE hold, engage on approach); Sentinels on the forced
           //    POI (or a roll) so the heavies still show, else spider-bots. Mortar set back as usual.
+          // EVERY POI enemy is hidden INSIDE a building (all POIs are a known danger — no visible-
+          // guard tell), then DRIVES OUT the front door in single file (g.door = outward normal,
+          // g.exitOrder = queue position) when the player nears. Sentinels file out too.
           const sentinelSentries = mustSentinel || Math.random() < 0.4;
           for (const g of e.guards) {
-            if (g.role === 'lurker') {
-              add(new ChaffEnemy(this.scene, g.x, g.z, { bounds, ambush: true, ambushRadius: 12 }), g.x, g.z);
-            } else if (sentinelSentries) {
-              add(new SentinelEnemy(this.scene, g.x, g.z, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, bounds }), g.x, g.z);
+            const o = { bounds, ambush: true, ambushRadius: 16, emerge: 'door', door: g.door, exitOrder: g.exitOrder };
+            if (g.role !== 'lurker' && sentinelSentries) {
+              add(new SentinelEnemy(this.scene, g.x, g.z, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ...o }), g.x, g.z);
             } else {
-              add(new ChaffEnemy(this.scene, g.x, g.z, { bounds }), g.x, g.z);
+              add(new ChaffEnemy(this.scene, g.x, g.z, o), g.x, g.z);
             }
           }
-          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
+          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1, e.guards[0]?.door);
         } else if (e.poi) {
           // fallback (POI without an authored guard plan): the old scatter behaviour
           if (mustSentinel || Math.random() < 0.5) {
@@ -875,7 +880,7 @@ export default class ArenaScene {
     }
     let nearest = null, bestDist = Infinity;
     for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy.alive || enemy._hidden) continue;   // can't lock onto a unit still hidden inside a building
       const d = Math.hypot(enemy.position.x - cx, enemy.position.z - cz);
       if (d < bestDist) { bestDist = d; nearest = enemy; }
     }
@@ -1373,7 +1378,7 @@ export default class ArenaScene {
     const t = this.tank;
     const pBox = { cx: t.position.x, cz: t.position.z, hw: t.halfW, hd: t.halfD, rot: t.rotY };
     for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy.alive || enemy._hidden) continue;   // hidden bots are intangible until they emerge
       const eBox = { cx: enemy.position.x, cz: enemy.position.z, hw: enemy.halfW, hd: enemy.halfD, rot: enemy.rotY };
       const hit = this._obbOverlap(eBox, pBox);   // normal points enemy → player
       if (!hit) continue;
@@ -1770,7 +1775,9 @@ export default class ArenaScene {
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
         // Near-miss: a shot streaking past gives the player away (no break — one shell can pass several).
+        // This still fires for HIDDEN bots, so shooting a building flushes its garrison out (shoot-to-activate).
         if (dx * dx + dz * dz < SHELL_ALERT_R2) enemy.alert?.();
+        if (enemy._hidden) continue;                              // intangible while hidden inside — no hit until it emerges
         if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
           const speed      = Math.hypot(shell.vx, shell.vz);
           const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;

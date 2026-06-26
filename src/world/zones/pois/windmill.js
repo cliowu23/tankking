@@ -39,12 +39,14 @@ function place(ctx, rand, opts = {}) {
   ];
 
   const containers = [{ x: chx, z: chz, value: Math.round(valueFor(band) * o.lootMult), radius: 6 }];
-  // Guard plan: sentries posted at the base on the road side, a lurker hidden in the tower.
+  // Guard plan: bots wait inside the windmill and file out the base door (road side) in single file.
+  const doorN = { nx: -px, nz: -pz };
+  const ix = wx - px * 1.6, iz = wz - pz * 1.6;       // just inside the tower, at the door
   const guards = [
-    { x: wx - px * 5 + d.x * 3, z: wz - pz * 5 + d.z * 3, role: 'sentry' },
-    { x: wx - px * 5 - d.x * 3, z: wz - pz * 5 - d.z * 3, role: 'sentry' },
-    { x: wx, z: wz, role: 'lurker' },                       // inside the tower
-    { x: wx + px * 3, z: wz + pz * 3, role: 'lurker' },      // behind the tower
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 0 },
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 1 },
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 2 },
+    { x: ix, z: iz, role: 'sentry', door: doorN, exitOrder: 3 },
   ];
   return { poiType: ID, anchor: { x: wx, z: wz }, props, enemies: [], loot: [], containers, towerHalf: o.towerHalf, clearR: 13, guards };
 }

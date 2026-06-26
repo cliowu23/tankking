@@ -39,13 +39,15 @@ function place(ctx, rand, opts = {}) {
   ];
 
   const containers = [{ x: chx, z: chz, value: Math.round(valueFor(band) * o.lootMult), radius: 6 }];
-  // Guard plan: sentries posted in the yard flanking the barn door (road-facing −px side),
-  // lurkers hidden inside the barn that burst out as you arrive.
+  // Guard plan: bots wait INSIDE the barn and file out the front door (road-facing −px side) in
+  // single file when you arrive. The heavy (sentry) comes out last.
+  const doorN = { nx: -px, nz: -pz };                 // outward through the door, toward the road
+  const ix = fx - px * 2.5, iz = fz - pz * 2.5;       // just inside the barn, at the door
   const guards = [
-    { x: fx - px * 6 + d.x * 3.5, z: fz - pz * 6 + d.z * 3.5, role: 'sentry' },
-    { x: fx - px * 6 - d.x * 3.5, z: fz - pz * 6 - d.z * 3.5, role: 'sentry' },
-    { x: fx + d.x * 1.8, z: fz + d.z * 1.8, role: 'lurker' },   // inside the barn
-    { x: fx - d.x * 1.8, z: fz - d.z * 1.8, role: 'lurker' },
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 0 },
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 1 },
+    { x: ix, z: iz, role: 'lurker', door: doorN, exitOrder: 2 },
+    { x: ix, z: iz, role: 'sentry', door: doorN, exitOrder: 3 },
   ];
   return { poiType: ID, anchor: { x: fx, z: fz }, props, enemies: [], loot: [], containers, barnHalf: o.barnHalf, clearR: 15, guards };
 }

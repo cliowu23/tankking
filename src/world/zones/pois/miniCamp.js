@@ -51,11 +51,13 @@ function place(ctx, rand, opts = {}) {
     const hx = center.x + d.x * lat + px * out + (rand() - 0.5) * 1.0;
     const hz = center.z + d.z * lat + pz * out + (rand() - 0.5) * 1.0;
     props.push({ name: 'Hut', x: hx, z: hz, scale: o.hutScale, rotY: doorToward(hx, hz, center.x, center.z) });
-    guards.push({ x: hx, z: hz, role: 'lurker' });   // a bot waits inside this house
+    // each house hides 2 bots that file out its door (the door faces the clearing centre)
+    const tcx = center.x - hx, tcz = center.z - hz, tl = Math.hypot(tcx, tcz) || 1;
+    const nx = tcx / tl, nz = tcz / tl;                 // outward through the door, toward the centre
+    const ix = hx + nx * 1.2, iz = hz + nz * 1.2;       // just inside the door
+    guards.push({ x: ix, z: iz, role: 'lurker', door: { nx, nz }, exitOrder: 0 });
+    guards.push({ x: ix, z: iz, role: i === 0 ? 'sentry' : 'lurker', door: { nx, nz }, exitOrder: 1 });
   }
-  // sentries posted in the clearing toward the road (the welcoming party you see first)
-  guards.push({ x: center.x - px * 5 + d.x * 2.5, z: center.z - pz * 5 + d.z * 2.5, role: 'sentry' });
-  guards.push({ x: center.x - px * 5 - d.x * 2.5, z: center.z - pz * 5 - d.z * 2.5, role: 'sentry' });
   // dressing trees flank the camp (to the sides, clear of the house row + approach)
   for (let i = 0; i < 4; i++) {
     const sideSel = i % 2 ? 1 : -1;
