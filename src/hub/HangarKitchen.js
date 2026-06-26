@@ -275,9 +275,13 @@ export function buildKitchen(s, M) {
     m.parent          = parent;
     return m;
   };
-  block(root, 'kit-barrier-s', 6.0,  0.12, 0.0,  -2.45);  // south cook-line front → east wall
-  block(root, 'kit-barrier-e', 0.12, 3.5,  2.45, -1.25);  // east cook-line front → south wall
-  block(tb,   'tb-block',      0.90, 0.90, 0.25, -0.55);  // free-standing dining table
+  // L-barrier front (south leg + east leg) ...
+  block(root, 'kit-barrier-s', 5.9,  0.12, 0.05, -2.45);  // south cook-line front (west end at counter edge)
+  block(root, 'kit-barrier-e', 0.12, 3.5,  2.45, -1.25);  // east cook-line front
+  // ... plus end-caps so the two OPEN ends can't be rounded into the pocket:
+  block(root, 'kit-barrier-w', 0.14, 0.75, -2.9, -2.78);  // west end-cap (exit-door side) → seals the gap
+  block(root, 'kit-barrier-n', 0.65, 0.14,  2.72, 0.40);  // north end-cap (east leg)
+  block(tb,   'tb-block',      0.90, 0.90,  0.25, -0.55);  // free-standing dining table
 
   const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
   const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));
