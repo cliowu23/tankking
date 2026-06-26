@@ -7,6 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter, { DRIVER_DEFAULT, ATTACH_SLOTS, normalizeDriverConfig } from './DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, addBlob } from './HangarProps.js';
+import { makeWorldWall } from './hangarColliders.js';
 import { buildLounge } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
 import { buildMapTable } from './HangarMapTable.js';
@@ -287,20 +288,22 @@ export default class HangarScene {
 
     const propMats = makeMats(s);
     this._blobMat = propMats.blob;
+    const _wb = buildWorkbench(s, -11, -2, propMats);
+    const _qm = buildQMCrates(s,   11,  0, propMats);
     this._stationMeshes = [
-      { mesh: buildWorkbench(s,  -11,  -2, propMats), data: this._stationDefs.mechanic },
-      { mesh: buildQMCrates(s,    11,   0, propMats), data: this._stationDefs.qm       },
+      { mesh: _wb.trigger, data: this._stationDefs.mechanic },
+      { mesh: _qm.trigger, data: this._stationDefs.qm       },
     ];
 
     // NW-corner planning desk — the redesigned tactical map. Hand-tuned layout
     // baked into HangarMapTable.js, scaled into the corner like lounge/kitchen.
     this._map = buildMapTable(s, propMats);
-    this._stationMeshes.push({ mesh: this._map.collider, data: this._stationDefs.map });
+    this._stationMeshes.push({ mesh: this._map.trigger, data: this._stationDefs.map });
 
     // NE-corner radio / intercept station (quest-giver comms hub) — baked into
     // HangarRadio.js. Carries the swappable north-wall poster (this._radio.setPoster).
     this._radio = buildRadio(s, propMats);
-    this._stationMeshes.push({ mesh: this._radio.collider, data: this._stationDefs.radio });
+    this._stationMeshes.push({ mesh: this._radio.trigger, data: this._stationDefs.radio });
     // Poster: if the player deliberately pinned one via the 5-click chooser, honor
     // it; otherwise show a fresh random design each hangar visit.
     try {
@@ -320,12 +323,25 @@ export default class HangarScene {
     // HangarLounge.js, no longer customizable). Pressing E opens the character
     // customization panel (driver look) via openLounge().
     this._lounge = buildLounge(s, propMats);
-    this._stationMeshes.push({ mesh: this._lounge.collider, data: this._stationDefs.lounge });
+    this._stationMeshes.push({ mesh: this._lounge.trigger, data: this._stationDefs.lounge });
 
     // SE-corner kitchen — static INTERACT station (galley/mess), scaled into the
     // corner the same way as the lounge.
     this._kitchen = buildKitchen(s, propMats);
-    this._stationMeshes.push({ mesh: this._kitchen.collider, data: this._stationDefs.kitchen });
+    this._stationMeshes.push({ mesh: this._kitchen.trigger, data: this._stationDefs.kitchen });
+
+    // Perimeter collision buffers — user-marked in hangar-collision-editor.html
+    // (world-space): a solid edge just inside each room wall so the player can't
+    // clip into the walls. Room-level, so they live here rather than in a station.
+    [
+      { cx: 11.87, cz: -2.98, w: 0.23, d: 26.26 },  // east
+      { cx: -0.09, cz: -15.89, w: 23.86, d: 0.67 }, // south
+      { cx: -11.75, cz: -0.25, w: 0.50, d: 32.12 }, // west
+      { cx: -0.06, cz: 15.72, w: 23.88, d: 0.44 },  // north
+    ].forEach((b, i) => makeWorldWall(s, `room-buffer-${i}`, b));
+
+    // Tank-bay blocker — solid footprint around the parked tank so the player can't walk through it.
+    makeWorldWall(s, 'tank-bay-wall', { cx: -0.07, cz: 10.12, w: 3.88, d: 5.04 });
 
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
