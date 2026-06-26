@@ -183,8 +183,8 @@ export function buildMapTable(s, M) {
 
   // Collision seal walls — user-marked in hangar-collision-editor.html, world-space.
   [
-    { cx: -11.04, cz: 12.68, w: 1.89, d: 6.14 },
-    { cx: -8.50,  cz: 15.21, w: 7.07, d: 1.35 },
+    { cx: -11.09, cz: 13.12, w: 1.93, d: 5.50 },
+    { cx: -8.42,  cz: 15.66, w: 7.15, d: 0.38 },
   ].forEach((b, i) => makeWorldWall(s, `map-wall-${i}`, b));
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), radio };

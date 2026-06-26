@@ -1,6 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight, DynamicTexture } from '@babylonjs/core';
 import { drawPoster } from './posterArt.js';
-import { makeTrigger } from './hangarColliders.js';
+import { makeTrigger, makeWorldWall } from './hangarColliders.js';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function vis(mesh) { mesh.isPickable = false; mesh.checkCollisions = false; return mesh; }
@@ -196,6 +196,13 @@ export function buildRadio(s, M) {
   const sz = (zc) => root.position.z + S * (zc + OZ - CAZ);
   const cx = sx(1.45), cz = sz(1.5);
   const trigger = makeTrigger(s, 'radio-trigger', new Vector3(cx, 0.5, cz));
+
+  // Collision seal walls — user-marked in hangar-collision-editor.html, world-space.
+  // (Chair step-pad + rug-open tuning come in a follow-up SEAT pass.)
+  [
+    { cx: 8.91,  cz: 14.89, w: 5.86, d: 1.60 },
+    { cx: 11.03, cz: 13.05, w: 1.82, d: 5.55 },
+  ].forEach((b, i) => makeWorldWall(s, `radio-wall-${i}`, b));
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), setPoster, setCustomPhoto, posterMesh: art, get posterDesign() { return posterDesign; } };
 }

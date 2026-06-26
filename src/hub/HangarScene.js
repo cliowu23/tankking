@@ -7,6 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials';
 import DriverCharacter, { DRIVER_DEFAULT, ATTACH_SLOTS, normalizeDriverConfig } from './DriverCharacter.js';
 import { makeMats, buildWorkbench, buildQMCrates, addBlob } from './HangarProps.js';
+import { makeWorldWall } from './hangarColliders.js';
 import { buildLounge } from './HangarLounge.js';
 import { buildKitchen } from './HangarKitchen.js';
 import { buildMapTable } from './HangarMapTable.js';
@@ -328,6 +329,16 @@ export default class HangarScene {
     // corner the same way as the lounge.
     this._kitchen = buildKitchen(s, propMats);
     this._stationMeshes.push({ mesh: this._kitchen.trigger, data: this._stationDefs.kitchen });
+
+    // Perimeter collision buffers — user-marked in hangar-collision-editor.html
+    // (world-space): a solid edge just inside each room wall so the player can't
+    // clip into the walls. Room-level, so they live here rather than in a station.
+    [
+      { cx: 11.87, cz: -2.98, w: 0.23, d: 26.26 },  // east
+      { cx: -0.09, cz: -15.89, w: 23.86, d: 0.67 }, // south
+      { cx: -11.75, cz: -0.25, w: 0.50, d: 32.12 }, // west
+      { cx: -0.06, cz: 15.72, w: 23.88, d: 0.44 },  // north
+    ].forEach((b, i) => makeWorldWall(s, `room-buffer-${i}`, b));
 
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
