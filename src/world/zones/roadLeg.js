@@ -122,8 +122,11 @@ export function generateRoadLeg(seed = 1) {
   const lo = INTRO_CLEAR, hi = total - 12;
   const maxFit = Math.floor((hi - lo) / POI_GAP);
   const queue = ['farmstead', 'windmill', 'roadside-hut', 'mini-camp'].map(id => POI_TYPES[id]).filter(Boolean);
+  // Random extra picks repeat the PASTORAL POIs only — the turret-bunker is a machine defence
+  // placed exclusively as the leg-end stronghold cannons (below), never a mid-leg surprise.
+  const EXTRA_POOL = POI_LIST.filter(t => t.id !== 'turret-bunker');
   const extraN = Math.max(0, Math.min(1 + Math.floor(rand() * 3), maxFit - queue.length));   // +0..3, length-capped
-  for (let i = 0; i < extraN && POI_LIST.length; i++) queue.push(POI_LIST[Math.floor(rand() * POI_LIST.length)]);
+  for (let i = 0; i < extraN && EXTRA_POOL.length; i++) queue.push(EXTRA_POOL[Math.floor(rand() * EXTRA_POOL.length)]);
   for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
 
   const nQ = queue.length;
@@ -168,6 +171,23 @@ export function generateRoadLeg(seed = 1) {
       const stopShort = Math.max(3, Math.round((inst.clearR ?? 9) * 0.45));
       const wps = buildAccessSpur(idx, inst.anchor, stopShort);
       spurs.push({ wps }); poiSpurs.push(wps);
+    }
+  }
+
+  // ── leg-end stronghold defences: 2 turret-bunker cannons flank the final approach ──────
+  // The leg ends in an enemy STRONGHOLD (the "safe house" you assault + capture: take it to
+  // replenish/recoup/extract, fail and you lose the run). Two dug-in Automaton cannons guard
+  // the outro straight — one each side of the road, guns trained on the player driving up.
+  const tbType = POI_TYPES['turret-bunker'];
+  if (tbType) {
+    for (const [eidx, eside] of [[total - 9, 1], [total - 7, -1]]) {
+      if (eidx <= lo) continue;
+      const inst = tbType.place({ pts, total, dirAt, bandFor, valueFor, anchorIdx: eidx }, rand,
+        { offset: 13 + rand() * 3, sideForce: eside });
+      if (!inst) continue;
+      pois.push(inst);
+      enemies.push({ x: inst.anchor.x, z: inst.anchor.z, mode: 'ambush', band: bandFor(eidx / total), poi: true, guards: inst.guards });
+      for (const c of (inst.containers || [])) containers.push(c);
     }
   }
 

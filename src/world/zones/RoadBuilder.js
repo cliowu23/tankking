@@ -196,6 +196,7 @@ export function buildRoadLeg(scene, zone) {
                       ...(await loadPropTemplates(scene, 'buildings.glb')),
                       ...(await loadPropTemplates(scene, 'farmstead.glb')),
                       ...(await loadPropTemplates(scene, 'windmill.glb')),
+                      ...(await loadPropTemplates(scene, 'turret-bunker.glb')),
                       ...(await loadPropTemplates(scene, 'hedge.glb')) };
         const pick = (a) => a[Math.floor(Math.random() * a.length)];
         const obs = [], sc = [], slow = [];   // slow[] = soft hedge zones that drag the tank (not walls)

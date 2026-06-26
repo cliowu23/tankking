@@ -10,6 +10,7 @@ import roadsideHut from './roadsideHut.js';
 import miniCamp from './miniCamp.js';
 import farmstead from './farmstead.js';
 import windmill from './windmill.js';
+import turretBunker from './turretBunker.js';
 
 // The MAJOR POIs — one of each is guaranteed per leg (roadLeg.js), with extra random picks on
 // top so the count varies. tree-patch is NOT a POI anymore (too mundane / no road); tree clumps
@@ -19,6 +20,7 @@ export const POI_LIST = [
   miniCamp,
   farmstead,
   windmill,
+  turretBunker,
 ];
 
 export const POI_TYPES = Object.fromEntries(POI_LIST.map((t) => [t.id, t]));
