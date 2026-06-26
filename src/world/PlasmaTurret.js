@@ -20,8 +20,6 @@ const BEAM_SPEED  = 72;
 const BEAM_RANGE  = 64;
 const POOL        = 3;
 const SCREEN_MARGIN = 0.02;
-const BORE_DIST = 3.98;    // cannon bore offset from the turret centre (model), along the aim
-const BORE_Y    = 2.46;    // bore height (glow); the beam itself flies lower to stay under the hit gate
 const GUN_FILE  = 'turret-gun.glb';
 const BASE_FILE = 'turret-bunker.glb';
 
@@ -46,6 +44,9 @@ export default class PlasmaTurret extends AIEnemy {
     this._chargeT  = 0;
     this._flash    = 0;
     this.turretPivot.position.set(0, 0, 0);          // gun carries its own height; pivot at the bunker axis
+    // Cannon bore in the gun's local (glTF) frame — the charge glow parents here so it rides the
+    // barrel exactly as it yaws. Tuned to sit on the muzzle.
+    this._boreLocal = new Vector3(opts.boreX ?? 0, opts.boreY ?? 2.46, opts.boreZ ?? 3.98);
     this._buildChargeGlow(scene);
     // selfBase = also build the static armoured BASE (for the Dev Arena, where there's no POI prop).
     // As a road POI the base is the POI prop, so the enemy only needs the gun.
@@ -55,6 +56,8 @@ export default class PlasmaTurret extends AIEnemy {
   async _buildModel(scene, selfBase) {
     if (selfBase) await this._loadInto(scene, BASE_FILE, this.root);          // static base on the (hull-locked) body
     this._gunRoot = await this._loadInto(scene, GUN_FILE, this.turretPivot);  // gun on the aiming pivot → yaw-tracks
+    // glow rides the gun at the bore (so it stays on the barrel through the yaw)
+    if (this._gunRoot && this._glow) { this._glow.parent = this._gunRoot; this._glow.position.copyFrom(this._boreLocal); }
     return this;
   }
 
@@ -110,16 +113,14 @@ export default class PlasmaTurret extends AIEnemy {
     if (this._chargeT >= CHARGE_TIME) this._release();
   }
 
-  // Muzzle = the bore along the gun's ACTUAL world forward (read from the gun transform), so the
-  // charge glow + beam line up with the VISIBLE barrel as it slowly yaws — not the target angle.
+  // Muzzle = the parented glow's actual world position (it rides the barrel), and the firing
+  // direction is from the turret centre out to that bore — so the beam leaves the visible muzzle.
   _muzzle() {
-    let fwd;
-    if (this._gunRoot) { this._gunRoot.computeWorldMatrix(true); const m = this._gunRoot.getWorldMatrix().m; fwd = new Vector3(m[8], 0, m[10]); }
-    if (!fwd || fwd.lengthSquared() < 1e-6) fwd = new Vector3(Math.sin(this.turretAimAngle), 0, Math.cos(this.turretAimAngle));
-    fwd.normalize();
-    const aim = new Vector3(Math.sin(this.turretAimAngle), 0, Math.cos(this.turretAimAngle));
-    if (Vector3.Dot(fwd, aim) < 0) fwd.scaleInPlace(-1);   // resolve the GLB's forward sign by the aim
-    return { pos: new Vector3(this.root.position.x + fwd.x * BORE_DIST, BORE_Y, this.root.position.z + fwd.z * BORE_DIST), dir: fwd };
+    this._glow.computeWorldMatrix(true);
+    const pos = this._glow.getAbsolutePosition();
+    const dx = pos.x - this.root.position.x, dz = pos.z - this.root.position.z;
+    const len = Math.hypot(dx, dz) || 1;
+    return { pos, dir: new Vector3(dx / len, 0, dz / len) };
   }
 
   _release() {
@@ -147,13 +148,12 @@ export default class PlasmaTurret extends AIEnemy {
   }
 
   _updateGlow(dt) {
-    const mz = this._muzzle();
-    this._glow.setAbsolutePosition(mz.pos);
+    if (!this._gunRoot) { this._glow.setEnabled(false); return; }   // glow parents to the gun once loaded
     if (this._flash > 0) this._flash = Math.max(0, this._flash - dt / 0.18);
     if (this._charging || this._flash > 0) {
       this._glow.setEnabled(true);
       const t = this._charging ? Math.min(1, this._chargeT / CHARGE_TIME) : 0;
-      this._glow.scaling.setAll(0.3 + t * 1.0 + this._flash * 0.9);
+      this._glow.scaling.setAll(0.3 + t * 1.0 + this._flash * 0.9);   // position is parented to the bore
     } else {
       this._glow.setEnabled(false);
     }

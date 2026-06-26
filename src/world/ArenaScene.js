@@ -1660,7 +1660,7 @@ export default class ArenaScene {
     const bounds = this._devBounds ?? 48;
     const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy, turret: PlasmaTurret };
     const extra = { turret: { selfBase: true, faceAngle: Math.PI } };   // the turret builds its own base in the dev arena
-    const rows = [['turret', counts.turret | 0, 50], ['sentinel', counts.sentinel | 0, 40], ['mortar', counts.mortar | 0, 30], ['chaff', counts.chaff | 0, 20]];
+    const rows = [['turret', counts.turret | 0, 22], ['sentinel', counts.sentinel | 0, 32], ['mortar', counts.mortar | 0, 26], ['chaff', counts.chaff | 0, 18]];
     for (const [type, n, baseZ] of rows) {
       for (let i = 0; i < n; i++) {
         const spread = n === 1 ? 0 : (i / (n - 1) - 0.5);
