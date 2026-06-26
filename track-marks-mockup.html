@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TanKING — Track Marks Mockup</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b1014;font:13px/1.4 system-ui,sans-serif;color:#cfe}
+  #c{width:100vw;height:100vh;display:block;touch-action:none}
+  #panel{position:fixed;top:12px;left:12px;z-index:10;background:rgba(8,14,20,.9);
+    border:1px solid #1d4; border-radius:8px;padding:12px 14px;width:236px;backdrop-filter:blur(4px)}
+  #panel h1{font-size:13px;margin:0 0 8px;color:#9fe;letter-spacing:.5px}
+  .styles{display:flex;gap:6px;margin-bottom:10px}
+  .styles button{flex:1;padding:7px 4px;border:1px solid #2a6;border-radius:5px;background:#13242c;
+    color:#bfe;cursor:pointer;font:inherit;font-size:11px}
+  .styles button.on{background:#1d6;color:#021;border-color:#1d6;font-weight:600}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 0}
+  .row label{flex:1;color:#9bd}
+  .row input[type=range]{flex:1.2;accent-color:#1d6}
+  .row .val{width:38px;text-align:right;color:#dfe;font-variant-numeric:tabular-nums}
+  .acts{display:flex;gap:6px;margin-top:10px}
+  .acts button{flex:1;padding:6px;border:1px solid #2a6;border-radius:5px;background:#13242c;color:#bfe;cursor:pointer;font:inherit;font-size:11px}
+  #hint{position:fixed;bottom:12px;left:12px;z-index:10;color:#7ab;background:rgba(8,14,20,.7);padding:6px 10px;border-radius:6px}
+  #dump{position:fixed;bottom:12px;right:12px;z-index:10;max-width:340px;background:rgba(8,14,20,.92);
+    border:1px solid #1d4;border-radius:6px;padding:10px 12px;color:#bfe;font:11px/1.5 ui-monospace,monospace;white-space:pre;display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>TRACK MARKS</h1>
+  <div class="styles">
+    <button data-style="stamp" class="on">Stamped<br>imprints</button>
+    <button data-style="ribbon">Continuous<br>ribbon</button>
+    <button data-style="dust">Dust<br>scuff</button>
+  </div>
+  <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0.05" max="1" step="0.05" value="0.45"><span class="val" id="opacityV">0.45</span></div>
+  <div class="row"><label>Mark width</label><input id="markW" type="range" min="0.15" max="1.2" step="0.05" value="0.45"><span class="val" id="markWV">0.45</span></div>
+  <div class="row"><label>Mark length</label><input id="markL" type="range" min="0.2" max="2" step="0.05" value="0.7"><span class="val" id="markLV">0.7</span></div>
+  <div class="row"><label>Spacing</label><input id="spacing" type="range" min="0.2" max="2.5" step="0.1" value="0.6"><span class="val" id="spacingV">0.6</span></div>
+  <div class="row"><label>Lifetime s</label><input id="life" type="range" min="1" max="20" step="0.5" value="6"><span class="val" id="lifeV">6</span></div>
+  <div class="acts">
+    <button id="auto">Auto-drive</button>
+    <button id="clear">Clear</button>
+    <button id="dumpBtn">Dump</button>
+  </div>
+</div>
+<div id="hint">WASD to drive · drag to orbit · scroll to zoom</div>
+<div id="dump"></div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+const C3=BABYLON.Color3, C4=BABYLON.Color4, V3=BABYLON.Vector3;
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{adaptToDeviceRatio:true});
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new C4(0.42,0.62,0.85,1);                 // bright W1-ish sky
+
+// ---- lights (match game: hemi + dir) ----
+const hemi=new BABYLON.HemisphericLight('h',new V3(0.2,1,0.1),scene);
+hemi.intensity=0.95; hemi.groundColor=new C3(0.28,0.52,0.10);
+const dir=new BABYLON.DirectionalLight('d',new V3(0.3,-1,0.25),scene); dir.intensity=0.55;
+
+// ---- camera: top-down-ish like the game (beta≈0.5 from vertical) ----
+const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,0.5,34,new V3(0,0,0),scene);
+cam.attachControl(canvas,true);
+cam.lowerRadiusLimit=12; cam.upperRadiusLimit=70; cam.wheelPrecision=8;
+
+// ---- ground: pastel green with a faint checker so motion reads ----
+const groundTex=new BABYLON.DynamicTexture('gt',{width:512,height:512},scene,false);
+(()=>{const x=groundTex.getContext();const a=[ '#4f7a32','#587f37'];
+  for(let i=0;i<8;i++)for(let j=0;j<8;j++){x.fillStyle=a[(i+j)&1];x.fillRect(i*64,j*64,64,64);}
+  groundTex.update();})();
+groundTex.uScale=groundTex.vScale=12;
+const ground=BABYLON.MeshBuilder.CreateGround('g',{width:200,height:200},scene);
+const gmat=new BABYLON.StandardMaterial('gm',scene);
+gmat.diffuseTexture=groundTex; gmat.specularColor=new C3(0,0,0);
+ground.material=gmat; ground.isPickable=false;
+
+// ================= TANK =================
+const trackMat=new BABYLON.StandardMaterial('tm',scene); trackMat.diffuseColor=new C3(0.16,0.18,0.16); trackMat.specularColor=new C3(.05,.05,.05);
+const hullMat =new BABYLON.StandardMaterial('hm',scene); hullMat.diffuseColor =new C3(0.55,0.50,0.28); hullMat.specularColor=new C3(.06,.06,.06);
+const root=new BABYLON.TransformNode('tankRoot',scene);
+const hull=BABYLON.MeshBuilder.CreateBox('hull',{width:2.4,height:0.65,depth:2.5},scene); hull.position.y=0.55; hull.material=hullMat; hull.parent=root;
+const GAUGE=1.34;  // matches Tank.js track lateral offset
+for(const sx of [-GAUGE,GAUGE]){
+  const t=BABYLON.MeshBuilder.CreateBox('trk',{width:0.28,height:0.65,depth:3.25},scene);
+  t.position.set(sx,0.325,0); t.material=trackMat; t.parent=root;
+}
+const tur=BABYLON.MeshBuilder.CreateBox('tur',{width:1.15,height:0.38,depth:1.2},scene); tur.position.set(0,0.95,0.05); tur.material=hullMat; tur.parent=root;
+const bar=BABYLON.MeshBuilder.CreateCylinder('bar',{height:1.7,diameter:0.18},scene); bar.rotation.x=Math.PI/2; bar.position.set(0,0.95,1.1); bar.material=trackMat; bar.parent=root;
+
+// kinematics (loosely mirrors movement.js feel)
+const tank={x:0,z:0,rotY:0,speed:0,maxSpeed:16,accel:34,drag:24,rotate:2.2};
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;});
+addEventListener('keyup',  e=>{keys[e.key.toLowerCase()]=false;});
+
+// ================= MARK SYSTEM =================
+// One shared ring-buffer pool of flat quads. Per-mark fade via mesh.visibility.
+const POOL=900;
+const marks=[];          // {mesh, born, life, active}
+let head=0;
+
+// --- textures per style (drawn once) ---
+function treadTex(){
+  const t=new BABYLON.DynamicTexture('tread',{width:64,height:96},scene,false);
+  const x=t.getContext(); x.clearRect(0,0,64,96);
+  x.fillStyle='rgba(30,22,16,0.95)';                 // dark imprint base
+  // ladder rungs (tread grooves)
+  for(let i=0;i<8;i++){x.fillRect(6,4+i*12,52,7);}
+  t.hasAlpha=true; t.update(); return t;
+}
+function ribbonTex(){
+  const t=new BABYLON.DynamicTexture('rib',{width:32,height:32},scene,false);
+  const x=t.getContext(); x.clearRect(0,0,32,32);
+  const g=x.createLinearGradient(0,0,32,0);          // soft-edged dark band
+  g.addColorStop(0,'rgba(28,20,14,0)');g.addColorStop(.5,'rgba(28,20,14,0.9)');g.addColorStop(1,'rgba(28,20,14,0)');
+  x.fillStyle=g; x.fillRect(0,0,32,32);
+  t.hasAlpha=true; t.update(); return t;
+}
+function dustTex(){
+  const t=new BABYLON.DynamicTexture('dust',{width:128,height:128},scene,false);
+  const x=t.getContext(); x.clearRect(0,0,128,128);
+  const g=x.createRadialGradient(64,64,4,64,64,62);  // soft radial scuff
+  g.addColorStop(0,'rgba(46,34,22,0.7)');g.addColorStop(.6,'rgba(46,34,22,0.28)');g.addColorStop(1,'rgba(46,34,22,0)');
+  x.fillStyle=g; x.fillRect(0,0,128,128);
+  t.hasAlpha=true; t.update(); return t;
+}
+const texes={stamp:treadTex(),ribbon:ribbonTex(),dust:dustTex()};
+const markMat={};
+for(const k of Object.keys(texes)){
+  const m=new BABYLON.StandardMaterial('mm_'+k,scene);
+  m.diffuseTexture=texes[k]; m.diffuseTexture.hasAlpha=true;
+  m.useAlphaFromDiffuseTexture=true; m.disableLighting=true; m.emissiveColor=new C3(1,1,1);
+  m.specularColor=new C3(0,0,0); m.backFaceCulling=false; m.alphaMode=BABYLON.Engine.ALPHA_COMBINE;
+  m.zOffset=-2;                                       // pull toward camera, beat z-fighting
+  markMat[k]=m;
+}
+// pre-build pool quads (flat on ground)
+for(let i=0;i<POOL;i++){
+  const q=BABYLON.MeshBuilder.CreatePlane('mk'+i,{size:1},scene);
+  q.rotation.x=Math.PI/2; q.isPickable=false; q.isVisible=false; q.material=markMat.stamp;
+  marks.push({mesh:q,born:0,life:0,active:false});
+}
+
+let style='stamp';
+const cfg={opacity:0.45,markW:0.45,markL:0.7,spacing:0.6,life:6};
+
+function dropMark(wx,wz,rotY,w,l){
+  const m=marks[head]; head=(head+1)%POOL;
+  const q=m.mesh;
+  q.material=markMat[style];
+  q.scaling.set(w,l,1);
+  q.position.set(wx,0.03,wz);                         // 3cm gap above ground
+  q.rotation.x=Math.PI/2; q.rotation.y=0; q.rotation.z=-rotY;   // align long axis to heading
+  m.born=now; m.life=cfg.life; m.active=true; q.isVisible=true;
+}
+
+let distAccum=0, lastX=0, lastZ=0, now=0;
+function emit(){
+  // distance since last emit
+  const dx=tank.x-lastX, dz=tank.z-lastZ; const d=Math.hypot(dx,dz);
+  distAccum+=d; lastX=tank.x; lastZ=tank.z;
+  if(Math.abs(tank.speed)<0.4) return;                // stationary: no marks
+  const spacing= style==='ribbon' ? Math.max(0.18,cfg.spacing*0.35) : cfg.spacing;
+  while(distAccum>=spacing){
+    distAccum-=spacing;
+    const fwdX=Math.sin(tank.rotY), fwdZ=Math.cos(tank.rotY);
+    const rgtX=Math.cos(tank.rotY), rgtZ=-Math.sin(tank.rotY);
+    if(style==='dust'){
+      dropMark(tank.x,tank.z,tank.rotY,cfg.markW*3.2,cfg.markL*2.4); // one wide soft smudge
+    }else{
+      for(const s of [-GAUGE,GAUGE]){                 // left + right tread
+        dropMark(tank.x+rgtX*s, tank.z+rgtZ*s, tank.rotY, cfg.markW, cfg.markL);
+      }
+    }
+  }
+}
+
+// ================= LOOP =================
+let auto=false, autoT=0;
+scene.onBeforeRenderObservable.add(()=>{
+  const dt=Math.min(0.05,engine.getDeltaTime()/1000); now+=dt;
+  // input / auto-drive
+  let fwd=0,turn=0;
+  if(auto){ autoT+=dt; fwd=1; turn=Math.sin(autoT*0.6)*1; }
+  else{
+    if(keys['w'])fwd=1; if(keys['s'])fwd=-1;
+    if(keys['a'])turn=-1; if(keys['d'])turn=1;
+  }
+  // throttle
+  if(fwd!==0) tank.speed+=fwd*tank.accel*dt*(1-Math.min(1,Math.abs(tank.speed)/tank.maxSpeed));
+  else tank.speed-= Math.sign(tank.speed)*Math.min(Math.abs(tank.speed),tank.drag*dt);
+  tank.speed=Math.max(-tank.maxSpeed*0.6,Math.min(tank.maxSpeed,tank.speed));
+  const turnRate=tank.rotate*(1-0.5*Math.min(1,Math.abs(tank.speed)/tank.maxSpeed));
+  tank.rotY+=turn*turnRate*dt*(tank.speed<0?-1:1);
+  tank.x+=Math.sin(tank.rotY)*tank.speed*dt;
+  tank.z+=Math.cos(tank.rotY)*tank.speed*dt;
+  root.position.set(tank.x,0,tank.z); root.rotation.y=tank.rotY;
+  cam.target.set(tank.x,0,tank.z);
+
+  emit();
+  // fade
+  for(const m of marks){
+    if(!m.active)continue;
+    const age=now-m.born;
+    if(age>=m.life){m.active=false;m.mesh.isVisible=false;continue;}
+    const f=1-age/m.life;                             // 1 = fresh, 0 = dead
+    m.mesh.visibility=cfg.opacity*Math.min(1,f/0.4);  // full opacity, then fade over final 40%
+  }
+});
+engine.runRenderLoop(()=>scene.render());
+addEventListener('resize',()=>engine.resize());
+
+// ================= UI =================
+document.querySelectorAll('.styles button').forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll('.styles button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); style=b.dataset.style;};
+});
+function bind(id){const el=document.getElementById(id),v=document.getElementById(id+'V');
+  el.oninput=()=>{cfg[id]=parseFloat(el.value);v.textContent=el.value;};}
+['opacity','markW','markL','spacing','life'].forEach(bind);
+document.getElementById('auto').onclick=e=>{auto=!auto;e.target.style.background=auto?'#1d6':'#13242c';e.target.style.color=auto?'#021':'#bfe';};
+document.getElementById('clear').onclick=()=>{for(const m of marks){m.active=false;m.mesh.isVisible=false;}};
+document.getElementById('dumpBtn').onclick=()=>{
+  const d=document.getElementById('dump');
+  d.style.display='block';
+  d.textContent='style:   '+style+'\n'+
+    Object.entries(cfg).map(([k,v])=>k.padEnd(8)+': '+v).join('\n');
+};
+</script>
+</body>
+</html>
