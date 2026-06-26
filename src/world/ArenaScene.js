@@ -19,6 +19,7 @@ import MortarEnemy from './MortarEnemy.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
+import TrackMarks from './TrackMarks.js';
 import SalvageCrate from './SalvageCrate.js';
 import ExtractionZone from './ExtractionZone.js';
 import { ARENA_LOOT, PICKUP_RADIUS } from './arenaLoot.js';
@@ -103,6 +104,7 @@ export default class ArenaScene {
     this._setupLockOn();
     this._setupFiring();
     this.vfx = new ArenaVFX(this.scene);
+    this.trackMarks = new TrackMarks(this.scene);
     this._setupGameLoop();
   }
 
@@ -912,6 +914,7 @@ export default class ArenaScene {
 
       this.tank.update(dt);
       this._clampCorridor();
+      this.trackMarks.update(dt, this.tank);   // drop/fade ground marks at the final position
 
       // Group-steering pre-pass (§③): per living enemy, sum an inverse-distance
       // separation nudge from packmates (anti-clump) and count nearby allies (feeds
