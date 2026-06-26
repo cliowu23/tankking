@@ -258,14 +258,10 @@ export function buildKitchen(s, M) {
     (CAZ + NUDGE_Z) + S * (-2.0 + OZ - CAZ),
   );
 
-  // Short solids (counter tops ~0.90, stove, table) sit at/under the player's
-  // collision capsule floor (~0.9), so their visual colliders don't block — and
-  // there are gaps BETWEEN props you could squeeze through. So instead of per-prop
-  // blockers, fence the whole SE cook corner with a tall invisible L-barrier along
-  // the cook-line's room-facing front (south leg + east leg, sealed to the walls);
-  // plus one blocker for the free-standing dining table. Parented to the prop
-  // group (or root) so the group/scale offsets are inherited.
+  // Short solids (counter tops ~0.90, stove, round table top ~0.75) sit at/under the
+  // player's collision capsule floor (~0.9), so their visual colliders don't block.
   const BLOCK_H = 1.6;
+  // Group-local blocker (inherits the prop group's offset/scale) — used for the table.
   const block = (parent, name, w, d, x, z) => {
     const m = MeshBuilder.CreateBox(name, { width: w, height: BLOCK_H, depth: d }, s);
     m.position        = new Vector3(x + OX - CAX, BLOCK_H / 2, z + OZ - CAZ);
@@ -275,13 +271,23 @@ export function buildKitchen(s, M) {
     m.parent          = parent;
     return m;
   };
-  // L-barrier front (south leg + east leg) ...
-  block(root, 'kit-barrier-s', 5.9,  0.12, 0.05, -2.45);  // south cook-line front (west end at counter edge)
-  block(root, 'kit-barrier-e', 0.12, 3.5,  2.45, -1.25);  // east cook-line front
-  // ... plus end-caps so the two OPEN ends can't be rounded into the pocket:
-  block(root, 'kit-barrier-w', 0.14, 0.75, -2.9, -2.78);  // west end-cap (exit-door side) → seals the gap
-  block(root, 'kit-barrier-n', 0.65, 0.14,  2.72, 0.40);  // north end-cap (east leg)
-  block(tb,   'tb-block',      0.90, 0.90,  0.25, -0.55);  // free-standing dining table
+  block(tb, 'tb-block', 0.90, 0.90, 0.25, -0.55);  // free-standing dining table (confirmed good)
+
+  // Cook-corner seal walls — marked by the user in kitchen-collision-editor.html and
+  // placed in WORLD space (unparented), so there's no authored→world transform to get
+  // wrong. They trace the counter/stove/fridge cook-line perimeter.
+  [
+    { cx: 2.93,  cz: -15.06, w: 0.15, d: 1.92 },
+    { cx: 6.52,  cz: -14.10, w: 7.19, d: 0.15 },
+    { cx: 10.10, cz: -11.61, w: 0.15, d: 4.95 },
+    { cx: 11.05, cz: -9.11,  w: 1.91, d: 0.15 },
+  ].forEach((b, i) => {
+    const m = MeshBuilder.CreateBox(`kit-seal-${i}`, { width: b.w, height: BLOCK_H, depth: b.d }, s);
+    m.position        = new Vector3(b.cx, BLOCK_H / 2, b.cz);   // WORLD coords (not parented)
+    m.isVisible       = false;
+    m.isPickable      = false;
+    m.checkCollisions = true;
+  });
 
   const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
   const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));
