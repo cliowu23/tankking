@@ -487,8 +487,7 @@ export default class ArenaScene {
           // Live cannon: a static, destructible PlasmaTurret that charges + beams down its locked
           // lane (the road). Tanky + heavy + slow vs a normal bot — the stronghold's outer gun.
           add(new PlasmaTurret(this.scene, e.x, e.z, {
-            bounds, fireAngle: e.turret.fireAngle, muzzle: e.turret.muzzle,
-            hp: Math.round(t.hp * 2.4), damage: Math.round(t.dmg * 1.7), cooldown: t.cooldown * 1.25,
+            bounds, hp: Math.round(t.hp * 2.4), damage: Math.round(t.dmg * 1.7), cooldown: t.cooldown * 1.25,
           }), e.x, e.z);
         }
         if (e.poi && e.guards && e.guards.length) {
