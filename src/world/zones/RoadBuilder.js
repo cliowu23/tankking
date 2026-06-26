@@ -152,17 +152,25 @@ export function buildRoadLeg(scene, zone) {
     const uv2 = new Float32Array(2*K*2);
     for (let i=0;i<K;i++){ const t=cum[i]/PATH_MASK_TILE; uv2[i*2]=0; uv2[i*2+1]=t; uv2[(K+i)*2]=1; uv2[(K+i)*2+1]=t; }
     ribbon.setVerticesData(VertexBuffer.UV2Kind, uv2);
-    // Blotchy END fade (spurs only): per-vertex alpha (white rgb) ramps to 0 over the last
-    // FADE units, jittered per vertex (L/R independently) so the dead end frays into the grass
-    // instead of a hard rectangular cut. Multiplies with the dirt opacity-mask. Start stays
-    // solid (alpha 1) so the junction with the main road reads seamless.
+    // Blotchy fade (spurs only): per-vertex alpha (white rgb) jittered per vertex (L/R
+    // independently) so the path frays into the grass instead of a hard rectangular cut.
+    // Multiplies with the dirt opacity-mask. TWO ramps, alpha = min(tip, root):
+    //   • TIP   — frays to 0 over the last FADE units (the dead end).
+    //   • ROOT  — held at 0 where the spur underlaps the main road, ramping to solid right at
+    //     the road EDGE. The main road's dirt alone covers the junction, so the spur no longer
+    //     paints a second semi-transparent dirt layer under the road's patchy holes (that double
+    //     blend was the thin dark seam at the crook); it just emerges from the road edge.
     if (fadeEnd) {
-      const FADE = 6, cols = new Float32Array(2 * K * 4);   // SHORT, abrupt fray at the very tip
+      const FADE = 6;                     // SHORT, abrupt fray at the very tip
+      const ROOT_LO = 3, ROOT_HI = 9;     // hidden under the ~6-wide road core, opaque just past the edge
+      const cols = new Float32Array(2 * K * 4);
       for (let i = 0; i < K; i++) {
-        const dEnd = total - cum[i];
-        const fa = (j) => { let v = (dEnd + (Math.random() * 2 - 1) * 2.5) / FADE; v = v < 0 ? 0 : v > 1 ? 1 : v; return v * v * (3 - 2 * v); };
-        cols[i*4]=1; cols[i*4+1]=1; cols[i*4+2]=1; cols[i*4+3]=fa();
-        cols[(K+i)*4]=1; cols[(K+i)*4+1]=1; cols[(K+i)*4+2]=1; cols[(K+i)*4+3]=fa();
+        const dEnd = total - cum[i], dStart = cum[i];
+        const tip  = () => { let v = (dEnd + (Math.random() * 2 - 1) * 2.5) / FADE; v = v < 0 ? 0 : v > 1 ? 1 : v; return v * v * (3 - 2 * v); };
+        const root = () => { let v = (dStart - ROOT_LO + (Math.random() * 2 - 1) * 1.5) / (ROOT_HI - ROOT_LO); v = v < 0 ? 0 : v > 1 ? 1 : v; return v * v * (3 - 2 * v); };
+        const aL = Math.min(tip(), root()), aR = Math.min(tip(), root());
+        cols[i*4]=1; cols[i*4+1]=1; cols[i*4+2]=1; cols[i*4+3]=aL;
+        cols[(K+i)*4]=1; cols[(K+i)*4+1]=1; cols[(K+i)*4+2]=1; cols[(K+i)*4+3]=aR;
       }
       ribbon.setVerticesData(VertexBuffer.ColorKind, cols);
       ribbon.hasVertexAlpha = true;
@@ -171,8 +179,9 @@ export function buildRoadLeg(scene, zone) {
   // ONE continuous ribbon over the full centerline (southern approach + generated road) —
   // seamless join (single Catmull-Rom + single mask run).
   // Spurs draw FIRST (alphaIndex 0) at the SAME height; the main road draws LAST (alphaIndex 1)
-  // so its solid dirt covers the spur where they overlap at the junction — no double-feathered
-  // dark wedge at the crook, while the spur still shows where it runs past the road.
+  // so its solid dirt covers the spur where they overlap at the junction. The spur's ROOT fade
+  // (see buildPath) keeps it transparent under the road so there's no double-blended dirt seam at
+  // the crook either, while the spur still shows where it runs past the road.
   for (const sp of leg.spurs) buildPath(sp.wps, 5, true, PATH_Y, 0);
   buildPath(leg.centerline, 8, false, PATH_Y, 1);
 
