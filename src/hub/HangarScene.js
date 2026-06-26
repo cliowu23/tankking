@@ -341,7 +341,7 @@ export default class HangarScene {
     ].forEach((b, i) => makeWorldWall(s, `room-buffer-${i}`, b));
 
     // Tank-bay blocker — solid footprint around the parked tank so the player can't walk through it.
-    makeWorldWall(s, 'tank-bay-wall', { cx: -0.04, cz: 9.82, w: 3.59, d: 4.23 });
+    makeWorldWall(s, 'tank-bay-wall', { cx: -0.07, cz: 10.32, w: 3.66, d: 5.34 });
 
     this._tankPosition = new Vector3(0, 0, 10);
     this._buildBayGeometry();
