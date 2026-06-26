@@ -3,9 +3,9 @@
 // (mirrors shield.js / movement.js). Decides how many marks to drop; the
 // Babylon TrackMarks class handles placement and fade.
 
-export const SPACING       = 0.8;    // raw spacing chosen in the mockup
-export const RIBBON_PACK    = 0.35;   // ribbon packs tighter than the raw slider
-export const EMIT_SPACING   = Math.max(0.18, SPACING * RIBBON_PACK); // → 0.28: metres between drop steps
+export const SPACING       = 1.1;    // raw spacing chosen in the mockup
+export const RIBBON_PACK    = 0.22;   // feathered blobs pack tighter for a seamless smear
+export const EMIT_SPACING   = Math.max(0.12, SPACING * RIBBON_PACK); // → 0.242: metres between drop steps
 export const SPEED_EPS      = 0.4;    // below this |speed| the tank is "parked" — no marks
 export const LIFE           = 6;      // seconds a mark lives before it is fully gone
 export const MAX_DROPS_PER_FRAME = 24; // burst guard for respawn/teleport jumps

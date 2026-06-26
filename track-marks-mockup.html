@@ -111,11 +111,16 @@ function treadTex(){
   t.hasAlpha=true; t.update(); return t;
 }
 function ribbonTex(){
-  const t=new BABYLON.DynamicTexture('rib',{width:32,height:32},scene,false);
-  const x=t.getContext(); x.clearRect(0,0,32,32);
-  const g=x.createLinearGradient(0,0,32,0);          // soft-edged dark band
-  g.addColorStop(0,'rgba(28,20,14,0)');g.addColorStop(.5,'rgba(28,20,14,0.9)');g.addColorStop(1,'rgba(28,20,14,0)');
-  x.fillStyle=g; x.fillRect(0,0,32,32);
+  // Feathered-all-edges smudge blob: radial fade to 0 on every side, so dense
+  // overlapping drops melt into one continuous smear (no hard tile edges, and
+  // fully-transparent edges hide mark-vs-mark z-ordering).
+  const t=new BABYLON.DynamicTexture('rib',{width:64,height:64},scene,false);
+  const x=t.getContext(); x.clearRect(0,0,64,64);
+  const g=x.createRadialGradient(32,32,2,32,32,30);
+  g.addColorStop(0,'rgba(30,22,15,0.85)');
+  g.addColorStop(.55,'rgba(30,22,15,0.42)');
+  g.addColorStop(1,'rgba(30,22,15,0)');
+  x.fillStyle=g; x.fillRect(0,0,64,64);
   t.hasAlpha=true; t.update(); return t;
 }
 function dustTex(){
@@ -162,7 +167,7 @@ function emit(){
   const dx=tank.x-lastX, dz=tank.z-lastZ; const d=Math.hypot(dx,dz);
   distAccum+=d; lastX=tank.x; lastZ=tank.z;
   if(Math.abs(tank.speed)<0.4) return;                // stationary: no marks
-  const spacing= style==='ribbon' ? Math.max(0.18,cfg.spacing*0.35) : cfg.spacing;
+  const spacing= style==='ribbon' ? Math.max(0.12,cfg.spacing*0.22) : cfg.spacing;
   while(distAccum>=spacing){
     distAccum-=spacing;
     const fwdX=Math.sin(tank.rotY), fwdZ=Math.cos(tank.rotY);

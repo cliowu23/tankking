@@ -7,9 +7,9 @@ import { EMIT_SPACING, LIFE, planEmission } from './trackMarksEmit.js';
 // only tank.position / rotY / speed; nothing in the game depends on it.
 
 const GAUGE     = 1.34;  // lateral track offset — matches Tank.js trackLeft/Right
-const OPACITY   = 0.10;  // peak visibility — deliberately subtle
+const OPACITY   = 0.25;  // peak visibility — subtle, but reads as a smear
 const MARK_W    = 0.95;  // quad width  (across the track)
-const MARK_L    = 1.50;  // quad length (along the heading)
+const MARK_L    = 1.00;  // quad length (along the heading)
 const Y_OFFSET  = 0.03;  // height above ground — gap that helps beat z-fighting
 const FADE_TAIL = 0.40;  // fraction of life spent fading out (full opacity before)
 // Pool covers LIFE seconds at a generous top speed, 2 quads per step, + headroom.
@@ -24,17 +24,19 @@ export default class TrackMarks {
     this._lastX = null;
     this._lastZ = null;
 
-    // Soft-edged dark band: transparent edges → opaque centre, so dense drops
-    // blend into one continuous ribbon rather than reading as hard stamps.
-    const tex = new DynamicTexture('trackMarkTex', { width: 32, height: 32 }, scene, false);
+    // Feathered-all-edges smudge blob: a radial fade to zero alpha on every
+    // side, so dense overlapping drops melt into one continuous smear rather
+    // than tiling into discrete marks (and the transparent edges hide any
+    // mark-vs-mark z-ordering between coplanar quads).
+    const tex = new DynamicTexture('trackMarkTex', { width: 64, height: 64 }, scene, false);
     const ctx = tex.getContext();
-    ctx.clearRect(0, 0, 32, 32);
-    const g = ctx.createLinearGradient(0, 0, 32, 0);
-    g.addColorStop(0,   'rgba(28,20,14,0)');
-    g.addColorStop(0.5, 'rgba(28,20,14,0.9)');
-    g.addColorStop(1,   'rgba(28,20,14,0)');
+    ctx.clearRect(0, 0, 64, 64);
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    g.addColorStop(0,    'rgba(30,22,15,0.85)');
+    g.addColorStop(0.55, 'rgba(30,22,15,0.42)');
+    g.addColorStop(1,    'rgba(30,22,15,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillRect(0, 0, 64, 64);
     tex.hasAlpha = true;
     tex.update();
     this._tex = tex;
