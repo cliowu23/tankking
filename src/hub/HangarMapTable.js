@@ -186,8 +186,9 @@ export function buildMapTable(s, M) {
     { cx: -11.09, cz: 13.12, w: 1.93, d: 5.50 },
     { cx: -8.42,  cz: 15.66, w: 7.15, d: 0.38 },
   ].forEach((b, i) => makeWorldWall(s, `map-wall-${i}`, b));
-  // Step-pad (1.05 = low/climbable) — the map-nook stool reads as sit-on.
-  makeWorldWall(s, 'map-seat-0', { cx: -9.84, cz: 12.53, w: 0.68, d: 1.02 }, 1.05);
+  // Step-pad — height 1.6 world matches the climbable seat height the parented
+  // lounge/kitchen pads end up at (1.05 local × 1.55 root scale); the map-nook stool reads as sit-on.
+  makeWorldWall(s, 'map-seat-0', { cx: -9.84, cz: 12.53, w: 0.68, d: 1.02 }, 1.6);
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), radio };
 }

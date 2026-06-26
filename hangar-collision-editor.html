@@ -47,6 +47,7 @@ import { buildMapTable } from '/src/hub/HangarMapTable.js';
 import { buildRadio }    from '/src/hub/HangarRadio.js';
 import { buildLounge }   from '/src/hub/HangarLounge.js';
 import { buildKitchen }  from '/src/hub/HangarKitchen.js';
+import { buildPrimitiveTank } from '/src/tank/primitiveTank.js';
 
 const canvas = document.getElementById('c');
 const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
@@ -62,6 +63,16 @@ try { buildMapTable(scene, M); } catch(e){ console.warn('map', e); }
 try { buildRadio(scene, M);    } catch(e){ console.warn('radio', e); }
 try { buildLounge(scene, M);   } catch(e){ console.warn('lounge', e); }
 try { buildKitchen(scene, M);  } catch(e){ console.warn('kitchen', e); }
+// tank display reference — primitive tank scaled to 3.2 wide at (0,0,10), same as the hangar
+try {
+  const prim = buildPrimitiveTank(scene, { simpleBarrel: true });
+  prim.root.position.set(0,0,0); prim.root.computeWorldMatrix(true);
+  const bb = prim.root.getHierarchyBoundingVectors(); const rawW = bb.max.x - bb.min.x;
+  if (rawW > 0) prim.root.scaling.setAll(3.2 / rawW);
+  prim.root.computeWorldMatrix(true);
+  const bb2 = prim.root.getHierarchyBoundingVectors();
+  prim.root.position.set(0, -bb2.min.y, 10);
+} catch(e){ console.warn('tank', e); }
 
 // ---- room walls (grey reference) ----
 const ROOM_W = 24, ROOM_D = 32, WALL_T = 0.15;
@@ -97,6 +108,7 @@ label('WORKBENCH', -11, -1);
 label('QM CRATES',  11,  1);
 label('LOUNGE',     -8, -12);
 label('KITCHEN',     8, -12);
+label('TANK',        0,   7);
 
 // ---- top-down orthographic camera framing the whole room ----
 const cam = new ArcRotateCamera('cam', -Math.PI / 2, 0.001, 60, new Vector3(0,0,0), scene);
@@ -128,7 +140,7 @@ canvas.addEventListener('pointerdown', e => {
   if (!cornerA) { cornerA = w; dot = MeshBuilder.CreateSphere('dot', { diameter: 0.4 }, scene); dot.position = new Vector3(w.x, 0.2, w.z); dot.material = dotMat; dot.isPickable = false; }
   else {
     const cx=(cornerA.x+w.x)/2, cz=(cornerA.z+w.z)/2, ww=Math.max(0.15,Math.abs(w.x-cornerA.x)), dd=Math.max(0.15,Math.abs(w.z-cornerA.z));
-    const h = mode==='seat' ? 1.05 : 3.0;
+    const h = mode==='seat' ? 1.6 : 3.0;
     const b = MeshBuilder.CreateBox('mk'+boxes.length,{width:ww,height:h,depth:dd},scene);
     b.position=new Vector3(cx,h/2,cz); b.material = (mode==='seat'?seatMatM:wallMatM); b.isPickable=false;
     meshes.push(b); boxes.push({type:mode,cx:+cx.toFixed(2),cz:+cz.toFixed(2),w:+ww.toFixed(2),d:+dd.toFixed(2)});
