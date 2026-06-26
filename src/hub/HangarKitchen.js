@@ -276,14 +276,18 @@ export function buildKitchen(s, M) {
   // Cook-corner seal walls — marked by the user in kitchen-collision-editor.html and
   // placed in WORLD space (unparented), so there's no authored→world transform to get
   // wrong. They trace the counter/stove/fridge cook-line perimeter.
+  // SEAL_H is tall (well above any climbable height, incl. from a 1.05 stool) so the
+  // player CANNOT ride up and walk the cook line like a platform — these are walls,
+  // not the low climb-on pads.
+  const SEAL_H = 3.0;
   [
     { cx: 2.93,  cz: -15.06, w: 0.15, d: 1.92 },
     { cx: 6.52,  cz: -14.10, w: 7.19, d: 0.15 },
     { cx: 10.10, cz: -11.61, w: 0.15, d: 4.95 },
     { cx: 11.05, cz: -9.11,  w: 1.91, d: 0.15 },
   ].forEach((b, i) => {
-    const m = MeshBuilder.CreateBox(`kit-seal-${i}`, { width: b.w, height: BLOCK_H, depth: b.d }, s);
-    m.position        = new Vector3(b.cx, BLOCK_H / 2, b.cz);   // WORLD coords (not parented)
+    const m = MeshBuilder.CreateBox(`kit-seal-${i}`, { width: b.w, height: SEAL_H, depth: b.d }, s);
+    m.position        = new Vector3(b.cx, SEAL_H / 2, b.cz);   // WORLD coords (not parented)
     m.isVisible       = false;
     m.isPickable      = false;
     m.checkCollisions = true;
