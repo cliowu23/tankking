@@ -156,6 +156,22 @@ export function buildLounge(s, M) {
   box(scatterNode, 'mag1', 0.34, 0.03, 0.26, SX - 0.25, 0.49, SZ + 0.12, paper);
   box(scatterNode, 'mag2', 0.34, 0.03, 0.26, SX - 0.22, 0.52, SZ + 0.16, olive);
 
+  // Invisible back-seal walls: bridge each couch back to its room wall so the
+  // player can't slip into the ~1-unit gap behind the sofa — the cushions are
+  // the only way up. Authored BEHIND the backs (toward the SW corner walls), so
+  // they never protrude into the walkable room.
+  const seal = (name, w, d, x, z) => {
+    const m = MeshBuilder.CreateBox(name, { width: w, height: 1.8, depth: d }, s);
+    m.position        = new Vector3(x + OX - CAX, 0.9, z + OZ - CAZ);
+    m.isVisible       = false;
+    m.isPickable      = false;
+    m.checkCollisions = true;
+    m.parent          = root;
+    return m;
+  };
+  seal('lng-seal-w', 1.2, 2.9, -3.3, -1.3);   // behind west arm → west wall
+  seal('lng-seal-s', 2.9, 1.2, -1.3, -3.3);   // behind south arm → south wall
+
   // Seat-pads (raised step-pads over each cushion footprint) + solid colliders
   // are already on the meshes (tags above). Build the [E] proximity trigger at
   // the scaled couch centre, matching the old collider centre.
