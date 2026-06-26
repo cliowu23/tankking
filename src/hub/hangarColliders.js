@@ -9,6 +9,11 @@ import { computeSeatPad } from './hangarColliderMath.js';
 //              character can climb on and read as sitting.
 //   • trigger→ an invisible NON-colliding proximity marker for the [E] prompt.
 
+// World-space climbable step-pad height: a makeWorldWall at this height reads as a
+// sit-on seat (matches the parented makeSeatPad pads at SEAT_PAD_TOP 1.05 × ~1.55
+// root scale ≈ 1.63). makeWorldWall's default 3.0 is the un-climbable WALL height.
+export const SEAT_STEP_H = 1.6;
+
 export function markSolid(mesh) {
   mesh.checkCollisions = true;
   mesh.isPickable      = false;

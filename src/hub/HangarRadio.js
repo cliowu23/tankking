@@ -1,6 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight, DynamicTexture } from '@babylonjs/core';
 import { drawPoster } from './posterArt.js';
-import { makeTrigger, makeWorldWall } from './hangarColliders.js';
+import { makeTrigger, makeWorldWall, SEAT_STEP_H } from './hangarColliders.js';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function vis(mesh) { mesh.isPickable = false; mesh.checkCollisions = false; return mesh; }
@@ -205,7 +205,7 @@ export function buildRadio(s, M) {
   ].forEach((b, i) => makeWorldWall(s, `radio-wall-${i}`, b));
   // Step-pad — height 1.6 world (matches the climbable seat height the parented
   // lounge/kitchen pads end up at); the radio chair reads as sit-on, rug stays walkable.
-  makeWorldWall(s, 'radio-seat-0', { cx: 8.65, cz: 12.69, w: 1.06, d: 1.06 }, 1.6);
+  makeWorldWall(s, 'radio-seat-0', { cx: 8.65, cz: 12.69, w: 1.06, d: 1.06 }, SEAT_STEP_H);
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), setPoster, setCustomPhoto, posterMesh: art, get posterDesign() { return posterDesign; } };
 }

@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
-import { markSolid, makeSeatPad, makeTrigger } from './hangarColliders.js';
+import { markSolid, makeSeatPad, makeTrigger, makeWorldWall } from './hangarColliders.js';
 
 // ── helpers (kept local so this module stays decoupled from HangarProps) ──────
 function vis(mesh) {
@@ -279,19 +279,12 @@ export function buildKitchen(s, M) {
   // SEAL_H is tall (well above any climbable height, incl. from a 1.05 stool) so the
   // player CANNOT ride up and walk the cook line like a platform — these are walls,
   // not the low climb-on pads.
-  const SEAL_H = 3.0;
   [
     { cx: 2.93,  cz: -15.06, w: 0.15, d: 1.92 },
     { cx: 6.52,  cz: -14.10, w: 7.19, d: 0.15 },
     { cx: 10.10, cz: -11.61, w: 0.15, d: 4.95 },
     { cx: 11.05, cz: -9.11,  w: 1.91, d: 0.15 },
-  ].forEach((b, i) => {
-    const m = MeshBuilder.CreateBox(`kit-seal-${i}`, { width: b.w, height: SEAL_H, depth: b.d }, s);
-    m.position        = new Vector3(b.cx, SEAL_H / 2, b.cz);   // WORLD coords (not parented)
-    m.isVisible       = false;
-    m.isPickable      = false;
-    m.checkCollisions = true;
-  });
+  ].forEach((b, i) => makeWorldWall(s, `kit-seal-${i}`, b));   // default 3.0 height = un-climbable
 
   const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
   const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));

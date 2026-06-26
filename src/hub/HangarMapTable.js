@@ -1,5 +1,5 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
-import { makeTrigger, makeWorldWall } from './hangarColliders.js';
+import { makeTrigger, makeWorldWall, SEAT_STEP_H } from './hangarColliders.js';
 
 // ── helpers (local so this module stays decoupled from HangarProps) ───────────
 function vis(mesh) {
@@ -188,7 +188,7 @@ export function buildMapTable(s, M) {
   ].forEach((b, i) => makeWorldWall(s, `map-wall-${i}`, b));
   // Step-pad — height 1.6 world matches the climbable seat height the parented
   // lounge/kitchen pads end up at (1.05 local × 1.55 root scale); the map-nook stool reads as sit-on.
-  makeWorldWall(s, 'map-seat-0', { cx: -9.84, cz: 12.53, w: 0.68, d: 1.02 }, 1.6);
+  makeWorldWall(s, 'map-seat-0', { cx: -9.84, cz: 12.53, w: 0.68, d: 1.02 }, SEAT_STEP_H);
 
   return { trigger, root, center: new Vector3(cx, 0.5, cz), radio };
 }
