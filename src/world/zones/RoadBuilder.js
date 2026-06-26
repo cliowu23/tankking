@@ -238,6 +238,17 @@ export function buildRoadLeg(scene, zone) {
           makeRock: (x, z, s = 1, r = 0) => instanceProp(tpl, s >= 0.9 ? 'Rock_A' : 'Rock_B', { x, z, scale: s * POI_ROCK_SCALE, rotY: r, parent: root }),
           prop:     (name, x, z, s = 1, r = 0) => instanceProp(tpl, name, { x, z, scale: s, rotY: r, parent: root }),
           pickTree: () => pick(TREE_VARIANTS),
+          // A flat churned-earth apron under a POI (e.g. the turret-bunker) so it doesn't sit bare
+          // on the grass. Reuses the road's dirt grain; lifted just above the grass + zOffset to
+          // avoid flicker (see feedback_avoid_zfighting).
+          dirtPatch: (x, z, r = 4) => {
+            if (!M.poiDirt) { M.poiDirt = mat('poiDirt', 0.30, 0.22, 0.14); surf(M.poiDirt, 'dirt', 6); M.poiDirt.zOffset = -2; M.poiDirt.backFaceCulling = false; }
+            const d = MeshBuilder.CreateDisc('poi-dirt', { radius: r, tessellation: 24 }, scene);
+            d.rotation.x = -Math.PI / 2;          // lay flat, visible face up
+            d.position.set(x, 0.06, z);
+            d.material = M.poiDirt; d.parent = root; d.isPickable = false; d.receiveShadows = true;
+            return [d];
+          },
         };
         for (const inst of (leg.pois ?? [])) {
           const type = POI_TYPES[inst.poiType];

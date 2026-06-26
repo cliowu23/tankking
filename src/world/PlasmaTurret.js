@@ -37,8 +37,9 @@ export default class PlasmaTurret extends AIEnemy {
     this.shells = Array.from({ length: POOL }, () => new EyeBeam(scene));
 
     this._fireAngle  = opts.fireAngle ?? 0;
-    this._muzzleDist = opts.muzzleDist ?? 3.0;      // beam emits from the cannon muzzle, out front
-    this._beamY      = 1.15;
+    // The cannon bore in world space (from the POI — lines the charge glow up to the actual muzzle).
+    this._muzzle     = opts.muzzle ?? { x: x + Math.sin(this._fireAngle) * 3.0, y: 2.4, z: z + Math.cos(this._fireAngle) * 3.0 };
+    this._beamY      = 1.3;                          // beam flies at hit height (must stay under the y<1.6 gate)
     this._charging   = false;
     this._chargeT    = 0;
     this._flash      = 0;
@@ -72,10 +73,9 @@ export default class PlasmaTurret extends AIEnemy {
   _release() {
     this._charging = false; this._chargeT = 0;
     const a = this._fireAngle;
-    const mx = this.root.position.x + Math.sin(a) * this._muzzleDist;
-    const mz = this.root.position.z + Math.cos(a) * this._muzzleDist;
     const beam = this.shells.find(s => !s.active);
-    if (beam) beam.fire(mx, this._beamY, mz, Math.sin(a) * BEAM_SPEED, 0, Math.cos(a) * BEAM_SPEED, BEAM_RANGE);
+    // fire from the bore (XZ) but at hit height — the muzzle bore sits high; the beam flies level low
+    if (beam) beam.fire(this._muzzle.x, this._beamY, this._muzzle.z, Math.sin(a) * BEAM_SPEED, 0, Math.cos(a) * BEAM_SPEED, BEAM_RANGE);
     this._flash = 1;
     audio.play('enemy.sentinel_beam_fire', { emitter: this.root });
     this.fireCooldown = this._fireCooldownDuration;
@@ -104,10 +104,7 @@ export default class PlasmaTurret extends AIEnemy {
   }
 
   _updateGlow(dt) {
-    const a = this._fireAngle;
-    const mx = this.root.position.x + Math.sin(a) * this._muzzleDist;
-    const mz = this.root.position.z + Math.cos(a) * this._muzzleDist;
-    this._glow.setAbsolutePosition(new Vector3(mx, this._beamY, mz));   // world-anchored at the muzzle (immune to root rot)
+    this._glow.setAbsolutePosition(new Vector3(this._muzzle.x, this._muzzle.y, this._muzzle.z));   // pinned to the cannon bore
     if (this._flash > 0) this._flash = Math.max(0, this._flash - dt / 0.18);
     if (this._charging || this._flash > 0) {
       this._glow.setEnabled(true);

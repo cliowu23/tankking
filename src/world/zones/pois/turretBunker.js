@@ -1,21 +1,27 @@
 // src/world/zones/pois/turretBunker.js
-// Point-POI: a dug-in Automaton CANNON EMPLACEMENT — the King's roadblock. A low armoured
-// bunker with a faceted tank turret + heavy plasma cannon aimed at the road, a glowing red
-// optic + viewport. The first overtly-machine POI of World 1 (the others are pastoral): cold
-// manufactured menace dug into the farmland. Model: turret-bunker.glb (built in Blender).
-// The CANNON faces the road (threat tell on approach); the garrison hides INSIDE and files out
-// the REAR hatch (away from the road) to flank — so you see the gun first, then they appear
-// from cover. place() = data; build() instances the GLB, sets the red optic/viewport/bore
-// GLOWING, and blocks the bunker mass.
+// Point-POI: a dug-in Automaton CANNON EMPLACEMENT — the King's roadblock. A low armoured bunker
+// with a faceted tank turret + heavy plasma cannon, a glowing red optic + viewport, sat on a
+// cleared patch of churned dirt. The first overtly-machine POI of World 1 (the others are
+// pastoral): cold manufactured menace dug into the farmland. Model: turret-bunker.glb (Blender).
+//
+// The CANNON faces SOUTH — down the road toward the direction the player assaults FROM (they drive
+// up the leg into the gun). The garrison hides INSIDE and files out the REAR hatch (now facing
+// up-road, away from the player) to flank. No loot — it's a machine, not a scavenge site.
+// place() = data; build() instances the GLB, lays a dirt apron, sets the red optic GLOWING, blocks
+// the bunker mass, and hands ArenaScene the muzzle world-point so the PlasmaTurret's charge glow
+// + beam line up to the actual cannon bore.
 
 const ID = 'turret-bunker';
+// Cannon bore in the GLB (Blender (0, 3.98, 2.46) → glTF y-up): the beam/charge origin, measured
+// from the bunker centre along the cannon direction. DIST = horizontal reach, Y = bore height.
+const BORE_DIST = 3.98;
+const BORE_Y    = 2.46;
 const DEFAULTS = {
-  offset: 15,        // a roadblock sits CLOSE to the road (low landmark, gun trained on the road)
+  offset: 15,        // a roadblock sits CLOSE to the road (low landmark, gun trained on the lane)
   scale: 1.0,        // turret-bunker.glb is authored at game scale
-  chestScale: 1.3,
-  lootMult: 2.5,     // a guarded emplacement → solid reward
-  faceOffset: Math.PI, // the prop "front" convention is Blender −Y; the CANNON is on +Y, so flip 180° to aim it at the road (hatch then faces away, matching the rear-flank guard exit)
+  faceOffset: 0,     // fine-tune the cannon heading if needed (baseline aim is computed below)
   bunkerHalf: 1.95,  // AABB half-extent blocking the solid bunker mass (turret/cannon are high)
+  dirtR: 4.6,        // radius of the churned-earth apron under the emplacement
 };
 
 function place(ctx, rand, opts = {}) {
@@ -26,40 +32,48 @@ function place(ctx, rand, opts = {}) {
   const px = -d.z * side, pz = d.x * side;                  // unit perpendicular, off-road
   const off = o.offset + (o.offsetBonus || 0);             // leg may push it farther out (varied distance)
   const bx = p.x + px * off, bz = p.z + pz * off;          // bunker centre
-  const faceRoad = Math.atan2(-px, -pz);                    // toward the road (cannon points here)
-  const rotY = faceRoad + o.faceOffset;
+
+  // CANNON aims down the road toward the player's approach (they assault from the south / lower
+  // road index): aim = -roadTangent. Both flanking cannons face the SAME way (at the oncoming
+  // player), not across the road at each other. rotY orients the model (cannon = +Y) to that aim.
+  const aimAngle = Math.atan2(-d.x, -d.z) + o.faceOffset;
+  const rotY = aimAngle + Math.PI;                          // model cannon (+Y) → aimAngle (front conv. is −Y)
+  const aimX = Math.sin(aimAngle), aimZ = Math.cos(aimAngle);
   const band = bandFor(anchorIdx / total);
 
-  // loot cache tucked beside the emplacement (clear of the cannon line + the rear hatch)
-  const chx = bx + d.x * 5.5, chz = bz + d.z * 5.5;
   const props = [
     { name: 'TurretBunker', x: bx, z: bz, scale: o.scale, rotY },
-    { name: 'Chest', x: chx, z: chz, scale: o.chestScale, rotY: faceRoad },
-    // a little overgrowth reclaiming the dug-in machine (set clear of the bunker footprint)
+    // a little overgrowth reclaiming the dug-in machine (set clear of the bunker + cannon line)
     { name: 'Bush', x: bx + px * 4.5 - d.x * 4, z: bz + pz * 4.5 - d.z * 4, scale: 1.1, rotY: rand() * Math.PI },
     { name: 'Bush', x: bx + px * 4.5 + d.x * 4, z: bz + pz * 4.5 + d.z * 4, scale: 1.0, rotY: rand() * Math.PI },
   ];
 
-  const containers = [{ x: chx, z: chz, value: Math.round(valueFor(band) * o.lootMult), radius: 6 }];
-  // Garrison: bots wait INSIDE the bunker and file out the REAR hatch (model −Y → world +perp,
-  // away from the road) when you arrive — emerging from cover behind the bunker to flank. A
-  // Sentinel sentry (eye-on-eye with the turret optic) comes out last.
-  const hatchN = { nx: px, nz: pz };                 // outward through the rear hatch (off-road side)
-  const ix = bx + px * 1.2, iz = bz + pz * 1.2;      // just inside the bunker, at the rear hatch
+  // Garrison: bots wait INSIDE the bunker and file out the REAR hatch (now facing UP the road,
+  // +roadTangent — opposite the south-facing cannon) to flank the player from cover.
+  const hatchN = { nx: d.x, nz: d.z };                 // outward through the rear hatch (up-road)
+  const ix = bx + d.x * 1.2, iz = bz + d.z * 1.2;      // just inside the bunker, at the rear hatch
   const guards = [
     { x: ix, z: iz, role: 'lurker', door: hatchN, exitOrder: 0 },
     { x: ix, z: iz, role: 'lurker', door: hatchN, exitOrder: 1 },
     { x: ix, z: iz, role: 'lurker', door: hatchN, exitOrder: 2 },
     { x: ix, z: iz, role: 'sentry', door: hatchN, exitOrder: 3 },
   ];
-  // The live cannon fires down the road-facing lane (the King's roadblock): ArenaScene spawns a
-  // static PlasmaTurret here that charges + beams along `fireAngle`. atan2(-px,-pz) = toward road.
-  const turret = { fireAngle: Math.atan2(-px, -pz), muzzleDist: 3.0 };
-  return { poiType: ID, anchor: { x: bx, z: bz }, props, enemies: [], loot: [], containers, bunkerHalf: o.bunkerHalf, clearR: 13, guards, turret };
+  // Live cannon: ArenaScene spawns a static PlasmaTurret that charges + beams along `fireAngle`.
+  // The muzzle world-point (the actual bore) drives the charge-glow placement + beam origin.
+  const turret = {
+    fireAngle: aimAngle,
+    muzzle: { x: bx + aimX * BORE_DIST, y: BORE_Y, z: bz + aimZ * BORE_DIST },
+  };
+  return {
+    poiType: ID, anchor: { x: bx, z: bz }, props, enemies: [], loot: [], containers: [],
+    bunkerHalf: o.bunkerHalf, dirtR: o.dirtR, clearR: 13, guards, turret,
+  };
 }
 
 function build(scene, inst, helpers) {
   const meshes = [], obstacles = [], shadowCasters = [];
+  // churned-earth apron under the emplacement so it doesn't sit bare on the grass
+  if (helpers.dirtPatch) helpers.dirtPatch(inst.anchor.x, inst.anchor.z, inst.dirtR ?? DEFAULTS.dirtR);
   for (const pr of inst.props) {
     let made;
     if (pr.name === 'Bush') made = helpers.makeBush(pr.x, pr.z, pr.scale, pr.rotY);
