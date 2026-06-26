@@ -44,11 +44,14 @@ export default class Tank {
     this.redlineRecovery  = 1.2;   // s lockout after a FULL drain (boost+shield disabled)
     this.redlineRefillRate = 200;  // units/s fast sweep-up to full after the lockout
     this.tapCost          = 18;
-    this.tapDashDist      = 3.0;
-    this.tapDashExit      = 18;
+    this.tapDashDist      = 4.0;  // how far the tap lunges you (units, over tapDashDuration)
+    this.tapDashExit      = 24;   // speed you carry out of the dash (cruise=16) → a strong surge that lingers then bleeds
+    this.tapDashDuration  = 0.16; // length of the lunge phase (s)
+    this.tapMomentum      = 0.30; // s the surge coasts at top speed before bleeding back (makes the boost last a tad longer)
     this.holdBoostAccel   = 30;
     this.holdFuelDrain    = 20;
-    this.boostMaxSpeed    = 19;
+    this.holdBoostUnlocked = false; // FUTURE UPGRADE "sustained overdrive": locked on the base tank (zooming reads uncanny); boost is the tap-dash burst
+    this.boostMaxSpeed    = 26;   // hard speed clamp + cap for the future sustained-overdrive upgrade
     this.boostDecay       = 15;   // units/s² bleed from boostMaxSpeed back to maxSpeed
     this.momentumDuration = 0.175;  // seconds to coast at boost speed after releasing
     this.turretSpeed      = 72 * Math.PI / 180; // rad/s — 72°/s traverse rate
@@ -406,18 +409,21 @@ export default class Tank {
         const reversing    = this.keys.s;
         const dist         = reversing ? -(this.tapDashDist * 0.8) : this.tapDashDist;
         const exitSpd      = reversing ? -(this.tapDashExit  * 0.8) : this.tapDashExit;
-        const DURATION     = 0.14;
+        const DURATION     = this.tapDashDuration;
         this.dashVx        = forward.x * (dist / DURATION);
         this.dashVz        = forward.z * (dist / DURATION);
         this.dashTimeLeft  = DURATION;
         this.dashExitSpeed = exitSpd;
         this.isDashing     = true;
+        this._momentumTimer = this.tapMomentum;  // hold the surge briefly before it bleeds back to cruise
         energySpent       += this.tapCost;
         this.scene._onCameraShake?.(0.07, 0.3);
       }
 
-      // Hold-boost is blocked during redline; draining to 0 here triggers the lockout.
-      if (boostHeld && !this.energy.redline && this.energy.fuel > 0) {
+      // Hold-boost = sustained overdrive, gated behind a FUTURE UPGRADE (holdBoostUnlocked).
+      // Locked for now — sustained zooming reads uncanny on the base tank; boost is the
+      // tap-dash burst above. Kept intact so the upgrade just flips the flag on.
+      if (boostHeld && this.holdBoostUnlocked && !this.energy.redline && this.energy.fuel > 0) {
         const reversing = this.keys.s;
         const accel = reversing ? -(this.holdBoostAccel * 0.8) : this.holdBoostAccel;
         const cap   = reversing ? -(this.boostMaxSpeed  * 0.8) : this.boostMaxSpeed;
@@ -428,7 +434,9 @@ export default class Tank {
       }
 
     // --- Boost momentum bleed ---
-    if (!boostHeld) {
+    // Runs whenever we're not actively hold-boosting (incl. while the overdrive upgrade is
+    // locked), so a tap-dash still coasts then bleeds back to cruise.
+    if (!boostHeld || !this.holdBoostUnlocked) {
       const absSpeed = Math.abs(this.speed);
       if (absSpeed > this.maxSpeed) {
         if (this._momentumTimer > 0) {
