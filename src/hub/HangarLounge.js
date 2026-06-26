@@ -125,7 +125,7 @@ export function buildLounge(s, M) {
   const TX = T0X + TABLE_DX, TZ = T0Z + TABLE_DZ;
   const tableNode = new TransformNode('lng-table', s);
   tableNode.parent = root;
-  box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal, 'solid');
+  box(tableNode, 't-top', 1.05, 0.06, 0.70, TX, 0.45, TZ, darkMetal, 'seat');  // low enough to step onto
   [[-0.45, -0.28], [0.45, -0.28], [-0.45, 0.28], [0.45, 0.28]].forEach(([dx, dz], i) =>
     box(tableNode, 't-leg' + i, 0.07, 0.42, 0.07, TX + dx, 0.21, TZ + dz, metal));
 
