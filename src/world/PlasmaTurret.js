@@ -23,6 +23,7 @@ const SCREEN_MARGIN = 0.02;
 const BORE_DIST = 3.98;    // cannon bore offset from the turret centre (model), along the aim
 const BORE_Y    = 2.46;    // bore height (glow); the beam itself flies lower to stay under the hit gate
 const GUN_FILE  = 'turret-gun.glb';
+const BASE_FILE = 'turret-bunker.glb';
 
 export default class PlasmaTurret extends AIEnemy {
   constructor(scene, x, z, opts = {}) {
@@ -46,23 +47,31 @@ export default class PlasmaTurret extends AIEnemy {
     this._flash    = 0;
     this.turretPivot.position.set(0, 0, 0);          // gun carries its own height; pivot at the bunker axis
     this._buildChargeGlow(scene);
-    this.ready = this._buildGun(scene);
+    // selfBase = also build the static armoured BASE (for the Dev Arena, where there's no POI prop).
+    // As a road POI the base is the POI prop, so the enemy only needs the gun.
+    this.ready = this._buildModel(scene, !!opts.selfBase);
   }
 
-  // Load the gun GLB and seat it on the turretPivot so AIEnemy's turret aim yaws it onto the player.
-  async _buildGun(scene) {
-    const res = await SceneLoader.ImportMeshAsync('', '/assets/models/props/', GUN_FILE, scene);
-    const root = res.meshes.find(m => m.name === '__root__') || res.meshes[0].parent;
-    if (root) { root.parent = this.turretPivot; root.position.set(0, 0, 0); }
+  async _buildModel(scene, selfBase) {
+    if (selfBase) await this._loadInto(scene, BASE_FILE, this.root);          // static base on the (hull-locked) body
+    this._gunRoot = await this._loadInto(scene, GUN_FILE, this.turretPivot);  // gun on the aiming pivot → yaw-tracks
+    return this;
+  }
+
+  // Import a GLB and parent it under `parent`, flattening its materials to match the base prop.
+  async _loadInto(scene, file, parent) {
+    const res = await SceneLoader.ImportMeshAsync('', '/assets/models/props/', file, scene);
+    const root = res.meshes.find(m => m.name === '__root__') || (res.meshes[0] && res.meshes[0].parent);
+    if (root) { root.parent = parent; root.position.set(0, 0, 0); }
     for (const m of res.meshes) {
       if (!m.getTotalVertices || m.getTotalVertices() === 0) continue;
       const c = m.material && (m.material.albedoColor || m.material.diffuseColor);
       const rgb = c ? [c.r, c.g, c.b] : [0.4, 0.4, 0.4];
       m.material = this._gunMat(scene, rgb);
       m.isPickable = false;
-      if (!root) m.parent = this.turretPivot;
+      if (!root) m.parent = parent;
     }
-    return this;
+    return root;
   }
 
   // Flat material matching the base prop (reuse loadProp's cached flats so base + gun match);
@@ -101,18 +110,23 @@ export default class PlasmaTurret extends AIEnemy {
     if (this._chargeT >= CHARGE_TIME) this._release();
   }
 
-  // Muzzle world point = the bore, along the gun's CURRENT aim (turretAimAngle), so it tracks.
+  // Muzzle = the bore along the gun's ACTUAL world forward (read from the gun transform), so the
+  // charge glow + beam line up with the VISIBLE barrel as it slowly yaws — not the target angle.
   _muzzle() {
-    const a = this.turretAimAngle;
-    return { x: this.root.position.x + Math.sin(a) * BORE_DIST, y: BORE_Y, z: this.root.position.z + Math.cos(a) * BORE_DIST };
+    let fwd;
+    if (this._gunRoot) { this._gunRoot.computeWorldMatrix(true); const m = this._gunRoot.getWorldMatrix().m; fwd = new Vector3(m[8], 0, m[10]); }
+    if (!fwd || fwd.lengthSquared() < 1e-6) fwd = new Vector3(Math.sin(this.turretAimAngle), 0, Math.cos(this.turretAimAngle));
+    fwd.normalize();
+    const aim = new Vector3(Math.sin(this.turretAimAngle), 0, Math.cos(this.turretAimAngle));
+    if (Vector3.Dot(fwd, aim) < 0) fwd.scaleInPlace(-1);   // resolve the GLB's forward sign by the aim
+    return { pos: new Vector3(this.root.position.x + fwd.x * BORE_DIST, BORE_Y, this.root.position.z + fwd.z * BORE_DIST), dir: fwd };
   }
 
   _release() {
     this._charging = false; this._chargeT = 0;
-    const a = this.turretAimAngle;
     const mz = this._muzzle();
     const beam = this.shells.find(s => !s.active);
-    if (beam) beam.fire(mz.x, this._beamY, mz.z, Math.sin(a) * BEAM_SPEED, 0, Math.cos(a) * BEAM_SPEED, BEAM_RANGE);
+    if (beam) beam.fire(mz.pos.x, this._beamY, mz.pos.z, mz.dir.x * BEAM_SPEED, 0, mz.dir.z * BEAM_SPEED, BEAM_RANGE);
     this._flash = 1;
     audio.play('enemy.sentinel_beam_fire', { emitter: this.root });
     this.fireCooldown = this._fireCooldownDuration;
@@ -134,7 +148,7 @@ export default class PlasmaTurret extends AIEnemy {
 
   _updateGlow(dt) {
     const mz = this._muzzle();
-    this._glow.setAbsolutePosition(new Vector3(mz.x, mz.y, mz.z));
+    this._glow.setAbsolutePosition(mz.pos);
     if (this._flash > 0) this._flash = Math.max(0, this._flash - dt / 0.18);
     if (this._charging || this._flash > 0) {
       this._glow.setEnabled(true);

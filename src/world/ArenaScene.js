@@ -541,7 +541,7 @@ export default class ArenaScene {
       this.enemies = [];
       this._spawnDefs = [];
       this._devBounds = bounds;
-      this._spawnDevSet({ chaff: 6, sentinel: 1, mortar: 2 });   // sensible default mix
+      this._spawnDevSet({});   // start EMPTY — pick the mix/count yourself from the dev menu
       this._buildDevSpawnMenu();
     }
 
@@ -1658,14 +1658,15 @@ export default class ArenaScene {
   _spawnDevSet(counts, replace = true) {
     if (replace) this._clearEnemies();
     const bounds = this._devBounds ?? 48;
-    const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy };
-    const rows = [['sentinel', counts.sentinel | 0, 40], ['mortar', counts.mortar | 0, 30], ['chaff', counts.chaff | 0, 20]];
+    const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy, turret: PlasmaTurret };
+    const extra = { turret: { selfBase: true, faceAngle: Math.PI } };   // the turret builds its own base in the dev arena
+    const rows = [['turret', counts.turret | 0, 50], ['sentinel', counts.sentinel | 0, 40], ['mortar', counts.mortar | 0, 30], ['chaff', counts.chaff | 0, 20]];
     for (const [type, n, baseZ] of rows) {
       for (let i = 0; i < n; i++) {
         const spread = n === 1 ? 0 : (i / (n - 1) - 0.5);
         const x = spread * Math.min(40, 8 + n * 4);
         const z = baseZ + (i % 2) * 4;
-        const e = new ctor[type](this.scene, x, z, { bounds });
+        const e = new ctor[type](this.scene, x, z, { bounds, ...(extra[type] || {}) });
         e.addShadows?.(this.shadowGen);
         this.enemies.push(e);
         this._spawnDefs.push([x, z]);
@@ -1688,14 +1689,14 @@ export default class ArenaScene {
 
   _buildDevSpawnMenu() {
     document.getElementById('dev-spawn-menu')?.remove();
-    const counts = { chaff: 6, sentinel: 1, mortar: 2 };
+    const counts = { turret: 0, chaff: 0, sentinel: 0, mortar: 0 };
     const bs = 'background:#15303a;color:#bfe;border:1px solid #2a6;border-radius:3px;padding:3px 8px;cursor:pointer;font:inherit;font-size:11px;';
     const el = document.createElement('div');
     el.id = 'dev-spawn-menu';
     el.style.cssText = 'position:fixed;top:64px;right:12px;z-index:50;background:rgba(8,14,20,0.92);' +
       'border:1px solid #2a6;border-radius:6px;padding:10px 12px;font-family:inherit;color:#cfe;' +
       'font-size:12px;min-width:178px;box-shadow:0 4px 18px rgba(0,0,0,0.55);';
-    const types = [['chaff', 'CHAFF'], ['sentinel', 'SENTINEL'], ['mortar', 'MORTAR']];
+    const types = [['turret', 'TURRET'], ['chaff', 'CHAFF'], ['sentinel', 'SENTINEL'], ['mortar', 'MORTAR']];
     el.innerHTML = '<div style="color:#6fd;letter-spacing:1px;margin-bottom:8px;">DEV · SPAWN</div>';
     for (const [key, label] of types) {
       const row = document.createElement('div');

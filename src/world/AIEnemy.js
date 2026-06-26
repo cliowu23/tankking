@@ -51,6 +51,7 @@ export default class AIEnemy {
     // PlasmaTurret — see turretBunker. Default null/false → normal mobile, tracking enemy.
     this._static        = !!opts.static;
     this._fixedAimAngle = (opts.fixedAim ?? null);
+    this._lockRotY      = (opts.faceAngle ?? null);   // _static units with a body on root: lock the hull heading so it can't spin
     // Emergence: a hidden POI unit reveals itself on wake (EMERGE state) instead of sliding out.
     //   'burrow' — buried below ground, CLAWS UP in place (saved for future burrow-bots).
     //   'door'   — waits INSIDE the building, then DRIVES OUT the front door in single file
@@ -74,7 +75,7 @@ export default class AIEnemy {
     this._sepX = 0; this._sepZ = 0;   // separation nudge (anti-clump)
     this._nearbyAllies = 0;           // living allies in range (feeds light confidence)
 
-    this.rotY            = Math.PI; // face south toward player spawn
+    this.rotY            = (this._lockRotY != null) ? this._lockRotY : Math.PI; // face south toward player spawn (or a locked heading)
     this.speed           = 0;
     this.turretAimAngle  = Math.PI;
     this.barrelElevation = 0;
@@ -461,6 +462,7 @@ export default class AIEnemy {
       this.root.position.x = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.x + (forward.x * this.speed + this.vx + sepX) * dt));
       this.root.position.z = Math.max(-this.bounds, Math.min(this.bounds, this.root.position.z + (forward.z * this.speed + this.vz + sepZ) * dt));
     }
+    if (this._static && this._lockRotY != null) this.rotY = this._lockRotY;   // hull stays put (only the turret yaws)
     this.root.rotation.y = this.rotY;
     this._sepX = 0; this._sepZ = 0;
 
