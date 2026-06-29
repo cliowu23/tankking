@@ -53,8 +53,29 @@ export default class PlasmaTurret extends AIEnemy {
   async _buildModel(scene, selfBase) {
     if (selfBase) await this._loadInto(scene, BASE_FILE, this.root);          // static base on the (hull-locked) body
     this._gunRoot = await this._loadInto(scene, GUN_FILE, this.turretPivot);  // gun on the aiming pivot → yaw-tracks
-    // the glow snaps to the actual bore MESH each frame (see _updateGlow) — no guessed offset
-    return this;
+    this._findMuzzle();   // locate the real cannon tip — the separate bore mesh sits in a DIFFERENT
+    return this;          // GLB node frame (~1.45 off the barrel), so we derive the muzzle from the cannon itself
+  }
+
+  // Find the cannon barrel and its muzzle point from GEOMETRY (the authored bore mesh is parented
+  // under a different node than the barrel and lands ~1.45 off-axis — so we ignore it and take the
+  // gun mesh that protrudes furthest forward, then the centroid of its forward-most vertex ring).
+  _findMuzzle() {
+    let best = null, bestZ = -Infinity, bestPos = null;
+    for (const m of this.turretPivot.getChildMeshes()) {
+      if (!/TurretGun/i.test(m.name)) continue;             // gun primitives only (skip the stray bore disk)
+      const pos = m.getVerticesData('position'); if (!pos) continue;
+      let maxZ = -Infinity; for (let i = 0; i < pos.length; i += 3) if (pos[i + 2] > maxZ) maxZ = pos[i + 2];
+      if (maxZ > bestZ) { bestZ = maxZ; best = m; bestPos = pos; }   // the cannon sticks out furthest (+Z = forward)
+    }
+    if (!best) return;
+    this._cannonMesh = best;
+    let sx = 0, sy = 0, sz = 0, n = 0;                       // centroid of the muzzle-ring verts → the bore centre
+    for (let i = 0; i < bestPos.length; i += 3) {
+      if (bestPos[i + 2] > bestZ - 0.5) { sx += bestPos[i]; sy += bestPos[i + 1]; sz += bestPos[i + 2]; n++; }
+    }
+    this._muzzleLocal = new Vector3(sx / n, sy / n, sz / n); // in the cannon mesh's own frame → always on the barrel
+    if (this._boreMesh) this._boreMesh.setEnabled(false);    // hide the off-axis authored bore disk
   }
 
   // Import a GLB and parent it under `parent`, flattening its materials to match the base prop.
@@ -110,11 +131,11 @@ export default class PlasmaTurret extends AIEnemy {
     if (this._chargeT >= CHARGE_TIME) this._release();
   }
 
-  // Muzzle = the actual bore MESH's world position (whatever the model says), and the firing
-  // direction is from the turret centre out to it — so the glow + beam leave the visible muzzle.
+  // Muzzle = the cannon barrel's own forward tip (its mesh-local muzzle point pushed through its
+  // world matrix), so the glow + beam ALWAYS leave the visible barrel. Direction = turret centre → tip.
   _muzzle() {
-    this._boreMesh.computeWorldMatrix(true);
-    const pos = this._boreMesh.getBoundingInfo().boundingBox.centerWorld;   // the disk's geometry centre (its pivot is at the turret axis)
+    this._cannonMesh.computeWorldMatrix(true);
+    const pos = Vector3.TransformCoordinates(this._muzzleLocal, this._cannonMesh.getWorldMatrix());
     const dx = pos.x - this.root.position.x, dz = pos.z - this.root.position.z;
     const len = Math.hypot(dx, dz) || 1;
     return { pos, dir: new Vector3(dx / len, 0, dz / len) };
@@ -122,7 +143,7 @@ export default class PlasmaTurret extends AIEnemy {
 
   _release() {
     this._charging = false; this._chargeT = 0;
-    if (!this._boreMesh) return;   // gun not loaded yet
+    if (!this._cannonMesh) return;   // gun not loaded yet
     const mz = this._muzzle();
     const beam = this.shells.find(s => !s.active);
     if (beam) beam.fire(mz.pos.x, this._beamY, mz.pos.z, mz.dir.x * BEAM_SPEED, 0, mz.dir.z * BEAM_SPEED, BEAM_RANGE);
@@ -146,7 +167,7 @@ export default class PlasmaTurret extends AIEnemy {
   }
 
   _updateGlow(dt) {
-    if (!this._boreMesh) { this._glow.setEnabled(false); return; }   // wait for the gun (with its bore) to load
+    if (!this._cannonMesh) { this._glow.setEnabled(false); return; }   // wait for the gun (with its barrel) to load
     if (this._flash > 0) this._flash = Math.max(0, this._flash - dt / 0.18);
     if (this._charging || this._flash > 0) {
       this._glow.setEnabled(true);
