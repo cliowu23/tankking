@@ -1,18 +1,11 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight } from '@babylonjs/core';
+import { markSolid, makeSeatPad, makeTrigger, makeWorldWall } from './hangarColliders.js';
 
 // ── helpers (kept local so this module stays decoupled from HangarProps) ──────
 function vis(mesh) {
   mesh.isPickable      = false;
   mesh.checkCollisions = false;
   return mesh;
-}
-function makeCollider(name, size, pos, s) {
-  const m = MeshBuilder.CreateBox(name, size, s);
-  m.position        = pos.clone();
-  m.isVisible       = false;
-  m.checkCollisions = true;
-  m.isPickable      = false;
-  return m;
 }
 
 // Port the SE-corner kitchen mockup into the hangar. The mockup is authored in a
@@ -97,10 +90,14 @@ export function buildKitchen(s, M) {
     n.position = new Vector3(d[0], d[1], d[2]);
     return n;
   };
-  const box = (parent, name, w, h, d, x, y, z, m) => {
+  const seats = [];
+  const box = (parent, name, w, h, d, x, y, z, m, tag) => {
     const b = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, s);
     b.position = new Vector3(x + OX - CAX, y, z + OZ - CAZ);
-    b.material = m; vis(b); b.parent = parent;
+    b.material = m; b.parent = parent; b.isPickable = false;
+    if (tag === 'solid')      { b.checkCollisions = false; markSolid(b); }
+    else if (tag === 'seat')  { b.checkCollisions = false; seats.push({ x: x + OX - CAX, z: z + OZ - CAZ, w, d }); }
+    else                      { b.checkCollisions = false; }
     return b;
   };
   const cyl = (parent, name, dia, h, x, y, z, m, tess = 16, opts = {}) => {
@@ -135,8 +132,8 @@ export function buildKitchen(s, M) {
 
   // ── SOUTH counter run (steel L), sink + stockpot ───────────────────────────
   const sc = grp('southCounter');
-  box(sc, 'cs-base', 3.0, 0.82, 0.82, -1.4, 0.41, -2.98, steelDk);
-  box(sc, 'cs-top',  3.1, 0.08, 0.92, -1.4, topY, -2.96, steel);
+  box(sc, 'cs-base', 3.0, 0.82, 0.82, -1.4, 0.41, -2.98, steelDk, 'solid');
+  box(sc, 'cs-top',  3.1, 0.08, 0.92, -1.4, topY, -2.96, steel, 'solid');
   box(sc, 'cs-kick', 3.0, 0.12, 0.70, -1.4, 0.06, -2.98, darkMetal);
   box(sc, 'cs-splash', 3.1, 0.55, 0.05, -1.4, 1.12, -3.45, steel);
   [-2.4, -1.4, -0.4].forEach((x, i) => {
@@ -156,8 +153,8 @@ export function buildKitchen(s, M) {
 
   // ── EAST counter run + samovar ─────────────────────────────────────────────
   const ec = grp('eastCounter');
-  box(ec, 'ce-base', 0.82, 0.82, 1.1, 2.98, 0.41, -0.15, steelDk);
-  box(ec, 'ce-top',  0.92, 0.08, 1.2, 2.96, topY, -0.15, steel);
+  box(ec, 'ce-base', 0.82, 0.82, 1.1, 2.98, 0.41, -0.15, steelDk, 'solid');
+  box(ec, 'ce-top',  0.92, 0.08, 1.2, 2.96, topY, -0.15, steel, 'solid');
   box(ec, 'ce-kick', 0.70, 0.12, 1.1, 2.98, 0.06, -0.15, darkMetal);
   box(ec, 'ce-splash', 0.05, 0.55, 1.2, 3.45, 1.12, -0.15, steel);
   box(ec, 'ce-door', 0.07, 0.62, 0.9, 2.545, 0.45, -0.15, metal);
@@ -172,7 +169,7 @@ export function buildKitchen(s, M) {
 
   // ── Stove + oven ───────────────────────────────────────────────────────────
   const st = grp('stove');
-  box(st, 'st-body', 0.86, 0.90, 1.05, 2.85, 0.45, -1.45, cream);
+  box(st, 'st-body', 0.86, 0.90, 1.05, 2.85, 0.45, -1.45, cream, 'solid');
   box(st, 'st-top', 0.92, 0.06, 1.10, 2.85, 0.93, -1.45, darkMetal);
   [[-0.16, -0.26], [-0.16, 0.26], [0.12, -0.26], [0.12, 0.26]].forEach(([dx, dz], i) =>
     cyl(st, 'st-burner' + i, 0.24, 0.03, 2.85 + dx, 0.97, -1.45 + dz, metal, 14));
@@ -184,7 +181,7 @@ export function buildKitchen(s, M) {
 
   // ── Fridge (corner) ────────────────────────────────────────────────────────
   const fr = grp('fridge');
-  box(fr, 'fr-body', 0.84, 1.85, 0.80, 2.90, 0.93, -2.70, cream);
+  box(fr, 'fr-body', 0.84, 1.85, 0.80, 2.90, 0.93, -2.70, cream, 'solid');
   box(fr, 'fr-seam', 0.86, 0.03, 0.80, 2.90, 1.45, -2.70, darkMetal);
   box(fr, 'fr-h1', 0.05, 0.40, 0.05, 2.50, 1.10, -2.96, steel);
   box(fr, 'fr-h2', 0.05, 0.30, 0.05, 2.50, 1.70, -2.96, steel);
@@ -217,6 +214,9 @@ export function buildKitchen(s, M) {
    ['stoolC', 1.17, -0.40], ['stoolD', 0.50, 0.37]].forEach(([name, sxk, szk]) => {
     const g = grp(name);
     cyl(g, name + '-seat', 0.34, 0.05, sxk, 0.50, szk, enamelR, 16);
+    // Record seat-pad footprint in root local space (stool group adds its D offset).
+    const dk = D[name] || [0, 0, 0];
+    seats.push({ x: sxk + OX - CAX + dk[0], z: szk + OZ - CAZ + dk[2], w: 0.34, d: 0.34 });
     cyl(g, name + '-pole', 0.07, 0.48, sxk, 0.24, szk, metal, 8);
     blob(g, sxk, szk, 0.26, 0.26);
   });
@@ -251,17 +251,42 @@ export function buildKitchen(s, M) {
   // Shadows are cast hangar-wide from the overhead key light (see
   // HangarScene._setupShadows), so the kitchen meshes don't manage their own.
 
-  // Collision/proximity centre — the scaled footprint centre. Sized a touch under
-  // the visual footprint so the driver can step close enough to trigger the prompt
-  // (threshold ≈ 3.5 from the collider centre) while still blocking the counters.
+  // Proximity trigger centre — the scaled footprint centre of the kitchen.
   const center = new Vector3(
     (CAX + NUDGE_X) + S * (1.0 + OX - CAX),
     0.8,
     (CAZ + NUDGE_Z) + S * (-2.0 + OZ - CAZ),
   );
-  const collider = makeCollider('station-kitchen',
-    { width: 4.2, height: 1.8, depth: 4.2 },
-    center, s);
 
-  return { collider, root, center: new Vector3(center.x, 0.5, center.z) };
+  // Short solids (counter tops ~0.90, stove, round table top ~0.75) sit at/under the
+  // player's collision capsule floor (~0.9), so their visual colliders don't block.
+  const BLOCK_H = 1.6;
+  // Group-local blocker (inherits the prop group's offset/scale) — used for the table.
+  const block = (parent, name, w, d, x, z) => {
+    const m = MeshBuilder.CreateBox(name, { width: w, height: BLOCK_H, depth: d }, s);
+    m.position        = new Vector3(x + OX - CAX, BLOCK_H / 2, z + OZ - CAZ);
+    m.isVisible       = false;
+    m.isPickable      = false;
+    m.checkCollisions = true;
+    m.parent          = parent;
+    return m;
+  };
+  block(tb, 'tb-block', 0.90, 0.90, 0.25, -0.55);  // free-standing dining table (confirmed good)
+
+  // Cook-corner seal walls — marked by the user in kitchen-collision-editor.html and
+  // placed in WORLD space (unparented), so there's no authored→world transform to get
+  // wrong. They trace the counter/stove/fridge cook-line perimeter.
+  // SEAL_H is tall (well above any climbable height, incl. from a 1.05 stool) so the
+  // player CANNOT ride up and walk the cook line like a platform — these are walls,
+  // not the low climb-on pads.
+  [
+    { cx: 2.93,  cz: -15.06, w: 0.15, d: 1.92 },
+    { cx: 6.52,  cz: -14.10, w: 7.19, d: 0.15 },
+    { cx: 10.10, cz: -11.61, w: 0.15, d: 4.95 },
+    { cx: 11.05, cz: -9.11,  w: 1.91, d: 0.15 },
+  ].forEach((b, i) => makeWorldWall(s, `kit-seal-${i}`, b));   // default 3.0 height = un-climbable
+
+  const colliders = seats.map((f, i) => makeSeatPad(s, `kit-seatpad-${i}`, f, root));
+  const trigger   = makeTrigger(s, 'kit-trigger', new Vector3(center.x, 0.5, center.z));
+  return { root, colliders, trigger, center: new Vector3(center.x, 0.5, center.z) };
 }

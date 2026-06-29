@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hangar Collision Marker</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0c0f12;font:13px/1.4 system-ui,sans-serif;color:#cfe}
+  #c{width:100vw;height:100vh;display:block;touch-action:none}
+  #ui{position:fixed;top:12px;left:12px;z-index:10;background:rgba(8,12,16,.92);border:1px solid #1d4;
+      border-radius:8px;padding:12px 14px;width:320px;backdrop-filter:blur(4px)}
+  #ui h1{font-size:13px;margin:0 0 6px;color:#9fe;letter-spacing:.4px}
+  #ui p{margin:5px 0;color:#9bd;font-size:12px}
+  .key{color:#dfe;font-weight:600}
+  .red{color:#f88} .grn{color:#8f8} .gry{color:#9aa}
+  #coord{font:12px ui-monospace,monospace;color:#dfe;margin:6px 0}
+  .btns{display:flex;gap:6px;margin-top:8px}
+  .btns button{flex:1;padding:6px;border:1px solid #2a6;border-radius:5px;background:#13242c;color:#bfe;cursor:pointer;font:inherit;font-size:11px}
+  .btns button.on{background:#1d6;color:#021;border-color:#1d6;font-weight:600}
+  #dump{margin-top:8px;max-height:240px;overflow:auto;font:11px/1.5 ui-monospace,monospace;color:#bfe;white-space:pre;background:#0a1014;border-radius:5px;padding:6px;display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>HANGAR COLLISION MARKER</h1>
+  <p><span class="red">Red</span> = existing collision · <span class="gry">grey</span> = room walls · <span class="grn">green</span> = walls you mark.</p>
+  <p>Stations are labelled. Mark seal/blocker walls for <span class="key">map (NW)</span>, <span class="key">radio (NE)</span>, <span class="key">workbench</span>, <span class="key">QM crates</span>.</p>
+  <p><span class="key">Click two opposite corners</span> = one box. <span class="key">Scroll</span> zoom · <span class="key">right-drag</span> pan.</p>
+  <div class="btns" style="margin-bottom:6px">
+    <button id="modeWall" class="on">WALL (block)</button>
+    <button id="modeSeat">SEAT (step-on)</button>
+  </div>
+  <div id="coord">cursor: —</div>
+  <div class="btns">
+    <button id="undo">Undo last</button>
+    <button id="clear">Clear</button>
+    <button id="copy">Copy</button>
+  </div>
+  <div id="dump"></div>
+</div>
+
+<script type="module">
+import { Engine, Scene, Color3, Color4, Vector3, ArcRotateCamera, HemisphericLight,
+         MeshBuilder, StandardMaterial, DynamicTexture, Camera } from '@babylonjs/core';
+import { makeMats, buildWorkbench, buildQMCrates } from '/src/hub/HangarProps.js';
+import { buildMapTable } from '/src/hub/HangarMapTable.js';
+import { buildRadio }    from '/src/hub/HangarRadio.js';
+import { buildLounge }   from '/src/hub/HangarLounge.js';
+import { buildKitchen }  from '/src/hub/HangarKitchen.js';
+import { buildPrimitiveTank } from '/src/tank/primitiveTank.js';
+
+const canvas = document.getElementById('c');
+const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
+const scene  = new Scene(engine);
+scene.clearColor = new Color4(0.10, 0.12, 0.14, 1);
+new HemisphericLight('h', new Vector3(0, 1, 0), scene).intensity = 1.0;
+
+// ---- build the REAL stations at their HangarScene positions ----
+const M = makeMats(scene);
+try { buildWorkbench(scene, -11, -2, M); } catch(e){ console.warn('workbench', e); }
+try { buildQMCrates(scene,  11,  0, M); } catch(e){ console.warn('qm', e); }
+try { buildMapTable(scene, M); } catch(e){ console.warn('map', e); }
+try { buildRadio(scene, M);    } catch(e){ console.warn('radio', e); }
+try { buildLounge(scene, M);   } catch(e){ console.warn('lounge', e); }
+try { buildKitchen(scene, M);  } catch(e){ console.warn('kitchen', e); }
+// tank display reference — primitive tank scaled to 3.2 wide at (0,0,10), same as the hangar
+try {
+  const prim = buildPrimitiveTank(scene, { simpleBarrel: true });
+  prim.root.position.set(0,0,0); prim.root.computeWorldMatrix(true);
+  const bb = prim.root.getHierarchyBoundingVectors(); const rawW = bb.max.x - bb.min.x;
+  if (rawW > 0) prim.root.scaling.setAll(3.2 / rawW);
+  prim.root.computeWorldMatrix(true);
+  const bb2 = prim.root.getHierarchyBoundingVectors();
+  prim.root.position.set(0, -bb2.min.y, 10);
+} catch(e){ console.warn('tank', e); }
+
+// ---- room walls (grey reference) ----
+const ROOM_W = 24, ROOM_D = 32, WALL_T = 0.15;
+const wallMat = new StandardMaterial('wm', scene);
+wallMat.diffuseColor = new Color3(0.28, 0.30, 0.36); wallMat.alpha = 0.55; wallMat.specularColor = new Color3(0,0,0);
+const refWall = (name, w, d, x, z) => {
+  const m = MeshBuilder.CreateBox(name, { width: w, height: 0.5, depth: d }, scene);
+  m.position = new Vector3(x, 0.25, z); m.material = wallMat; m.isPickable = false;
+};
+refWall('wall-s', ROOM_W, WALL_T, 0, -ROOM_D / 2);
+refWall('wall-n', ROOM_W, WALL_T, 0,  ROOM_D / 2);
+refWall('wall-w', WALL_T, ROOM_D, -ROOM_W / 2, 0);
+refWall('wall-e', WALL_T, ROOM_D,  ROOM_W / 2, 0);
+
+// ---- overlay EVERY collider in translucent red ----
+const colMat = new StandardMaterial('col', scene);
+colMat.diffuseColor = new Color3(1, 0.2, 0.2); colMat.alpha = 0.35;
+colMat.specularColor = new Color3(0,0,0); colMat.backFaceCulling = false;
+for (const m of scene.meshes) { if (m.checkCollisions) { m.isVisible = true; m.material = colMat; } }
+
+// ---- corner labels (so you know which station is which from top-down) ----
+function label(text, x, z) {
+  const dt = new DynamicTexture('lt_'+text, { width: 256, height: 64 }, scene, false);
+  dt.hasAlpha = true; dt.drawText(text, null, 46, 'bold 38px sans', '#9fe', 'transparent');
+  const m = new StandardMaterial('lm_'+text, scene); m.diffuseTexture = dt; m.diffuseTexture.hasAlpha = true;
+  m.emissiveColor = new Color3(1,1,1); m.disableLighting = true; m.backFaceCulling = false;
+  const p = MeshBuilder.CreatePlane('lp_'+text, { width: 3.2, height: 0.8 }, scene);
+  p.material = m; p.rotation.x = Math.PI/2; p.position = new Vector3(x, 0.1, z); p.isPickable = false;
+}
+label('MAP (NW)',   -8,  12);
+label('RADIO (NE)',  8,  12);
+label('WORKBENCH', -11, -1);
+label('QM CRATES',  11,  1);
+label('LOUNGE',     -8, -12);
+label('KITCHEN',     8, -12);
+label('TANK',        0,   7);
+
+// ---- top-down orthographic camera framing the whole room ----
+const cam = new ArcRotateCamera('cam', -Math.PI / 2, 0.001, 60, new Vector3(0,0,0), scene);
+cam.mode = Camera.ORTHOGRAPHIC_CAMERA;
+cam.lowerBetaLimit = cam.upperBetaLimit = 0.001;
+cam.lowerAlphaLimit = cam.upperAlphaLimit = -Math.PI / 2;
+cam.panningSensibility = 30;
+cam.attachControl(canvas, true);
+let EXT = 17;
+const applyOrtho = () => { const a = canvas.height/canvas.width; cam.orthoLeft=-EXT; cam.orthoRight=EXT; cam.orthoTop=EXT*a; cam.orthoBottom=-EXT*a; };
+applyOrtho();
+canvas.addEventListener('wheel', e => { EXT = Math.max(4, Math.min(40, EXT + Math.sign(e.deltaY))); applyOrtho(); e.preventDefault(); }, { passive:false });
+
+// ---- pick plane ----
+const pickPlane = MeshBuilder.CreateGround('pickPlane', { width: 100, height: 100 }, scene);
+pickPlane.position.y = 0; pickPlane.visibility = 0; pickPlane.isPickable = true;
+const groundXZ = () => { const p = scene.pick(scene.pointerX, scene.pointerY, m => m === pickPlane); return p.hit ? { x: p.pickedPoint.x, z: p.pickedPoint.z } : null; };
+
+// ---- marking (WALL = tall block 3.0, SEAT = low step-on 1.05) ----
+const wallMatM = new StandardMaterial('mk', scene); wallMatM.diffuseColor = new Color3(0.2,1,0.3);  wallMatM.alpha = 0.5; wallMatM.specularColor = new Color3(0,0,0);
+const seatMatM = new StandardMaterial('sk', scene); seatMatM.diffuseColor = new Color3(0.25,0.7,1); seatMatM.alpha = 0.5; seatMatM.specularColor = new Color3(0,0,0);
+const dotMat   = new StandardMaterial('dot', scene); dotMat.diffuseColor = new Color3(1,1,0.3); dotMat.specularColor = new Color3(0,0,0);
+let cornerA = null, dot = null, mode = 'wall'; const boxes = [], meshes = [];
+const coordEl = document.getElementById('coord');
+scene.onPointerObservable.add(info => { if (info.type === 8) { const w = groundXZ(); if (w) coordEl.textContent = `cursor: x ${w.x.toFixed(2)}  z ${w.z.toFixed(2)}`; } });
+canvas.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  const w = groundXZ(); if (!w) return;
+  if (!cornerA) { cornerA = w; dot = MeshBuilder.CreateSphere('dot', { diameter: 0.4 }, scene); dot.position = new Vector3(w.x, 0.2, w.z); dot.material = dotMat; dot.isPickable = false; }
+  else {
+    const cx=(cornerA.x+w.x)/2, cz=(cornerA.z+w.z)/2, ww=Math.max(0.15,Math.abs(w.x-cornerA.x)), dd=Math.max(0.15,Math.abs(w.z-cornerA.z));
+    const h = mode==='seat' ? 1.6 : 3.0;
+    const b = MeshBuilder.CreateBox('mk'+boxes.length,{width:ww,height:h,depth:dd},scene);
+    b.position=new Vector3(cx,h/2,cz); b.material = (mode==='seat'?seatMatM:wallMatM); b.isPickable=false;
+    meshes.push(b); boxes.push({type:mode,cx:+cx.toFixed(2),cz:+cz.toFixed(2),w:+ww.toFixed(2),d:+dd.toFixed(2)});
+    if (dot){dot.dispose();dot=null;} cornerA=null; refresh();
+  }
+});
+function refresh(){ const el=document.getElementById('dump'); el.style.display='block'; el.textContent = boxes.length ? boxes.map((b,i)=>`${i+1}: ${b.type.toUpperCase().padEnd(4)}  cx ${b.cx}  cz ${b.cz}  w ${b.w}  d ${b.d}`).join('\n') : '(none marked)'; }
+const setMode = m => { mode = m; document.getElementById('modeWall').classList.toggle('on', m==='wall'); document.getElementById('modeSeat').classList.toggle('on', m==='seat'); };
+document.getElementById('modeWall').onclick = () => setMode('wall');
+document.getElementById('modeSeat').onclick = () => setMode('seat');
+document.getElementById('undo').onclick  = () => { if(meshes.length){meshes.pop().dispose();boxes.pop();} if(dot){dot.dispose();dot=null;cornerA=null;} refresh(); };
+document.getElementById('clear').onclick = () => { meshes.forEach(m=>m.dispose()); meshes.length=0; boxes.length=0; if(dot){dot.dispose();dot=null;cornerA=null;} refresh(); };
+document.getElementById('copy').onclick  = async () => { refresh(); const t=JSON.stringify(boxes); try{ await navigator.clipboard.writeText(t); const b=document.getElementById('copy'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1200);}catch{ document.getElementById('dump').textContent=t; } };
+
+engine.runRenderLoop(() => scene.render());
+addEventListener('resize', () => { engine.resize(); applyOrtho(); });
+</script>
+</body>
+</html>

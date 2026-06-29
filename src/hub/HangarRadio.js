@@ -1,12 +1,9 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3, TransformNode, PointLight, DynamicTexture } from '@babylonjs/core';
 import { drawPoster } from './posterArt.js';
+import { makeTrigger, makeWorldWall, SEAT_STEP_H } from './hangarColliders.js';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function vis(mesh) { mesh.isPickable = false; mesh.checkCollisions = false; return mesh; }
-function makeCollider(name, size, pos, s) {
-  const m = MeshBuilder.CreateBox(name, size, s);
-  m.position = pos.clone(); m.isVisible = false; m.checkCollisions = true; m.isPickable = false; return m;
-}
 
 // Port the mockup's LOCAL frame (east wall x=+3.55, north wall z=+3.55) into the
 // hangar's NE corner (east x=+12, north z=+16). Same OX as the kitchen, same OZ
@@ -194,11 +191,21 @@ export function buildRadio(s, M) {
   const r = MeshBuilder.CreateGround('radio-rug', { width: 2.0, height: 2.0 }, s);
   r.position = new Vector3(1.5 + OX - CAX, 0.015, 1.4 + OZ - CAZ); r.material = rugMat; vis(r); r.parent = rugN;
 
-  // ── collider + center (interaction point at the seat, room-facing side) ─────
+  // ── trigger + center (interaction point at the seat, room-facing side) ──────
   const sx = (xc) => root.position.x + S * (xc + OX - CAX);
   const sz = (zc) => root.position.z + S * (zc + OZ - CAZ);
   const cx = sx(1.45), cz = sz(1.5);
-  const collider = makeCollider('station-radio', { width: 3.8, height: 1.8, depth: 3.8 }, new Vector3(cx, 0.9, cz), s);
+  const trigger = makeTrigger(s, 'radio-trigger', new Vector3(cx, 0.5, cz));
 
-  return { collider, root, center: new Vector3(cx, 0.5, cz), setPoster, setCustomPhoto, posterMesh: art, get posterDesign() { return posterDesign; } };
+  // Collision seal walls — user-marked in hangar-collision-editor.html, world-space.
+  // (Chair step-pad + rug-open tuning come in a follow-up SEAT pass.)
+  [
+    { cx: 8.91,  cz: 14.89, w: 5.86, d: 1.60 },
+    { cx: 11.03, cz: 13.05, w: 1.82, d: 5.55 },
+  ].forEach((b, i) => makeWorldWall(s, `radio-wall-${i}`, b));
+  // Step-pad — height 1.6 world (matches the climbable seat height the parented
+  // lounge/kitchen pads end up at); the radio chair reads as sit-on, rug stays walkable.
+  makeWorldWall(s, 'radio-seat-0', { cx: 8.65, cz: 12.69, w: 1.06, d: 1.06 }, SEAT_STEP_H);
+
+  return { trigger, root, center: new Vector3(cx, 0.5, cz), setPoster, setCustomPhoto, posterMesh: art, get posterDesign() { return posterDesign; } };
 }

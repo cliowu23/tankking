@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kitchen Collision Marker</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0c0f12;font:13px/1.4 system-ui,sans-serif;color:#cfe}
+  #c{width:100vw;height:100vh;display:block;touch-action:none}
+  #ui{position:fixed;top:12px;left:12px;z-index:10;background:rgba(8,12,16,.92);border:1px solid #1d4;
+      border-radius:8px;padding:12px 14px;width:300px;backdrop-filter:blur(4px)}
+  #ui h1{font-size:13px;margin:0 0 6px;color:#9fe;letter-spacing:.4px}
+  #ui p{margin:5px 0;color:#9bd;font-size:12px}
+  .key{color:#dfe;font-weight:600}
+  .red{color:#f88} .grn{color:#8f8}
+  #coord{font:12px ui-monospace,monospace;color:#dfe;margin:6px 0}
+  .btns{display:flex;gap:6px;margin-top:8px}
+  .btns button{flex:1;padding:6px;border:1px solid #2a6;border-radius:5px;background:#13242c;color:#bfe;cursor:pointer;font:inherit;font-size:11px}
+  #dump{margin-top:8px;max-height:230px;overflow:auto;font:11px/1.5 ui-monospace,monospace;color:#bfe;white-space:pre;background:#0a1014;border-radius:5px;padding:6px;display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>KITCHEN COLLISION MARKER</h1>
+  <p>Top-down view. <span class="red">Red</span> = existing collision. <span class="grn">Green</span> = walls you mark.</p>
+  <p><span class="key">Click two opposite corners</span> to drop a wall over a gap.</p>
+  <p><span class="key">Scroll</span> zoom &nbsp;·&nbsp; <span class="key">Right-drag</span> pan</p>
+  <div id="coord">cursor: —</div>
+  <div class="btns">
+    <button id="undo">Undo last</button>
+    <button id="clear">Clear</button>
+    <button id="copy">Copy</button>
+  </div>
+  <div id="dump"></div>
+</div>
+
+<script type="module">
+import { Engine, Scene, Color3, Color4, Vector3, ArcRotateCamera, HemisphericLight,
+         MeshBuilder, StandardMaterial, Camera } from '@babylonjs/core';
+import { makeMats } from '/src/hub/HangarProps.js';
+import { buildKitchen } from '/src/hub/HangarKitchen.js';
+
+const canvas = document.getElementById('c');
+const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
+const scene  = new Scene(engine);
+scene.clearColor = new Color4(0.10, 0.12, 0.14, 1);
+new HemisphericLight('h', new Vector3(0, 1, 0), scene).intensity = 1.0;
+
+// ---- the REAL kitchen (same builder the game uses) ----
+const kit = buildKitchen(scene, makeMats(scene));
+const C   = kit.center;   // world centre of the kitchen
+
+// ---- reference SE-corner room walls (from HangarScene constants) ----
+const ROOM_W = 24, ROOM_D = 32, WALL_T = 0.15;
+const wallMat = new StandardMaterial('wm', scene);
+wallMat.diffuseColor = new Color3(0.28, 0.30, 0.36); wallMat.alpha = 0.6; wallMat.specularColor = new Color3(0,0,0);
+const refWall = (name, w, d, x, z) => {
+  const m = MeshBuilder.CreateBox(name, { width: w, height: 0.5, depth: d }, scene);
+  m.position = new Vector3(x, 0.25, z); m.material = wallMat; m.isPickable = false;
+};
+refWall('wall-s', ROOM_W, WALL_T, 0, -ROOM_D / 2);   // south wall (z = -16)
+refWall('wall-e', WALL_T, ROOM_D, ROOM_W / 2, 0);    // east wall  (x = +12)
+
+// ---- overlay EVERY collider in translucent red so gaps are obvious ----
+const colMat = new StandardMaterial('col', scene);
+colMat.diffuseColor = new Color3(1, 0.2, 0.2); colMat.alpha = 0.35;
+colMat.specularColor = new Color3(0,0,0); colMat.backFaceCulling = false;
+for (const m of scene.meshes) {
+  if (m.checkCollisions) { m.isVisible = true; m.material = colMat; }
+}
+
+// ---- top-down orthographic camera locked overhead, framed on the kitchen ----
+const cam = new ArcRotateCamera('cam', -Math.PI / 2, 0.001, 40, C.clone(), scene);
+cam.mode = Camera.ORTHOGRAPHIC_CAMERA;
+cam.lowerBetaLimit = cam.upperBetaLimit = 0.001;          // stay top-down
+cam.lowerAlphaLimit = cam.upperAlphaLimit = -Math.PI / 2; // lock spin → left-click is for marking, not rotating
+cam.panningSensibility = 30;
+cam.attachControl(canvas, true);
+let EXT = 9;
+const applyOrtho = () => { cam.orthoLeft=-EXT; cam.orthoRight=EXT; cam.orthoTop=EXT*(canvas.height/canvas.width); cam.orthoBottom=-EXT*(canvas.height/canvas.width); };
+applyOrtho();
+canvas.addEventListener('wheel', e => { EXT = Math.max(3, Math.min(24, EXT + Math.sign(e.deltaY))); applyOrtho(); e.preventDefault(); }, { passive:false });
+
+// ---- invisible pick plane at floor (y=0) ----
+const pickPlane = MeshBuilder.CreateGround('pickPlane', { width: 80, height: 80 }, scene);
+pickPlane.position = C.clone(); pickPlane.position.y = 0; pickPlane.visibility = 0; pickPlane.isPickable = true;
+const groundXZ = () => {
+  const p = scene.pick(scene.pointerX, scene.pointerY, m => m === pickPlane);
+  return p.hit ? { x: p.pickedPoint.x, z: p.pickedPoint.z } : null;
+};
+
+// ---- marking: click two opposite corners → a wall box ----
+const markMat = new StandardMaterial('mk', scene);
+markMat.diffuseColor = new Color3(0.2, 1, 0.3); markMat.alpha = 0.55; markMat.specularColor = new Color3(0,0,0);
+const dotMat = new StandardMaterial('dot', scene); dotMat.diffuseColor = new Color3(1,1,0.3); dotMat.specularColor=new Color3(0,0,0);
+let cornerA = null, dot = null;
+const boxes = [], meshes = [];
+const coordEl = document.getElementById('coord');
+
+scene.onPointerObservable.add(info => {
+  if (info.type === 8 /* MOVE */) {
+    const w = groundXZ();
+    if (w) coordEl.textContent = `cursor: x ${w.x.toFixed(2)}  z ${w.z.toFixed(2)}`;
+  }
+});
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;                 // left only (right = pan)
+  const w = groundXZ(); if (!w) return;
+  if (!cornerA) {
+    cornerA = w;
+    dot = MeshBuilder.CreateSphere('dot', { diameter: 0.3 }, scene);
+    dot.position = new Vector3(w.x, 0.2, w.z); dot.material = dotMat; dot.isPickable = false;
+  } else {
+    const cx = (cornerA.x + w.x) / 2, cz = (cornerA.z + w.z) / 2;
+    const ww = Math.max(0.15, Math.abs(w.x - cornerA.x)), dd = Math.max(0.15, Math.abs(w.z - cornerA.z));
+    const b = MeshBuilder.CreateBox('mk' + boxes.length, { width: ww, height: 1.6, depth: dd }, scene);
+    b.position = new Vector3(cx, 0.8, cz); b.material = markMat; b.isPickable = false;
+    meshes.push(b); boxes.push({ cx: +cx.toFixed(2), cz: +cz.toFixed(2), w: +ww.toFixed(2), d: +dd.toFixed(2) });
+    if (dot) { dot.dispose(); dot = null; }
+    cornerA = null; refreshDump();
+  }
+});
+
+function refreshDump() {
+  const el = document.getElementById('dump');
+  el.style.display = 'block';
+  el.textContent = boxes.length
+    ? boxes.map((b,i) => `wall ${i+1}: cx ${b.cx}  cz ${b.cz}  w ${b.w}  d ${b.d}`).join('\n')
+    : '(no walls marked yet)';
+}
+document.getElementById('undo').onclick  = () => { if (meshes.length){ meshes.pop().dispose(); boxes.pop(); } if (dot){dot.dispose();dot=null;cornerA=null;} refreshDump(); };
+document.getElementById('clear').onclick = () => { meshes.forEach(m=>m.dispose()); meshes.length=0; boxes.length=0; if(dot){dot.dispose();dot=null;cornerA=null;} refreshDump(); };
+document.getElementById('copy').onclick  = async () => {
+  refreshDump();
+  const text = JSON.stringify(boxes);   // compact, easy for me to parse
+  try { await navigator.clipboard.writeText(text); document.getElementById('copy').textContent = 'Copied!'; setTimeout(()=>document.getElementById('copy').textContent='Copy', 1200); }
+  catch { document.getElementById('dump').textContent = text; }   // fallback: select+copy this line
+};
+
+engine.runRenderLoop(() => scene.render());
+addEventListener('resize', () => { engine.resize(); applyOrtho(); });
+</script>
+</body>
+</html>
