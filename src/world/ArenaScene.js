@@ -16,6 +16,7 @@ import Tank from '../tank/Tank.js';
 import SentinelEnemy from './SentinelEnemy.js';
 import ChaffEnemy from './ChaffEnemy.js';
 import MortarEnemy from './MortarEnemy.js';
+import PlasmaTurret from './PlasmaTurret.js';
 import Shell from '../combat/Shell.js';
 import { GridMaterial } from '@babylonjs/materials';
 import ArenaVFX from './ArenaVFX.js';
@@ -82,6 +83,7 @@ export default class ArenaScene {
     this._corridor = zone?.corridor ?? null;
 
     this._obstacles = [];
+    this._slowZones = [];   // soft terrain (bocage hedges) that drags the tank's top speed
     this._barrelPivotBaseZ = 0.6; // updated after GLB loads to the actual trunnion position
 
     // Resolves when the player tank's async model work is done (or immediately
@@ -104,6 +106,7 @@ export default class ArenaScene {
     this._setupLockOn();
     this._setupFiring();
     this.vfx = new ArenaVFX(this.scene);
+    this.scene._arenaVfx = this.vfx;   // let enemies trigger VFX (e.g. the lurker emergence dust puff)
     this.trackMarks = new TrackMarks(this.scene);
     this._setupGameLoop();
   }
@@ -184,8 +187,9 @@ export default class ArenaScene {
       this._obstacles.push(...built.obstacles);
       for (const m of built.shadowCasters) this.shadowGen.addShadowCaster(m);
       if (built.propsReady) {
-        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters }) => {
+        this._poiReady = built.propsReady.then(({ obstacles, shadowCasters, slowZones }) => {
           this._obstacles.push(...obstacles);
+          if (slowZones) this._slowZones.push(...slowZones);
           for (const m of shadowCasters) this.shadowGen.addShadowCaster(m);
         });
       }
@@ -446,38 +450,89 @@ export default class ArenaScene {
       // Artillery support: place n mortar(s) set BACK from the squad (deeper into the
       // field, +Z away from the player's southern approach) so they lob over their own
       // line rather than standing in it.
-      const spawnMortarSupport = (cx, cz, n = 1) => {
+      const spawnMortarSupport = (cx, cz, n = 1, door = null) => {
         for (let i = 0; i < n; i++) {
           const px = cx + (Math.random() - 0.5) * 8;
           const pz = cz + 10 + Math.random() * 6;   // 10–16u deeper than the squad
-          add(new MortarEnemy(this.scene, px, pz, { bounds }), px, pz);
+          // POI mortars hide + file out a door too; road-blocker mortars stay visible.
+          const o = door ? { bounds, ambush: true, ambushRadius: 18, emerge: 'door', door, exitOrder: 5 } : { bounds };
+          add(new MortarEnemy(this.scene, px, pz, o), px, pz);
         }
       };
       // Each former single-tank spawn becomes a spider-bot pack; POI markers become
       // a heavier encounter — either 2 Sentinels or a big 8-strong spider swarm. Mid/deep
       // encounters can additionally bring a Mortar-bot: likely behind a Sentinel group
       // (artillery support), rarely behind a spider squad. The 'near' on-ramp stays gentle.
-      for (const e of this.zone.enemies) {
+      //
+      // GUARANTEE — the player MEETS the heavies every leg. Force one marker to field a
+      // Sentinel pair, and one mid/deep marker to bring a Mortar, regardless of the rolls:
+      // a spider pack is reliably traded for a Sentinel group, and another for a Mortar.
+      const markers  = this.zone.enemies;
+      const heavyIdx = markers.map((e, i) => (e.band !== 'near' ? i : -1)).filter(i => i >= 0);
+      const poiIdx   = markers.map((e, i) => (e.poi ? i : -1)).filter(i => i >= 0);
+      const pickRand = (arr) => (arr.length ? arr[Math.floor(Math.random() * arr.length)] : -1);
+      // Sentinel: prefer a POI (a heavier set-piece reads right), else the deepest marker.
+      const forceSentinelIdx = poiIdx.length ? pickRand(poiIdx)
+        : (heavyIdx.length ? heavyIdx[heavyIdx.length - 1] : markers.length - 1);
+      // Mortar: a mid/deep marker, ideally a different spot than the forced Sentinel.
+      const mortarPool = heavyIdx.filter(i => i !== forceSentinelIdx);
+      const forceMortarIdx = pickRand(mortarPool.length ? mortarPool : heavyIdx);
+
+      markers.forEach((e, idx) => {
         const t = tuning[e.band] || tuning.mid;
         const escalated = e.band !== 'near';   // gate artillery to mid/deep depth
-        if (e.poi) {
-          if (Math.random() < 0.5) {
+        const mustSentinel = idx === forceSentinelIdx;
+        const mustMortar   = idx === forceMortarIdx;
+        if (e.poi && e.turret) {
+          // Live cannon: a static, destructible PlasmaTurret that charges + beams down its locked
+          // lane (the road). Tanky + heavy + slow vs a normal bot — the stronghold's outer gun.
+          // hp/damage/stun use PlasmaTurret's own defaults (≈5 shots to kill, heavy stunning beam) so
+          // the skill-check feel is identical to the dev arena; only the fire cadence is band-tuned.
+          add(new PlasmaTurret(this.scene, e.x, e.z, {
+            bounds, cooldown: t.cooldown * 1.25,
+          }), e.x, e.z);
+        }
+        if (e.poi && e.guards && e.guards.length) {
+          // Intentional POI encounter: spawn one unit per authored guard slot.
+          //  • lurkers  → spider-bots in AMBUSH (tight radius) AT a building → "burst from building"
+          //  • sentries → posted guards (IDLE hold, engage on approach); Sentinels on the forced
+          //    POI (or a roll) so the heavies still show, else spider-bots. Mortar set back as usual.
+          // EVERY POI enemy is hidden INSIDE a building (all POIs are a known danger — no visible-
+          // guard tell), then DRIVES OUT the front door in single file (g.door = outward normal,
+          // g.exitOrder = queue position) when the player nears. Sentinels file out too.
+          const sentinelSentries = mustSentinel || Math.random() < 0.4;
+          for (const g of e.guards) {
+            const o = { bounds, ambush: true, ambushRadius: 16, emerge: 'door', door: g.door, exitOrder: g.exitOrder };
+            if (g.role !== 'lurker' && sentinelSentries) {
+              add(new SentinelEnemy(this.scene, g.x, g.z, { hp: t.hp, damage: t.dmg, cooldown: t.cooldown, ...o }), g.x, g.z);
+            } else {
+              add(new ChaffEnemy(this.scene, g.x, g.z, o), g.x, g.z);
+            }
+          }
+          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1, e.guards[0]?.door);
+        } else if (e.poi) {
+          // fallback (POI without an authored guard plan): the old scatter behaviour
+          if (mustSentinel || Math.random() < 0.5) {
             spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
-            if (escalated && Math.random() < MORTAR_SUPPORT_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+            if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
           } else {
             spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 3));   // 3–5 spider bots (5 max)
-            if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+            if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
           }
+        } else if (mustSentinel) {
+          // a roadside/patrol pack traded for a Sentinel pair so one shows up every leg
+          spawnSentinels(e.x, e.z, 2, t, e.mode === 'ambush');
+          if (mustMortar || (escalated && Math.random() < MORTAR_SUPPORT_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         } else if (e.mode === 'patrol') {
           // §③: roaming pack — shared route if authored, else per-unit area wander.
           const patrol = e.route ? { route: e.route, loop: e.loop } : { leash: e.leash };
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2), patrol);
-          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         } else {
           spawnChaff(e.x, e.z, 3 + Math.floor(Math.random() * 2));   // 3–4 spider bots
-          if (escalated && Math.random() < MORTAR_SQUAD_CHANCE) spawnMortarSupport(e.x, e.z, 1);
+          if (mustMortar || (escalated && Math.random() < MORTAR_SQUAD_CHANCE)) spawnMortarSupport(e.x, e.z, 1);
         }
-      }
+      });
       // Any explicitly-seeded chaff from the zone config.
       for (const c of (this.zone.chaff ?? [])) add(new ChaffEnemy(this.scene, c.x, c.z, { bounds }), c.x, c.z);
       // The loading screen waits for the player AND the composed enemies.
@@ -488,7 +543,7 @@ export default class ArenaScene {
       this.enemies = [];
       this._spawnDefs = [];
       this._devBounds = bounds;
-      this._spawnDevSet({ chaff: 6, sentinel: 1, mortar: 2 });   // sensible default mix
+      this._spawnDevSet({});   // start EMPTY — pick the mix/count yourself from the dev menu
       this._buildDevSpawnMenu();
     }
 
@@ -837,7 +892,7 @@ export default class ArenaScene {
     }
     let nearest = null, bestDist = Infinity;
     for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy.alive || enemy._hidden) continue;   // can't lock onto a unit still hidden inside a building
       const d = Math.hypot(enemy.position.x - cx, enemy.position.z - cz);
       if (d < bestDist) { bestDist = d; nearest = enemy; }
     }
@@ -869,6 +924,20 @@ export default class ArenaScene {
         t.root.position.x += overlapX * Math.sign(dx);
       } else {
         t.root.position.z += overlapZ * Math.sign(dz);
+      }
+    }
+  }
+
+  // Bocage hedges are soft cover: drive through them and they drag your top speed (you don't
+  // stop, you just slow). While inside a hedge zone, ease the tank's speed down toward a cap.
+  _checkSlowZones() {
+    if (!this.tank.alive || !this._slowZones.length) return;
+    const t = this.tank, CAP = 11;   // ~70% of cruise — a slight drag through the brush, never a wall
+    for (const z of this._slowZones) {
+      if (Math.abs(t.position.x - z.position.x) < z.halfW && Math.abs(t.position.z - z.position.z) < z.halfD) {
+        const sp = Math.abs(t.speed);
+        if (sp > CAP) t.speed = Math.max(CAP, sp * 0.9) * Math.sign(t.speed);
+        return;   // one zone is enough
       }
     }
   }
@@ -968,6 +1037,7 @@ export default class ArenaScene {
       this._checkHazards(dt);
       this._checkCollisions();
       this._checkObstacleCollisions();
+      this._checkSlowZones();
       const _cdBefore = this._fireCooldown;
       this._fireCooldown = Math.max(0, this._fireCooldown - dt);
       if (_cdBefore > 0 && this._fireCooldown === 0) audio.play('tank.reload', { emitter: this.tank.root }); // cannon ready
@@ -1321,7 +1391,7 @@ export default class ArenaScene {
     const t = this.tank;
     const pBox = { cx: t.position.x, cz: t.position.z, hw: t.halfW, hd: t.halfD, rot: t.rotY };
     for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy.alive || enemy._hidden) continue;   // hidden bots are intangible until they emerge
       const eBox = { cx: enemy.position.x, cz: enemy.position.z, hw: enemy.halfW, hd: enemy.halfD, rot: enemy.rotY };
       const hit = this._obbOverlap(eBox, pBox);   // normal points enemy → player
       if (!hit) continue;
@@ -1550,6 +1620,7 @@ export default class ArenaScene {
   }
 
   _shoot() {
+    if (!this.tank.alive || this.tank.isStunned) return;   // can't fire while frozen by a stun
     const shell = this.shells.find(s => !s.active);
     if (!shell) return;
 
@@ -1590,14 +1661,15 @@ export default class ArenaScene {
   _spawnDevSet(counts, replace = true) {
     if (replace) this._clearEnemies();
     const bounds = this._devBounds ?? 48;
-    const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy };
-    const rows = [['sentinel', counts.sentinel | 0, 40], ['mortar', counts.mortar | 0, 30], ['chaff', counts.chaff | 0, 20]];
+    const ctor = { chaff: ChaffEnemy, sentinel: SentinelEnemy, mortar: MortarEnemy, turret: PlasmaTurret };
+    const extra = { turret: { selfBase: true, faceAngle: Math.PI } };   // the turret builds its own base in the dev arena
+    const rows = [['turret', counts.turret | 0, 22], ['sentinel', counts.sentinel | 0, 32], ['mortar', counts.mortar | 0, 26], ['chaff', counts.chaff | 0, 18]];
     for (const [type, n, baseZ] of rows) {
       for (let i = 0; i < n; i++) {
         const spread = n === 1 ? 0 : (i / (n - 1) - 0.5);
         const x = spread * Math.min(40, 8 + n * 4);
         const z = baseZ + (i % 2) * 4;
-        const e = new ctor[type](this.scene, x, z, { bounds });
+        const e = new ctor[type](this.scene, x, z, { bounds, ...(extra[type] || {}) });
         e.addShadows?.(this.shadowGen);
         this.enemies.push(e);
         this._spawnDefs.push([x, z]);
@@ -1620,14 +1692,14 @@ export default class ArenaScene {
 
   _buildDevSpawnMenu() {
     document.getElementById('dev-spawn-menu')?.remove();
-    const counts = { chaff: 6, sentinel: 1, mortar: 2 };
+    const counts = { turret: 0, chaff: 0, sentinel: 0, mortar: 0 };
     const bs = 'background:#15303a;color:#bfe;border:1px solid #2a6;border-radius:3px;padding:3px 8px;cursor:pointer;font:inherit;font-size:11px;';
     const el = document.createElement('div');
     el.id = 'dev-spawn-menu';
     el.style.cssText = 'position:fixed;top:64px;right:12px;z-index:50;background:rgba(8,14,20,0.92);' +
       'border:1px solid #2a6;border-radius:6px;padding:10px 12px;font-family:inherit;color:#cfe;' +
       'font-size:12px;min-width:178px;box-shadow:0 4px 18px rgba(0,0,0,0.55);';
-    const types = [['chaff', 'CHAFF'], ['sentinel', 'SENTINEL'], ['mortar', 'MORTAR']];
+    const types = [['turret', 'TURRET'], ['chaff', 'CHAFF'], ['sentinel', 'SENTINEL'], ['mortar', 'MORTAR']];
     el.innerHTML = '<div style="color:#6fd;letter-spacing:1px;margin-bottom:8px;">DEV · SPAWN</div>';
     for (const [key, label] of types) {
       const row = document.createElement('div');
@@ -1698,7 +1770,10 @@ export default class ArenaScene {
           shell.deactivate();
           // Parry: any attack absorbed by the active bubble stuns its source.
           // Works for Shell / EyeBeam / LaserBolt alike — all share enemy.shells.
+          // An UNBLOCKED stunning hit (turret beam, enemy.hitStun) freezes the PLAYER
+          // instead — devastating, and the reason you must dodge or parry the beam.
           if (this.tank.shield?.active) enemy.stun?.(SHIELD_STUN_DURATION);
+          else if (enemy.hitStun) this.tank.stun(enemy.hitStun);
           this.tank.takeDamage(enemy.shellDamage ?? 34);   // mitigation auto-applied while shielded
           this._triggerShake(0.18, 0.55);
           if (!this.tank.alive) this._showDeath();
@@ -1718,7 +1793,9 @@ export default class ArenaScene {
         const dx = shell.position.x - enemy.position.x;
         const dz = shell.position.z - enemy.position.z;
         // Near-miss: a shot streaking past gives the player away (no break — one shell can pass several).
+        // This still fires for HIDDEN bots, so shooting a building flushes its garrison out (shoot-to-activate).
         if (dx * dx + dz * dz < SHELL_ALERT_R2) enemy.alert?.();
+        if (enemy._hidden) continue;                              // intangible while hidden inside — no hit until it emerges
         if (Math.abs(dx) < enemy.halfW && Math.abs(dz) < enemy.halfD) {
           const speed      = Math.hypot(shell.vx, shell.vz);
           const perpDist   = speed > 0 ? Math.abs(dx * shell.vz - dz * shell.vx) / speed : 999;
@@ -1730,10 +1807,16 @@ export default class ArenaScene {
           this._alertPack(enemy);   // drawing blood turns the whole nearby squad on you
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
           music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
-          if (!enemy.alive && this.lockedEnemy === enemy) {
-            this._prevLockedEnemy = enemy;
-            this._fadeOutTime     = 0;
-            this.lockedEnemy      = null;
+          if (!enemy.alive) {
+            if (enemy._deathBurstR) {   // big explosion → then it sits dark (the turret's death)
+              this.vfx.spawnPlasmaBurst(enemy.position.clone(), enemy._deathBurstR);
+              this._triggerShake(0.3, 0.85);
+            }
+            if (this.lockedEnemy === enemy) {
+              this._prevLockedEnemy = enemy;
+              this._fadeOutTime     = 0;
+              this.lockedEnemy      = null;
+            }
           }
           break;
         }

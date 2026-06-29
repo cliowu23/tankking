@@ -28,7 +28,8 @@ function place(ctx, rand, opts = {}) {
   const d = dirAt(pts, anchorIdx);
   const side = rand() < 0.5 ? 1 : -1;
   const px = -d.z * side, pz = d.x * side;                 // unit perpendicular, off-road
-  const cx = p.x + px * o.offset, cz = p.z + pz * o.offset; // patch centre, beside the road
+  const off = o.offset + (o.offsetBonus || 0);             // leg may push it farther out (varied distance)
+  const cx = p.x + px * off, cz = p.z + pz * off;          // patch centre, beside the road
 
   const props = [];
   for (let i = 0; i < o.trees; i++) {

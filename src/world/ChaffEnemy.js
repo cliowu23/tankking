@@ -55,7 +55,7 @@ export default class ChaffEnemy extends AIEnemy {
       damage: 4,         // CHIP per laser bolt (pure background tick; the Mortar carries the spike)
       aiSpeed: 9,        // fast
       optimalRange: 9,   // RUSHER: gets in your face
-      aggroRange: 35,    // ≈ tank-to-top-of-screen on desktop: an engagement only STARTS
+      aggroRange: 24,    // tighter than screen-edge so packs don't wake off-screen (shooting still wakes them); an engagement only STARTS
                          // once the scout is on-screen — no sniping you from beyond view.
                          // Once aggro'd it commits, closing + firing the whole way in.
       cooldown: LASER_INTERVAL,
@@ -70,6 +70,7 @@ export default class ChaffEnemy extends AIEnemy {
     this._tipOffset    = 0.12;         // bolt spawn just ahead of the eye lens
     this._eyeFlash     = 0;            // 0..1, brightens the eye briefly on each shot
     this._gaitPhase = 0; this._gaitSpeed = 0; this._legs = [];
+    this._emergePuffed = false;   // one-shot dust puff when it claws up (AIEnemy buries/raises via root.y)
 
     // Replace the inherited 4-shell cannon pool with a laser-bolt pool.
     for (const s of this.shells) s.deactivate?.();
@@ -322,7 +323,9 @@ export default class ChaffEnemy extends AIEnemy {
   // diagonal pairs in antiphase, plus a small body bob. Eases to a still stance
   // when stopped so a stationary bot doesn't twitch.
   _animateLegs(dt) {
-    const moving = Math.abs(this.speed);
+    // Burrow-EMERGE forces a fast scramble (legs flail as it claws up); a door-exit just walks
+    // out (gait follows its drive speed), as does everything else.
+    const moving = (this.state === 'EMERGE' && this._emergeStyle !== 'door') ? 9 : Math.abs(this.speed);
     this._gaitSpeed += (moving - this._gaitSpeed) * Math.min(1, dt * 8);
     this._gaitPhase += this._gaitSpeed * GAIT_FREQ * dt;
     const amp = Math.min(1, this._gaitSpeed / 4);
@@ -349,6 +352,18 @@ export default class ChaffEnemy extends AIEnemy {
     }
   }
 
+  // Claw-up reveal (EMERGE): AIEnemy rises the unit out of the ground via root.y; the chaff adds a
+  // one-shot dust puff at the surface and a leg scramble (the scramble is driven by _animateLegs
+  // reading state === 'EMERGE').
+  _emergeVisual(t) {
+    super._emergeVisual(t);
+    if (!this._emergePuffed) {
+      this._emergePuffed = true;
+      this.scene._arenaVfx?.spawnNormalImpact?.(new Vector3(this.root.position.x, 0.15, this.root.position.z));
+      audio.play('enemy.chaff_step', { emitter: this.root });
+    }
+  }
+
   _deathVisuals() {
     audio.play('enemy.chaff_death', { emitter: this.root });
     if (this._tint) for (const n of this._tint) n.instancedBuffers.color.set(0.18, 0.18, 0.20, 1);
@@ -368,5 +383,6 @@ export default class ChaffEnemy extends AIEnemy {
       this.legMat?.diffuseColor.set(...LEG_DARK);
     }
     if (this.eyeMat) this.eyeMat.emissiveColor.set(...EYE_RED);
+    this._emergePuffed = false;   // AIEnemy.reset re-buries via root.y; just rearm the puff
   }
 }
