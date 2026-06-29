@@ -486,8 +486,10 @@ export default class ArenaScene {
         if (e.poi && e.turret) {
           // Live cannon: a static, destructible PlasmaTurret that charges + beams down its locked
           // lane (the road). Tanky + heavy + slow vs a normal bot — the stronghold's outer gun.
+          // hp/damage/stun use PlasmaTurret's own defaults (≈5 shots to kill, heavy stunning beam) so
+          // the skill-check feel is identical to the dev arena; only the fire cadence is band-tuned.
           add(new PlasmaTurret(this.scene, e.x, e.z, {
-            bounds, hp: Math.round(t.hp * 2.4), damage: Math.round(t.dmg * 1.7), cooldown: t.cooldown * 1.25,
+            bounds, cooldown: t.cooldown * 1.25,
           }), e.x, e.z);
         }
         if (e.poi && e.guards && e.guards.length) {
@@ -1618,6 +1620,7 @@ export default class ArenaScene {
   }
 
   _shoot() {
+    if (!this.tank.alive || this.tank.isStunned) return;   // can't fire while frozen by a stun
     const shell = this.shells.find(s => !s.active);
     if (!shell) return;
 
@@ -1767,7 +1770,10 @@ export default class ArenaScene {
           shell.deactivate();
           // Parry: any attack absorbed by the active bubble stuns its source.
           // Works for Shell / EyeBeam / LaserBolt alike — all share enemy.shells.
+          // An UNBLOCKED stunning hit (turret beam, enemy.hitStun) freezes the PLAYER
+          // instead — devastating, and the reason you must dodge or parry the beam.
           if (this.tank.shield?.active) enemy.stun?.(SHIELD_STUN_DURATION);
+          else if (enemy.hitStun) this.tank.stun(enemy.hitStun);
           this.tank.takeDamage(enemy.shellDamage ?? 34);   // mitigation auto-applied while shielded
           this._triggerShake(0.18, 0.55);
           if (!this.tank.alive) this._showDeath();
@@ -1801,10 +1807,16 @@ export default class ArenaScene {
           this._alertPack(enemy);   // drawing blood turns the whole nearby squad on you
           this._triggerShake(isCritical ? 0.12 : 0.06, isCritical ? 0.4 : 0.15);
           music[isCritical ? 'playHitCrit' : 'playHitmark'](); // hitmarker feedback
-          if (!enemy.alive && this.lockedEnemy === enemy) {
-            this._prevLockedEnemy = enemy;
-            this._fadeOutTime     = 0;
-            this.lockedEnemy      = null;
+          if (!enemy.alive) {
+            if (enemy._deathBurstR) {   // big explosion → then it sits dark (the turret's death)
+              this.vfx.spawnPlasmaBurst(enemy.position.clone(), enemy._deathBurstR);
+              this._triggerShake(0.3, 0.85);
+            }
+            if (this.lockedEnemy === enemy) {
+              this._prevLockedEnemy = enemy;
+              this._fadeOutTime     = 0;
+              this.lockedEnemy      = null;
+            }
           }
           break;
         }

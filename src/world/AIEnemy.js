@@ -471,7 +471,10 @@ export default class AIEnemy {
     // --- Fire ---
     this.fireCooldown -= dt;
     if (this._shouldFire() && this.fireCooldown <= 0) {
-      const aimDiff = Math.abs(shortAngle(this.turretAimAngle, angleToPlayer));
+      // Compare against where the gun is STEERING (the led point for leaders), not the raw
+      // player angle — otherwise a leading turret's aim-ahead would read as "not on target".
+      const aimRef  = this._aimTargetAngle != null ? this._aimTargetAngle : angleToPlayer;
+      const aimDiff = Math.abs(shortAngle(this.turretAimAngle, aimRef));
       if (aimDiff < this._aimTolerance) {
         this._fire();
       }
@@ -548,6 +551,10 @@ export default class AIEnemy {
     this.root.setEnabled(true);
   }
 
+  // Point the gun aims at. Base = the player's current position; subclasses override to
+  // LEAD a moving target (predict where it'll be when the shot arrives). Returns {x,y,z}.
+  _aimTarget(playerPos) { return playerPos; }
+
   _updateTurret(dt, playerPos) {
     // Fixed-aim emplacements (dug-in turrets) never track — the gun covers one locked lane.
     if (this._fixedAimAngle != null) { this.turretAimAngle = this._fixedAimAngle; return; }
@@ -558,10 +565,12 @@ export default class AIEnemy {
     if (this.state === 'PATROL') {
       targetAim = this.rotY;
     } else {
-      const dx  = playerPos.x - this.root.position.x;
-      const dz  = playerPos.z - this.root.position.z;
+      const aim = this._aimTarget(playerPos);                 // subclasses may LEAD a moving target
+      const dx  = aim.x - this.root.position.x;
+      const dz  = aim.z - this.root.position.z;
       targetAim = Math.atan2(dx, dz);
     }
+    this._aimTargetAngle = targetAim;   // what the gun is steering toward (the LED point for leaders)
     const diff      = shortAngle(this.turretAimAngle, targetAim);
     const maxTurn   = this._turretSpeed * dt;
     this.turretAimAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);

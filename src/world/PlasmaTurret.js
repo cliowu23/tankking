@@ -19,6 +19,14 @@ const CHARGE_TIME = 1.6;   // slow, heavy wind-up (vs the Sentinel's 1.1) — a 
 const BEAM_SPEED  = 72;
 const BEAM_RANGE  = 64;
 const POOL        = 3;
+const STUN_SECONDS  = 1.4;   // player freeze on a clean beam hit — the punish for not dodging/parrying
+const LEAD_MAX      = 12;    // cap on how far ahead of a moving player the gun leads (u)
+const DEATH_BURST_R = 5.5;   // explosion radius when it dies
+const TELEGRAPH     = 0.4;   // final pre-fire window: aim LOCKS + glow flares + 2-stage beep — the dodge cue
+// 2-stage warning beep (reuses the sentinel/mortar charge tone — that lower pitch, kept low):
+const BEEP1_RATE    = 1.0;   // stage 1 (telegraph start): the normal low tone
+const BEEP2_RATE    = 1.25;  // stage 2 (just before fire): a touch higher = "NOW", still in the low family
+const BEEP2_LEAD    = 0.14;  // how long before the shot the stage-2 tick fires
 const SCREEN_MARGIN = 0.02;
 const GUN_FILE  = 'turret-gun.glb';
 const BASE_FILE = 'turret-bunker.glb';
@@ -31,8 +39,10 @@ export default class PlasmaTurret extends AIEnemy {
       static: true,                       // dug in — the body never moves (gun stays on the base)
       aggroRange: opts.aggroRange ?? 40,  // engage as you near the stronghold
     });
-    this.hp = this.maxHp = opts.hp ?? 240;          // tanky emplacement — real fire to crack it
+    this.hp = this.maxHp = opts.hp ?? 170;          // ~5 clean shots to crack (34 dmg ea; ~3-4 with crits)
     this.shellDamage = opts.damage ?? 60;           // heavy plasma hit
+    this.hitStun     = opts.hitStun ?? STUN_SECONDS; // a connecting beam STUNS the player (ArenaScene applies)
+    this._deathBurstR = DEATH_BURST_R;               // ArenaScene fires the explosion on death
     this._fireCooldownDuration = opts.cooldown ?? 2.6;
     this._aimTolerance = 0.14;                       // ~8° — fires once the gun is roughly on the player
     this._turretSpeed = 1.6;                         // SLOW heavy yaw (rad/s) — a turret you can outrun
@@ -44,6 +54,9 @@ export default class PlasmaTurret extends AIEnemy {
     this._chargeT  = 0;
     this._flash    = 0;
     this.turretPivot.position.set(0, 0, 0);          // gun carries its own height; pivot at the bunker axis
+    this._bodyMeshes = [];                            // gun + base meshes — swapped to a dead material on death
+    this._pvx = 0; this._pvz = 0; this._prevP = null; // smoothed player velocity, for leading the shot
+    this.hpBarBg.position.y = this.hpBarFill.position.y = 3.6;  // float the bar above the tall bunker+gun
     this._buildChargeGlow(scene);
     // selfBase = also build the static armoured BASE (for the Dev Arena, where there's no POI prop).
     // As a road POI the base is the POI prop, so the enemy only needs the gun.
@@ -89,6 +102,7 @@ export default class PlasmaTurret extends AIEnemy {
       const rgb = c ? [c.r, c.g, c.b] : [0.4, 0.4, 0.4];
       m.material = this._gunMat(scene, rgb);
       m.isPickable = false;
+      this._bodyMeshes.push(m);                        // for the death darken (swap, not mutate shared mats)
       if (/bore/i.test(m.name)) this._boreMesh = m;   // the real muzzle disk — the glow/beam snap to it
       if (!root) m.parent = parent;
     }
@@ -114,20 +128,79 @@ export default class PlasmaTurret extends AIEnemy {
   _fire() {
     if (this._charging || !this._onScreen()) return;
     this._charging = true; this._chargeT = 0;
+    this._telegraphed = false; this._beep2 = false; this._lockedAim = null;   // fresh charge: not committed yet
     this.fireCooldown = 999;
     audio.play('enemy.sentinel_beam_charge', { emitter: this.root });
   }
 
   update(dt, playerPos) {
+    this._trackVel(dt, playerPos);     // smooth the player's velocity for leading
     super.update(dt, playerPos);       // tracks the player (turretPivot yaw) + runs the base fire gate
     if (!this.alive) { if (this._glow) this._glow.setEnabled(false); return; }
     this._updateCharge(dt);
     this._updateGlow(dt);
   }
 
+  _trackVel(dt, p) {
+    if (this._prevP && dt > 0) {
+      const vx = (p.x - this._prevP.x) / dt, vz = (p.z - this._prevP.z) / dt;
+      const a = 1 - Math.exp(-6 * dt);                 // low-pass so a single jitter frame can't swing the lead
+      this._pvx += (vx - this._pvx) * a;
+      this._pvz += (vz - this._pvz) * a;
+    }
+    this._prevP = { x: p.x, z: p.z };
+  }
+
+  // LEAD the shot: aim where the player will be when the beam ARRIVES (travel time = dist / speed),
+  // using smoothed velocity and capped. Hold a straight line and you get clipped; juke as it fires
+  // (charge glow near full) and the beam streaks through empty grass — the timing dodge.
+  _aimTarget(p) {
+    // Telegraph: hold the committed line (a far point along the locked angle) so dodging works.
+    if (this._lockedAim != null) {
+      return { x: this.root.position.x + Math.sin(this._lockedAim) * 100, y: p.y,
+               z: this.root.position.z + Math.cos(this._lockedAim) * 100 };
+    }
+    const dx = p.x - this.root.position.x, dz = p.z - this.root.position.z;
+    const lead = Math.hypot(dx, dz) / BEAM_SPEED;
+    let lx = this._pvx * lead, lz = this._pvz * lead;
+    const ld = Math.hypot(lx, lz);
+    if (ld > LEAD_MAX) { lx = lx / ld * LEAD_MAX; lz = lz / ld * LEAD_MAX; }
+    return { x: p.x + lx, y: p.y, z: p.z + lz };
+  }
+
+  // Death look: big explosion is spawned by ArenaScene (via _deathBurstR); here we just turn the
+  // machine DARK (placeholder dead-metal), swapping each body mesh to a shared dead material so we
+  // never mutate the cached propflat mats shared with other props. Kills the charge + glow too.
+  _deathVisuals() {
+    let dead = this.scene.getMaterialByName('turretDeadMat');
+    if (!dead) {
+      dead = new StandardMaterial('turretDeadMat', this.scene);
+      dead.diffuseColor  = new Color3(0.09, 0.07, 0.07);
+      dead.specularColor = new Color3(0.02, 0.02, 0.02);
+      dead.emissiveColor = new Color3(0.02, 0.006, 0.006);
+    }
+    for (const m of this._bodyMeshes) m.material = dead;
+    this._charging = false;
+    if (this._glow) this._glow.setEnabled(false);
+  }
+
   _updateCharge(dt) {
     if (!this._charging) return;
     this._chargeT += dt;
+    // Final telegraph (last TELEGRAPH s): COMMIT the aim (stop leading) + flare + 2-stage beep.
+    // The locked line + flare (see _updateGlow) is the "dodge NOW" window — break your vector and you
+    // clear the beam; the gun no longer follows you.
+    // Stage 1 — lock + flare start + first (low) warning beep.
+    if (!this._telegraphed && this._chargeT >= CHARGE_TIME - TELEGRAPH) {
+      this._telegraphed = true;
+      this._lockedAim = this.turretAimAngle;
+      audio.play('enemy.sentinel_beam_charge', { emitter: this.root, rate: BEEP1_RATE });
+    }
+    // Stage 2 — the final "fire now" tick a beat before the beam.
+    if (!this._beep2 && this._chargeT >= CHARGE_TIME - BEEP2_LEAD) {
+      this._beep2 = true;
+      audio.play('enemy.sentinel_beam_charge', { emitter: this.root, rate: BEEP2_RATE });
+    }
     if (this._chargeT >= CHARGE_TIME) this._release();
   }
 
@@ -143,6 +216,7 @@ export default class PlasmaTurret extends AIEnemy {
 
   _release() {
     this._charging = false; this._chargeT = 0;
+    this._lockedAim = null; this._telegraphed = false; this._beep2 = false;   // resume tracking/leading next charge
     if (!this._cannonMesh) return;   // gun not loaded yet
     const mz = this._muzzle();
     const beam = this.shells.find(s => !s.active);
@@ -173,7 +247,13 @@ export default class PlasmaTurret extends AIEnemy {
       this._glow.setEnabled(true);
       this._glow.setAbsolutePosition(this._muzzle().pos);            // snap to the real muzzle disk
       const t = this._charging ? Math.min(1, this._chargeT / CHARGE_TIME) : 0;
-      this._glow.scaling.setAll(0.3 + t * 1.0 + this._flash * 0.9);
+      let scale = 0.3 + t * 1.0 + this._flash * 0.9;
+      // Telegraph FLARE: the core swells hard over the final window — the visual "dodge now" cue.
+      if (this._charging && this._chargeT >= CHARGE_TIME - TELEGRAPH) {
+        const tg = Math.min(1, (this._chargeT - (CHARGE_TIME - TELEGRAPH)) / TELEGRAPH);   // 0 → 1 across it
+        scale += tg * 1.9;
+      }
+      this._glow.scaling.setAll(scale);
     } else {
       this._glow.setEnabled(false);
     }

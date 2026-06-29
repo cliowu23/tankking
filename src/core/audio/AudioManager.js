@@ -125,6 +125,7 @@ class AudioManager {
     // play() and the sound went mute. Each step is isolated; play() always runs.
     try {
       if (def.pitchVar) snd.playbackRate = 1 + (Math.random() * 2 - 1) * def.pitchVar;
+      if (opts.rate) snd.playbackRate = opts.rate;   // explicit pitch (e.g. a higher-pitched warning beep)
       if (def.spatial && opts.emitter && snd.spatial && typeof snd.spatial.attach === 'function') {
         snd.spatial.attach(opts.emitter);
       }

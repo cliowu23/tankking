@@ -62,6 +62,10 @@ export default class Tank {
     this.hp               = 340;
     this.alive            = true;
 
+    this._stunTimer       = 0;    // > 0 while stunned (frozen + white-blinking) by a heavy hit
+    this._stunBlinkT      = 0;
+    this._stunBlinkOn     = false;
+
     this.bounds           = 48;   // playable half-extent; zones override (e.g. World 1 = 140)
     this.spawnX           = x;    // reset() returns here, not to a hardcoded origin
     this.spawnZ           = z;
@@ -99,9 +103,12 @@ export default class Tank {
     turretMat.diffuseColor  = new Color3(0.08, 0.32, 0.75);
     turretMat.specularColor = new Color3(0.03, 0.10, 0.25);
 
+    const turretMat_ = turretMat;
     const trackMat = new StandardMaterial('tankTrack', scene);
     trackMat.diffuseColor  = new Color3(0.12, 0.12, 0.12);
     trackMat.specularColor = new Color3(0.04, 0.04, 0.04);
+    // Materials the stun white-flash drives (emissive → white). Kept for stun()/_stunBlink.
+    this._flashMats = [this.hullMat, turretMat_, trackMat];
 
     // Animated tread texture — scrolled each frame by ArenaScene update loop
     this.treadTex = new DynamicTexture('tread', { width: 16, height: 128 }, scene);
@@ -280,6 +287,35 @@ export default class Tank {
     if (this.hp <= 0) this._die();
   }
 
+  get isStunned() { return this._stunTimer > 0; }
+
+  // Heavy hit → frozen + white-blinking for `seconds`. Controls are locked while stunned
+  // (see update), which is what makes a connecting turret beam devastating. Stacks longest.
+  stun(seconds) {
+    if (!this.alive || seconds <= 0) return;
+    this._stunTimer   = Math.max(this._stunTimer, seconds);
+    this._stunBlinkT  = 0;
+    this._stunBlinkOn = false;
+    this.dashTimeLeft = 0;   // any active dodge-boost is killed
+    audio.play('tank.hit_heavy');
+  }
+
+  // Fast white blink across the tank's materials (cadence matches the enemy stun tell).
+  _stunBlink(dt) {
+    this._stunBlinkT -= dt;
+    if (this._stunBlinkT <= 0) {
+      this._stunBlinkOn = !this._stunBlinkOn;
+      this._stunBlinkT  = 0.08;
+      const v = this._stunBlinkOn ? 1 : 0;
+      for (const m of this._flashMats) m.emissiveColor.set(v, v, v);
+    }
+  }
+
+  _stunEnd() {
+    this._stunTimer = 0;
+    for (const m of this._flashMats) m.emissiveColor.set(0, 0, 0);
+  }
+
   _die() {
     this.alive = false;
     this.speed = 0;
@@ -308,6 +344,8 @@ export default class Tank {
     this.root.rotation.y = 0;
     this.hullMat.diffuseColor  = new Color3(0.12, 0.42, 0.88);
     this.hullMat.emissiveColor = new Color3(0, 0, 0);
+    this._stunTimer = 0;
+    if (this._flashMats) for (const m of this._flashMats) m.emissiveColor.set(0, 0, 0);
   }
 
   // Fuel lives in the energy state machine; expose it read-only for HUD/low-fuel/shield.
@@ -319,6 +357,15 @@ export default class Tank {
 
   update(dt) {
     if (!this.alive) return;
+
+    // --- Stun: freeze all controls for this frame + run the white blink ---
+    if (this._stunTimer > 0) {
+      this._stunTimer -= dt;
+      this._stunBlink(dt);
+      this.keys.w = this.keys.s = this.keys.a = this.keys.d = this.keys.shift = this.keys.q = false;
+      this._qPressed = false; this._justPressedShift = false;
+      if (this._stunTimer <= 0) this._stunEnd();   // restore emissive when it wears off
+    }
 
     let energySpent = 0;   // fuel burned this frame (shield + boost); applied via stepEnergy below
 
